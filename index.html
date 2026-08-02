@@ -8,8 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@300;420;450;500;520;550&family=JetBrains+Mono:wght@400;450;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css?v=3">
-<link rel="stylesheet" href="css/tutorial.css">
-<link rel="stylesheet" href="css/homepage.css">
 </head>
 <body>
 
@@ -189,7 +187,41 @@
 <script src="js/playback.js"></script>
 <script src="js/ui-panels.js"></script>
 <script src="js/main.js"></script>
-<script src="js/tutorial.js"></script>
+<script>
+// Load real demo media files
+window.addEventListener('DOMContentLoaded', async () => {
+  const statusHint = document.getElementById('status-hint');
+  const mediaFiles = [
+    { path: 'media/无人机操作.mp4', type: 'video' },
+    { path: 'media/无人机飞行.mp4', type: 'video' },
+    { path: 'media/海滩.mp4', type: 'video' },
+    { path: 'media/Minstrel.mp3', type: 'audio' },
+  ];
+
+  if (statusHint) statusHint.textContent = '加载素材中...';
+
+  for (const mf of mediaFiles) {
+    try {
+      const resp = await fetch(mf.path);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const blob = await resp.blob();
+      const filename = mf.path.replace('media/', '');
+      const file = new File([blob], filename, {
+        type: mf.type === 'video' ? 'video/mp4' : 'audio/mpeg'
+      });
+      if (mf.type === 'video') {
+        await importVideoFile(file);
+      } else {
+        await importAudioFile(file);
+      }
+    } catch (e) {
+      console.error('Failed to load media:', mf.path, e);
+    }
+  }
+
+  if (statusHint) statusHint.textContent = '共 ' + state.cards.length + ' 个素材';
+});
+</script>
 <script>
 // ================================================================
 // Automated test: Composition card playback diagnostic
