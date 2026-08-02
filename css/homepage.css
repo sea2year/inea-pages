@@ -1,0 +1,206 @@
+/* ================================================================
+   Homepage — pixel-accurate Figma "首页" design
+   All positions/colors/opacities match Figma exactly
+   All SVGs exported directly from Figma
+   ================================================================ */
+
+/* ---- Homepage ---- */
+#homepage {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #000;
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+/* ---- Inner 1280x832 container, left-aligned, vertically centered ---- */
+#homepage .hp-inner {
+  position: absolute; left: 0; top: 50%;
+  width: 1280px; height: 832px;
+  margin-top: -416px;
+  z-index: 2;
+}
+
+/* ---- Background SVG (首页-背景, fills viewport) ---- */
+#homepage .hp-bg {
+  position: absolute; inset: 0;
+  z-index: 0; pointer-events: none;
+}
+#homepage .hp-bg svg {
+  width: 100%; height: 100%;
+}
+
+/* ---- Green left rectangle wrap (stable hover target) ---- */
+#homepage .hp-left-rect-wrap {
+  position: absolute; left: 0; top: 0;
+  width: 920px; height: 800px;
+  z-index: 1;
+}
+#homepage .hp-left-rect {
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, #D4FF00 0%, #b8dd00 100%);
+  -webkit-transform-origin: center center;
+  transform-origin: center center;
+  -webkit-animation: leftRectSway 5s ease-in-out infinite;
+  animation: leftRectSway 5s ease-in-out infinite;
+  -webkit-transition: -webkit-transform 0.3s ease;
+  transition: transform 0.3s ease;
+}
+@keyframes leftRectSway {
+  0%, 100% { transform: perspective(800px) rotateY(4deg); }
+  50%      { transform: perspective(800px) rotateY(12deg); }
+}
+
+/* ---- Left nav menu (Figma: default=Light 300, hover=Bold 700) ---- */
+#homepage .hp-nav {
+  position: absolute; left: 21px; top: 110px; z-index: 3;
+  display: flex; flex-direction: column; gap: 6px;
+}
+#homepage .hp-nav button {
+  font-size: 25px; font-weight: 300; color: #000;
+  background: none; border: none; padding: 0; margin: 0;
+  font-family: var(--font-sans); text-align: left;
+  cursor: pointer;
+  transition: font-weight 0.15s;
+  text-transform: uppercase;
+}
+#homepage .hp-nav button:hover { font-weight: 700; }
+
+/* ---- Badge ---- */
+#homepage .hp-badge {
+  position: absolute; left: 21px; top: 18px;
+  font-size: 20px; font-weight: 700; color: #000;
+  z-index: 3;
+}
+
+/* ---- Green dot (播放点) ---- */
+#homepage .hp-dot {
+  position: absolute; left: 39px; top: -28px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #D4FF00; z-index: 3;
+}
+
+/* ---- Glass overlay (viewport right edge, Figma y=-28 relative to inner) ---- */
+#homepage .hp-glass {
+  position: absolute; right: 0; top: calc(50vh - 444px);
+  width: 655px; height: 912px; z-index: 1;
+  pointer-events: none;
+}
+
+/* ---- Dove wing image (viewport right edge, Figma y=80 relative to inner) ---- */
+#homepage .hp-dove {
+  position: absolute; right: 0; top: calc(50vh - 336px);
+  width: 784px; height: 183px; z-index: 5;
+  pointer-events: none;
+}
+
+/* ---- Negative white area (viewport-relative, above dove) ---- */
+#homepage .hp-negative {
+  position: absolute; left: 600px; top: calc(50vh - 222px);
+  width: 512px; height: 112px; z-index: 7;
+  background: #fff; pointer-events: none;
+  mix-blend-mode: difference;
+}
+#homepage .hp-negative::after {
+  content: '';
+  position: absolute; inset: -2px;
+  border: 2px solid #000;
+  mix-blend-mode: normal;
+}
+
+/* ---- DESIGN BY SEA ---- */
+#homepage .hp-design-by-sea {
+  position: absolute; right: 24px; top: calc(50vh - 180px);
+  font-size: 18px; color: #21201E;
+  letter-spacing: 1px; z-index: 9;
+  pointer-events: none;
+  font-family: var(--font-sans);
+}
+
+/* ---- Gradient pattern (exact Figma SVG) ---- */
+#homepage .hp-gradient-pattern {
+  position: absolute; left: 350px; top: 220px;
+  width: 1120px; height: 520px; z-index: 4;
+  pointer-events: none;
+}
+
+/* ---- Tutorial start button wrap (stable hover target) ---- */
+#homepage .hp-start-btn-wrap {
+  position: absolute; right: 0; top: calc(50vh + 53px);
+  width: 671px; height: 333px; z-index: 3;
+  -webkit-animation: btnSway 6s ease-in-out infinite;
+  animation: btnSway 6s ease-in-out infinite;
+}
+@keyframes btnSway {
+  0%, 100% { transform: perspective(600px) rotateY(-16deg); }
+  50%      { transform: perspective(600px) rotateY(-6deg); }
+}
+#homepage .hp-start-btn {
+  width: 100%; height: 100%;
+  cursor: pointer; position: relative; overflow: hidden;
+  -webkit-transition: -webkit-transform 0.3s ease;
+  transition: transform 0.3s ease;
+}
+#homepage .hp-start-btn::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(105deg,
+    transparent 45%, #FFFFFF 45%,
+    #FFFFFF 55%, transparent 55%
+  );
+  background-size: 200% 100%;
+  background-position: 200% 0;
+  background-repeat: no-repeat;
+  opacity: 0;
+}
+#homepage .hp-start-btn-wrap:hover .hp-start-btn::after {
+  opacity: 1;
+  animation: btnSweep 1s ease forwards;
+}
+@keyframes btnSweep {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -100% 0; }
+}
+#homepage .hp-start-btn-wrap:hover .hp-start-btn {
+  -webkit-transform: perspective(600px) rotateY(-20deg);
+  transform: perspective(600px) rotateY(-20deg);
+}
+#homepage .hp-start-btn-svg {
+  width: 100%; height: 100%;
+}
+
+/* ---- Time (exact Figma SVG, 首页-时间) ---- */
+#homepage .hp-time {
+  position: absolute; left: 21px; top: 660px;
+  width: 197px; height: 24px; z-index: 3;
+}
+
+/* ---- Logo ---- */
+#homepage .hp-logo {
+  position: absolute; left: 21px; top: 690px;
+  width: 270px; height: 61px; z-index: 3;
+}
+
+/* ---- English subtitle ---- */
+#homepage .hp-english {
+  position: absolute; left: 21px; top: 771px;
+  font-size: 20px; font-weight: 300; color: #000;
+  z-index: 3; letter-spacing: 0.5px;
+}
+
+/* ---- Dot patterns (recreated from Figma PATTERN fills) ---- */
+#homepage .hp-dots1 {
+  position: absolute; left: -94px; top: 353px;
+  width: 407px; height: 260px; z-index: 4;
+  pointer-events: none;
+  background-image: radial-gradient(circle, #000 1px, transparent 1px);
+  background-size: 8px 8px;
+  opacity: 0.15;
+}
+#homepage .hp-dots2 {
+  position: absolute; left: 479px; top: 758px;
+  width: 755px; height: 37px; z-index: 4;
+  pointer-events: none;
+  background-image: radial-gradient(circle, #000 1.5px, transparent 1.5px);
+  background-size: 6px 6px;
+  opacity: 0.2;
+}

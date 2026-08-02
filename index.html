@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INEA 画板 - 交互式教程</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@300;420;450;500;520;550&family=JetBrains+Mono:wght@400;450;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css?v=3">
+<link rel="stylesheet" href="css/tutorial.css">
+<link rel="stylesheet" href="css/homepage.css">
+</head>
+<body>
+
+<div id="app">
+  <!-- Toolbar (import/export pill) -->
+  <div id="toolbar">
+    <button id="btn-import-video" title="导入">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="0" x2="7" y2="14"/><line x1="0" y1="7" x2="14" y2="7"/></svg>
+    </button>
+    <div class="toolbar-spacer" style="flex:1;"></div>
+    <div id="zoom-badge">100%</div>
+    <button id="btn-export">Export</button>
+  </div>
+
+  <!-- Main row: left panel | canvas | right panel -->
+  <div id="main-row">
+    <!-- Left Panel — Layers -->
+    <div id="left-panel">
+      <div class="panel-header">
+        <span class="panel-project-name">New project 1</span>
+        <button class="panel-collapse-btn" id="panel-collapse-btn" title="收起">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3.33 6.67L0 3.33L3.33 0" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" transform="translate(4,5)"/><path d="M3.33 6.67L0 3.33L3.33 0" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" transform="translate(9,5)"/></svg>
+        </button>
+      </div>
+      <div class="panel-divider"></div>
+      <div class="panel-section-header">
+        <svg class="layers-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <!-- Top layer: diamond -->
+          <path d="M6 1L1 3.5L6 6L11 3.5L6 1Z" stroke="#D4FF00" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Middle layer: V chevron -->
+          <path d="M1 6L6 8.5L11 6" stroke="#D4FF00" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Bottom layer: V chevron -->
+          <path d="M1 8.5L6 11L11 8.5" stroke="#D4FF00" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Layers
+      </div>
+      <div id="layer-list"></div>
+    </div>
+
+    <div class="resize-handle" id="resize-handle-left"></div>
+
+    <!-- Canvas -->
+    <div id="canvas-wrap">
+      <canvas id="main-canvas"></canvas>
+      <canvas id="fabric-canvas"></canvas>
+      <!-- Floating toolbar (Figma-style) -->
+      <div id="float-bar">
+        <div id="float-hover"></div>
+        <div id="float-indicator"></div>
+        <button class="float-btn" data-tool="select" title="选择 / 移动 (V)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2l4.5 12 2-4.5L13 14l1-1-4.5-4.5L14 6 2 2z" fill="currentColor"/></svg></button>
+        <div style="width:1px;height:20px;background:#dedede;margin:0 0px 0 2px;"></div>
+        <button class="float-btn" data-tool="rect" title="矩形 (R)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+        <button class="float-btn" data-tool="ellipse" title="圆形 (E)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="8" rx="6" ry="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+        <button class="float-btn" data-tool="line" title="直线 (L)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><line x1="2" y1="14" x2="14" y2="2" stroke="currentColor" stroke-width="1.5"/></svg></button>
+        <button class="float-btn" data-tool="text" title="文字 (T)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><text x="3" y="12" font-size="12" font-weight="600" fill="currentColor" font-family="Inter,sans-serif">T</text></svg></button>
+      </div>
+    </div>
+
+    <div class="resize-handle" id="resize-handle-right"></div>
+
+    <!-- Preview Screen (top-right) — Figma: 预览屏幕, 250×168 -->
+    <div id="preview-screen">
+      <div id="preview-bg"></div>
+      <div id="preview-wrapper">
+        <video id="preview-video" playsinline preload="auto" style="display:none;width:100%;height:100%;background:#000;object-fit:contain;"></video>
+        <canvas id="group-preview-canvas" style="display:none;width:100%;height:100%;background:#000;"></canvas>
+        <canvas id="transform-overlay-canvas"></canvas>
+      </div>
+      <div id="preview-status" style="display:none;">
+        <div id="preview-dot"></div>
+        <span id="preview-time">0:00 / 0:00</span>
+        <span id="preview-name"></span>
+      </div>
+    </div>
+
+    <!-- Right Panel — Properties (fully dynamic, populated by updateInspector) -->
+    <div id="right-panel">
+      <div id="props-content">
+        <div class="inspector-hint">选中卡片以编辑属性</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Help panel -->
+<div id="help-panel">
+  <h3>画布操作</h3>
+  <div class="help-row"><span class="help-key">滚轮</span><span class="help-desc">上下平移画布</span></div>
+  <div class="help-row"><span class="help-key">Shift</span><span class="help-key">滚轮</span><span class="help-desc">左右平移画布</span></div>
+  <div class="help-row"><span class="help-key">⌘</span><span class="help-key">滚轮</span><span class="help-desc">缩放 (10%–600%)</span></div>
+  <div class="help-row"><span class="help-key">中键拖拽</span><span class="help-desc">平移画布</span></div>
+  <div class="help-row"><span class="help-key">空格</span><span class="help-desc">播放 / 暂停选中序列</span></div>
+  <div class="help-row"><span class="help-key">空格</span><span class="help-key">拖拽</span><span class="help-desc">临时平移画布</span></div>
+  <div class="help-row"><span class="help-key">0</span><span class="help-desc">缩放至 100%</span></div>
+  <div class="help-row"><span class="help-key">Esc</span><span class="help-desc">停止播放 / 取消选中</span></div>
+  <h3 style="margin-top:10px;">卡片操作</h3>
+  <div class="help-row"><span class="help-key">点击</span><span class="help-desc">选中卡片</span></div>
+  <div class="help-row"><span class="help-key">Shift</span><span class="help-key">点击</span><span class="help-desc">多选卡片</span></div>
+  <div class="help-row"><span class="help-key">拖拽卡片</span><span class="help-desc">移动卡片位置</span></div>
+  <div class="help-row"><span class="help-key">拖拽边缘</span><span class="help-desc">裁剪入点/出点</span></div>
+  <div class="help-row"><span class="help-key">拖拽音量</span><span class="help-desc">调整音量 (0–100%)</span></div>
+  <h3 style="margin-top:10px;">连线操作</h3>
+  <div class="help-row"><span class="help-key">拖拽锚点</span><span class="help-desc">从卡片边缘圆点拖出连线</span></div>
+  <div class="help-row"><span class="help-key">点击徽章</span><span class="help-desc">切换转场 (切/叠/黑)</span></div>
+  <div class="help-row"><span class="help-key">悬停连线</span><span class="help-desc">高亮连线 + 显示删除按钮</span></div>
+  <div class="help-row"><span class="help-key">点击 ✕</span><span class="help-desc">删除连线</span></div>
+  <div class="help-row"><span class="help-key">Esc</span><span class="help-desc">取消连线拖拽 / 取消选中</span></div>
+  <h3 style="margin-top:10px;">BGM 毯子</h3>
+  <div class="help-row"><span class="help-key">导入音频</span><span class="help-desc">拖入 mp3 或点击"导入音频"</span></div>
+  <div class="help-row"><span class="help-key">BGM 卡片</span><span class="help-desc">紫色调、无缩略图、波形填满内容区</span></div>
+  <div class="help-row"><span class="help-key">拖拽 BGM</span><span class="help-desc">覆盖到视频卡片上方，铺底生效</span></div>
+  <h3 style="margin-top:10px;">图层面板</h3>
+  <div class="help-row"><span class="help-key">点击图层</span><span class="help-desc">选中卡片（同步画布）</span></div>
+  <div class="help-row"><span class="help-key">Shift</span><span class="help-key">点击</span><span class="help-desc">多选卡片</span></div>
+  <div class="help-row"><span class="help-key">拖拽图层</span><span class="help-desc">调整图层顺序（改变渲染层级）</span></div>
+  <div class="help-row"><span class="help-key">双击名称</span><span class="help-desc">重命名卡片</span></div>
+  <h3 style="margin-top:10px;">属性面板</h3>
+  <div class="help-row"><span class="help-key">选中卡片</span><span class="help-desc">编辑名称、入出点、音量</span></div>
+  <div class="help-row"><span class="help-key">选中连线</span><span class="help-desc">切换转场类型、设置时长</span></div>
+  <h3 style="margin-top:10px;">播放控制</h3>
+  <div class="help-row"><span class="help-key">空格</span><span class="help-desc">播放/暂停选中卡片或序列</span></div>
+  <div class="help-row"><span class="help-key">Esc</span><span class="help-desc">停止播放</span></div>
+  <div class="help-row"><span class="help-key">右侧面板</span><span class="help-desc">预览窗口显示当前帧、播放状态</span></div>
+  <h3 style="margin-top:10px;">绘图工具</h3>
+  <div class="help-row"><span class="help-key">V</span><span class="help-desc">选择 / 移动图形</span></div>
+  <div class="help-row"><span class="help-key">R</span><span class="help-desc">矩形</span></div>
+  <div class="help-row"><span class="help-key">O</span><span class="help-desc">圆形</span></div>
+  <div class="help-row"><span class="help-key">L</span><span class="help-desc">线条</span></div>
+  <div class="help-row"><span class="help-key">T</span><span class="help-desc">文字</span></div>
+  <div class="help-row"><span class="help-key">Esc</span><span class="help-desc">退出绘图工具</span></div>
+  <h3 style="margin-top:10px;">编辑盒 & 合成卡片</h3>
+  <div class="help-row"><span class="help-key">选中图形</span><span class="help-key">右键</span><span class="help-desc">创建合成 → 编辑盒</span></div>
+  <div class="help-row"><span class="help-key">点击编辑盒内</span><span class="help-desc">进入编辑盒绘图模式</span></div>
+  <div class="help-row"><span class="help-key">双击编辑盒</span><span class="help-desc">进入沉浸模式</span></div>
+  <div class="help-row"><span class="help-key">⌘</span><span class="help-key">滚轮悬停</span><span class="help-desc">编辑盒相机缩放</span></div>
+  <div class="help-row"><span class="help-key">Enter</span><span class="help-desc">选中编辑盒 → 创建合成卡片</span></div>
+  <div class="help-row"><span class="help-key">合成卡片 + 视频</span><span class="help-key">编组</span><span class="help-desc">播放时图形叠加</span></div>
+  <div class="help-row"><span class="help-key">ESC</span><span class="help-desc">退出沉浸模式</span></div>
+</div>
+
+<!-- Hidden video element for thumbnail generation -->
+<video id="hidden-video" muted preload="metadata"></video>
+<!-- Hidden volume input for percentage editing -->
+<input type="number" id="volume-input" min="0" max="100" style="display:none;position:fixed;z-index:200;width:48px;height:20px;padding:0 4px;font-family:var(--font-mono);font-size:10px;text-align:center;border:1px solid var(--color-card-selected);border-radius:var(--rounded-sm);outline:none;" />
+
+<!-- Context menu -->
+<div id="context-menu"></div>
+
+<!-- Fullscreen preview overlay -->
+<div id="fullscreen-preview-overlay">
+  <canvas id="fullscreen-preview-canvas"></canvas>
+  <div class="close-hint">ESC 或双击退出全屏</div>
+</div>
+
+<!-- Edit box immersive overlay -->
+<div id="ebox-immersive-overlay">
+  <canvas id="ebox-immersive-canvas"></canvas>
+  <div class="close-hint">ESC 或双击退出沉浸模式</div>
+  <div id="ebox-immersive-tools" class="float-tools" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:1001;">
+    <button class="float-btn" data-tool="select" title="选择 (V)">▽</button>
+    <button class="float-btn" data-tool="rect" title="矩形 (R)">□</button>
+    <button class="float-btn" data-tool="ellipse" title="椭圆 (E)">○</button>
+    <button class="float-btn" data-tool="line" title="线条 (L)">╱</button>
+    <button class="float-btn" data-tool="text" title="文字 (T)">T</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/fabric@5.3.0/dist/fabric.min.js"></script>
+<script src="js/state.js"></script>
+<script src="js/canvas-core.js"></script>
+<script src="js/editbox.js"></script>
+<script src="js/render.js?v=2"></script>
+<script src="js/import.js?v=7"></script>
+<script src="js/fabric-bridge.js?v=2"></script>
+<script src="js/events.js"></script>
+<script src="js/playback.js"></script>
+<script src="js/ui-panels.js"></script>
+<script src="js/main.js"></script>
+<script src="js/tutorial.js"></script>
+<script>
+// ================================================================
+// Automated test: Composition card playback diagnostic
+// Run from console: testCompositionPlayback()
+// ================================================================
+window.testCompositionPlayback = function() {
+  var report = [];
+  function log(msg) { report.push(msg); console.log('%c[TEST] ' + msg, 'color:#D4FF00'); }
+  function err(msg) { report.push('ERROR: ' + msg); console.error('[TEST] ' + msg); }
+
+  log('========== Composition Playback Diagnostic ==========');
+
+  // 1. Enumerate all cards and find composition-like types
+  log('--- Step 1: Card inventory ---');
+  if (!state || !state.cards) { err('state.cards is missing!'); return report.join('\n'); }
+  log('Total cards: ' + state.cards.length);
+
+  var compCards = [];
+  var synthCards = [];
+  for (var i = 0; i < state.cards.length; i++) {
+    var c = state.cards[i];
+    log('Card[' + i + ']: id=' + c.id + ' type=' + c.type + ' editBoxId=' + c.editBoxId +
+      ' trimIn=' + c.trimIn + ' trimOut=' + c.trimOut + ' duration=' + c.duration);
+    if (c.type === 'composition') compCards.push(c);
+    if (c.type === 'synthesized-video') synthCards.push(c);
+  }
+  log('Composition cards: ' + compCards.length);
+  log('Synthesized-video cards: ' + synthCards.length);
+
+  // 2. Check edit boxes
+  log('--- Step 2: Edit box inventory ---');
+  if (!state.editBoxes) { err('state.editBoxes is missing!'); return report.join('\n'); }
+  log('Total edit boxes: ' + state.editBoxes.length);
+  for (var j = 0; j < state.editBoxes.length; j++) {
+    var eb = state.editBoxes[j];
+    var shapeCount = (eb.shapes || []).length;
+    var lineCount = 0;
+    var nonLineCount = 0;
+    (eb.shapes || []).forEach(function(s) {
+      if (s.shapeType === 'line') lineCount++;
+      else nonLineCount++;
+    });
+    log('EditBox[' + j + ']: id=' + eb.id + ' x=' + eb.x + ' y=' + eb.y +
+      ' w=' + eb.width + ' h=' + eb.height +
+      ' shapes=' + shapeCount + ' (lines=' + lineCount + ' non-lines=' + nonLineCount + ')' +
+      ' _shapesWorldCoords=' + eb._shapesWorldCoords);
+
+    var printed = 0;
+    (eb.shapes || []).forEach(function(s) {
+      if (s.shapeType !== 'line' && printed < 3) {
+        log('  Shape: id=' + s.id + ' type=' + s.shapeType +
+          ' left=' + s.left + ' top=' + s.top +
+          ' w=' + s.width + ' h=' + s.height +
+          ' fill=' + s.fill + ' stroke=' + s.stroke + ' angle=' + (s.angle || 0));
+        printed++;
+      }
+    });
+  }
+
+  // 3. Match composition cards to edit boxes
+  log('--- Step 3: Card <-> EditBox matching ---');
+  var allTargets = compCards.concat(synthCards);
+  if (allTargets.length === 0) {
+    err('No composition or synthesized-video cards found!');
+    err('Available card types: ' + state.cards.map(function(c) { return c.type; }).join(', '));
+    return report.join('\n');
+  }
+
+  for (var k = 0; k < allTargets.length; k++) {
+    var card = allTargets[k];
+    var eb = findEditBoxById(card.editBoxId);
+    if (!eb) {
+      err('Card ' + card.id + ' (type=' + card.type + ') has editBoxId=' + card.editBoxId + ' but NO matching edit box found!');
+    } else {
+      var ns = (eb.shapes || []).filter(function(s) { return s.shapeType !== 'line'; }).length;
+      log('Card ' + card.id + ' (' + card.type + ') -> EditBox ' + eb.id +
+        ': shapes=' + (eb.shapes || []).length + ' non-lines=' + ns +
+        ' worldCoords=' + eb._shapesWorldCoords);
+    }
+  }
+
+  // 4. Check playback state
+  log('--- Step 4: Playback state ---');
+  var pb = state.playback;
+  log('isPlaying=' + pb.isPlaying + ' pausedAt=' + pb.pausedAt +
+    ' playbackMode=' + pb.playbackMode + ' currentCardId=' + pb.currentCardId);
+  log('sequence length=' + ((pb.sequence || []).length));
+
+  // 5. Check groupPreviewCanvas
+  log('--- Step 5: Preview canvas ---');
+  var gpc = groupPreviewCanvas;
+  log('Canvas element: ' + (gpc ? 'EXISTS' : 'MISSING'));
+  if (gpc) {
+    log('  width=' + gpc.width + ' height=' + gpc.height +
+      ' style.display=' + gpc.style.display +
+      ' cssWidth=' + gpc.getBoundingClientRect().width +
+      ' cssHeight=' + gpc.getBoundingClientRect().height);
+  }
+
+  // 6. Try programmatic playback
+  log('--- Step 6: Programmatic playback test ---');
+  if (allTargets.length > 0 && !pb.isPlaying) {
+    var targetCard = allTargets[0];
+    log('Starting playback for card: ' + targetCard.id + ' (' + targetCard.type + ')');
+
+    if (typeof stopPlayback === 'function') {
+      stopPlayback();
+      log('Called stopPlayback() to reset state');
+    }
+
+    var targetEb = findEditBoxById(targetCard.editBoxId);
+    if (targetEb && !targetEb._shapesWorldCoords) {
+      log('Forcing shape migration for edit box ' + targetEb.id);
+      _migrateEditBoxShapesToWorld(targetEb);
+    }
+
+    var previewPanel = document.getElementById('preview-panel');
+    if (previewPanel) {
+      previewPanel.style.display = 'block';
+      log('Preview panel shown');
+    }
+
+    startPlayback(targetCard.id);
+
+    setTimeout(function() {
+      log('--- After 500ms delay ---');
+      log('isPlaying=' + pb.isPlaying + ' pausedAt=' + pb.pausedAt +
+        ' playbackMode=' + pb.playbackMode + ' currentCardId=' + pb.currentCardId);
+      log('sequence: ' + JSON.stringify(pb.sequence ? pb.sequence.map(function(s) { return s.id; }) : []));
+
+      if (gpc) {
+        log('Canvas: w=' + gpc.width + ' h=' + gpc.height +
+          ' display=' + gpc.style.display + ' cssW=' + gpc.getBoundingClientRect().width);
+        try {
+          var ctx = gpc.getContext('2d');
+          var imgData = ctx.getImageData(0, 0, Math.min(gpc.width, 100), Math.min(gpc.height, 100));
+          var nonWhite = 0;
+          for (var p = 0; p < imgData.data.length; p += 4) {
+            var r = imgData.data[p], g = imgData.data[p + 1], b = imgData.data[p + 2];
+            if (r !== 255 || g !== 255 || b !== 255) nonWhite++;
+          }
+          var total = imgData.data.length / 4;
+          log('Pixel check: ' + nonWhite + '/' + total + ' non-white pixels (' +
+            (nonWhite / total * 100).toFixed(1) + '%)');
+        } catch(ex) {
+          err('Canvas pixel read failed: ' + ex.message);
+        }
+      }
+
+      stopPlayback();
+      log('Playback stopped.');
+      log('========== Diagnostic complete ==========');
+    }, 500);
+
+    log('Waiting 500ms for playback to start...');
+  } else if (pb.isPlaying) {
+    log('Playback already running - stopping first');
+    stopPlayback();
+    log('Run test again to try programmatic playback');
+  } else {
+    log('No composition/synth cards to test');
+  }
+
+  return report.join('\n');
+};
+
+// Simpler smoke test - just checks data integrity
+window.smokeTestComposition = function() {
+  var issues = [];
+  function ok(msg) { console.log('%c[SMOKE] OK: ' + msg, 'color:#4CAF50'); }
+  function fail(msg) { issues.push(msg); console.error('[SMOKE] FAIL: ' + msg); }
+
+  console.log('%c===== Smoke Test: Composition Cards =====', 'color:#D4FF00;font-size:16px');
+
+  if (!state) { fail('state is undefined'); return issues; }
+  ok('state exists');
+  if (!state.cards) { fail('state.cards is undefined'); return issues; }
+  ok('state.cards exists (' + state.cards.length + ' cards)');
+  if (!state.editBoxes) { fail('state.editBoxes is undefined'); return issues; }
+  ok('state.editBoxes exists (' + state.editBoxes.length + ' boxes)');
+
+  state.cards.forEach(function(c) {
+    if (c.type !== 'composition' && c.type !== 'synthesized-video') return;
+    if (!c.editBoxId) {
+      fail('Card ' + c.id + ' (' + c.type + ') has no editBoxId');
+      return;
+    }
+    var eb = findEditBoxById(c.editBoxId);
+    if (!eb) {
+      fail('Card ' + c.id + ' editBoxId=' + c.editBoxId + ' — edit box NOT FOUND');
+      return;
+    }
+    var shapes = eb.shapes || [];
+    var nonLines = shapes.filter(function(s) { return s.shapeType !== 'line'; });
+    if (nonLines.length === 0) {
+      fail('Card ' + c.id + ' editBox ' + eb.id + ' has 0 non-line shapes');
+      return;
+    }
+    ok('Card ' + c.id + ' (' + c.type + ') -> editBox ' + eb.id +
+      ' with ' + shapes.length + ' shapes (' + nonLines.length + ' drawable)');
+  });
+
+  if (!groupPreviewCanvas) {
+    fail('groupPreviewCanvas is null');
+  } else {
+    ok('groupPreviewCanvas exists');
+  }
+
+  ['findEditBoxById', 'startPlayback', 'stopPlayback', 'togglePlayback',
+   'playbackTick', 'updatePreviewPanel'].forEach(function(fn) {
+    try {
+      if (typeof eval(fn) === 'function') {
+        ok('Function ' + fn + ' available');
+      } else {
+        fail('Function ' + fn + ' is NOT a function (type=' + typeof eval(fn) + ')');
+      }
+    } catch(e) {
+      fail('Function ' + fn + ' — eval failed: ' + e.message);
+    }
+  });
+
+  console.log('%c===== Smoke Test: ' + issues.length + ' issue(s) found =====', 'color:#D4FF00;font-size:16px');
+  return issues;
+};
+
+console.log('%c[TEST] smokeTestComposition() and testCompositionPlayback() ready', 'color:#D4FF00');
+</script>
+</body>
+</html>

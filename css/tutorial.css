@@ -1,0 +1,410 @@
+/* ================================================================
+   Tutorial — pixel-accurate Figma "教程页" design
+   All positions/colors/opacities match Figma exactly
+   ================================================================ */
+
+/* ---- Tutorial Index ---- */
+#tutorial-index {
+  position: fixed; inset: 0; z-index: 10000;
+  /* Figma: GRADIENT_LINEAR start=top #3a3a3a, end=bottom #000 */
+  background: linear-gradient(to bottom, #3a3a3a 0%, #000000 100%);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+/* Background STEP texts — each layer as separate <img>, no CSS text rendering.
+   Exactly matches Figma "背景" frame (1314x895) at x=-34, y=-63 inside 教程页 (1280x832) */
+#tutorial-index .index-bg-img {
+  position: absolute; left: -34px;
+  width: 1314px; height: 895px;
+  pointer-events: none; z-index: 0;
+}
+
+/* Each STEP layer at Figma y + wave animation */
+#tutorial-index .bg-step-1 { top: -10px; animation: stepWave 6s ease-in-out infinite; animation-delay: 0s; }     /* Figma y=0  */
+#tutorial-index .bg-step-2 { top: 324px; animation: stepWave 6s ease-in-out infinite; animation-delay: 0.8s; }   /* Figma y=334 */
+#tutorial-index .bg-step-3 { top: 614px; animation: stepWave 6s ease-in-out infinite; animation-delay: 1.6s; }   /* Figma y=624 */
+
+@keyframes stepWave {
+  0%   { transform: translateY(-12px); }
+  50%  { transform: translateY(10px); }
+  100% { transform: translateY(-12px); }
+}
+
+#tutorial-index .bg-step-1 { top: -10px; animation: stepWave 6s ease-in-out infinite; }
+#tutorial-index .bg-step-2 { top: 324px; animation: stepWave 6s ease-in-out infinite; animation-delay: -0.6s; }
+#tutorial-index .bg-step-3 { top: 614px; animation: stepWave 6s ease-in-out infinite; animation-delay: -1.2s; }
+
+/* Badge — Figma: x=21, y=18, fontSize=20, color=#888 */
+#tutorial-index .index-badge {
+  position: absolute; top: 18px; left: 21px;
+  font-size: 20px; font-weight: 500; color: #888;
+}
+
+/* 4-column container — positioned at top=192, centered */
+#tutorial-index .index-columns {
+  position: absolute; top: 192px; left: 50%; transform: translateX(-50%);
+  width: 1280px; height: 448px;
+  display: flex; gap: 84px;  /* Figma: gap = 387-94-209 = 84px */
+  padding-left: 94px;       /* Figma: first card at x=94 */
+}
+
+.index-col {
+  width: 209px; height: 448px;
+  position: relative; cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+.index-col:hover {
+  transform: scale(1.15);
+}
+
+/* Green overlay + title on hover */
+.col-overlay {
+  position: absolute; inset: 0; z-index: 1;
+  border-radius: 20px; overflow: hidden;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+/* Semi-transparent green sweeps first */
+.col-green-dim {
+  position: absolute;
+  top: -10%; bottom: -10%; left: -155%;
+  width: 130%;
+  background: rgba(213,255,0,0.4);
+  transform: skewX(-12deg);
+  transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: -2;
+}
+.index-col:hover .col-green-dim {
+  left: -10%;
+}
+
+/* Solid green sweeps after */
+.col-overlay::before {
+  content: '';
+  position: absolute;
+  top: -10%; bottom: -10%; left: -155%;
+  width: 130%;
+  background: #D4FF00;
+  transform: skewX(-12deg);
+  transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+  z-index: -1;
+}
+.index-col:hover .col-overlay::before {
+  left: -10%;
+}
+
+/* Text fades in */
+.col-title, .col-subtitle {
+  opacity: 0;
+  transition: opacity 0.25s ease 0.2s;
+}
+.index-col:hover .col-title,
+.index-col:hover .col-subtitle {
+  opacity: 1;
+}
+.col-title {
+  font-size: 24px; font-weight: 700; color: #000;
+  text-align: center; line-height: 1.2;
+}
+.col-subtitle {
+  font-size: 12px; font-weight: 400; color: rgba(0,0,0,0.5);
+  text-align: center;
+}
+
+/* Card image — 2x PNG (418x896) rendered at Figma size 209x448 */
+.index-col .col-img {
+  width: 209px; height: 448px;
+  position: absolute; left: 0; top: 0;
+  border-radius: 20px;
+  pointer-events: none;
+  transition: filter 0.25s ease;
+  filter: brightness(1);
+}
+.index-col:hover .col-img {
+  filter: brightness(1.1);
+}
+
+
+/* Shimmer sweep effect — cycles through cards one by one */
+.col-shimmer {
+  position: absolute; inset: 0; z-index: 3;
+  pointer-events: none; border-radius: 20px; overflow: hidden;
+  background-image: linear-gradient(105deg,
+    transparent 35%,
+    rgba(255,255,255,0.06) 40%,
+    rgba(255,255,255,0.18) 45%,
+    rgba(255,255,255,0.25) 50%,
+    rgba(255,255,255,0.18) 55%,
+    rgba(255,255,255,0.06) 60%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  background-position: 150% 0;
+  background-repeat: no-repeat;
+  animation: cardShimmer 12s ease-in-out infinite;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+.index-col:nth-child(1) .col-shimmer { animation-delay: 0s; }
+.index-col:nth-child(2) .col-shimmer { animation-delay: 3s; }
+.index-col:nth-child(3) .col-shimmer { animation-delay: 6s; }
+.index-col:nth-child(4) .col-shimmer { animation-delay: 9s; }
+
+@keyframes cardShimmer {
+  0% { background-position: 150% 0; }
+  5% { background-position: -50% 0; }
+  8% { background-position: -50% 0; }
+  13% { background-position: 150% 0; }
+  100% { background-position: 150% 0; }
+}
+
+/* Hide shimmer while hovering (green overlay shows instead) */
+.index-col:hover .col-shimmer {
+  opacity: 0;
+}
+
+/* Bottom bar — Figma Rectangle 871: x=0, y=801, w=1280, h=31, fill=#D5FF00 */
+#tutorial-index .index-bottom {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 31px; background: #D4FF00;
+}
+
+/* Back button — Figma "返回键" frame: x≈622, y=684, 37x18 */
+#tutorial-index .index-back {
+  position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+  width: 30px; cursor: pointer; z-index: 2;
+  opacity: 0.6; transition: opacity 0.2s;
+}
+#tutorial-index .index-back:hover { opacity: 1; }
+
+/* ---- Tutorial Overlay (editor steps) ---- */
+#tutorial-dim {
+  position: fixed; inset: 0; z-index: 9001;
+  background: rgba(0,0,0,0.55);
+  pointer-events: none;
+  transition: opacity 0.3s;
+  display: none;
+}
+#tutorial-dim.visible { display: block; }
+
+#tutorial-highlight {
+  position: fixed; z-index: 9002;
+  border: 2px solid var(--color-accent-blue);
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px rgba(0,102,255,0.18), 0 0 30px rgba(0,102,255,0.1);
+  pointer-events: none;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+}
+#tutorial-highlight.visible { opacity: 1; }
+
+#tutorial-step-card {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  z-index: 9003;
+  background: #1a1a1a; border: 1px solid #333;
+  border-radius: 16px; padding: 20px 28px;
+  min-width: 380px; max-width: 520px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  pointer-events: auto;
+}
+#tutorial-step-card .step-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+#tutorial-step-card .step-badge {
+  font-size: 11px; font-weight: 500; color: var(--color-accent-blue);
+  background: rgba(0,102,255,0.12); padding: 3px 10px;
+  border-radius: 20px;
+}
+#tutorial-step-card .step-title {
+  font-size: 16px; font-weight: 520; color: #fff;
+}
+#tutorial-step-card .step-desc {
+  font-size: 13px; color: #999; line-height: 1.5; margin-bottom: 14px;
+}
+#tutorial-step-card .step-actions { display: flex; gap: 10px; align-items: center; }
+#tutorial-step-card .btn-step {
+  padding: 8px 20px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  border: none; transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+#tutorial-step-card .btn-step.primary { background: var(--color-accent-blue); color: #fff; }
+#tutorial-step-card .btn-step.primary:hover { background: #0052cc; }
+#tutorial-step-card .btn-step.secondary { background: transparent; color: #888; border: 1px solid #333; }
+#tutorial-step-card .btn-step.secondary:hover { color: #fff; border-color: #555; }
+
+#tutorial-step-card .step-dots { display: flex; gap: 6px; align-items: center; }
+#tutorial-step-card .step-dot { width: 6px; height: 6px; border-radius: 50%; background: #444; transition: all 0.2s; }
+#tutorial-step-card .step-dot.done { background: var(--color-accent-blue); }
+#tutorial-step-card .step-dot.current { background: #fff; width: 8px; height: 8px; }
+
+/* Top bar during tutorial */
+#tutorial-topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9003;
+  padding: 12px 20px;
+  display: flex; align-items: center; gap: 16px;
+  pointer-events: auto;
+  background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+}
+#tutorial-topbar .lesson-title { font-size: 15px; font-weight: 520; color: #fff; }
+#tutorial-topbar .lesson-step { font-size: 12px; color: #888; }
+#tutorial-topbar .topbar-spacer { flex: 1; }
+#tutorial-topbar .btn-topbar {
+  padding: 6px 14px; border-radius: 6px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border: 1px solid #333; background: transparent; color: #888;
+  font-family: var(--font-sans);
+}
+#tutorial-topbar .btn-topbar:hover { color: #fff; border-color: #555; }
+
+@keyframes tutorialPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(0,102,255,0.18), 0 0 30px rgba(0,102,255,0.1); }
+  50% { box-shadow: 0 0 0 8px rgba(0,102,255,0.08), 0 0 40px rgba(0,102,255,0.15); }
+}
+#tutorial-highlight.pulse { animation: tutorialPulse 2s ease-in-out infinite; }
+
+#tutorial-tooltip {
+  position: fixed; z-index: 9004;
+  background: var(--color-accent-blue); color: #fff;
+  padding: 8px 14px; border-radius: 8px;
+  font-size: 13px; font-weight: 500;
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.2s; white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+#tutorial-tooltip.visible { opacity: 1; }
+#tutorial-tooltip::after {
+  content: '';
+  position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--color-accent-blue);
+}
+
+/* Completion toast */
+#tutorial-complete-toast {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 9100;
+  background: #1a1a1a; border: 1px solid #333;
+  border-radius: 20px; padding: 40px 48px; text-align: center;
+  pointer-events: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+  opacity: 0; transition: opacity 0.4s;
+}
+#tutorial-complete-toast.visible { opacity: 1; }
+#tutorial-complete-toast .complete-icon { font-size: 48px; margin-bottom: 16px; }
+#tutorial-complete-toast .complete-title { font-size: 24px; font-weight: 520; color: #fff; margin-bottom: 8px; }
+#tutorial-complete-toast .complete-desc { font-size: 13px; color: #888; margin-bottom: 24px; line-height: 1.5; }
+#tutorial-complete-toast .btn-row { display: flex; gap: 12px; justify-content: center; }
+#tutorial-complete-toast .btn-complete {
+  padding: 10px 24px; border-radius: 8px;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  border: none; font-family: var(--font-sans);
+}
+#tutorial-complete-toast .btn-complete.primary { background: var(--color-accent-blue); color: #fff; }
+#tutorial-complete-toast .btn-complete.primary:hover { background: #0052cc; }
+#tutorial-complete-toast .btn-complete.secondary { background: transparent; color: #888; border: 1px solid #333; }
+#tutorial-complete-toast .btn-complete.secondary:hover { color: #fff; border-color: #555; }
+
+body.tutorial-active #btn-help { display: none; }
+
+/* ---- Tutorial Detail Page (Figma 教程N frames, shown between index and tutorial) ---- */
+#tutorial-lesson-detail {
+  position: fixed; inset: 0; z-index: 10001;
+  background: #fff;
+  font-family: var(--font-sans);
+  display: none;
+  overflow: hidden;
+}
+#tutorial-lesson-detail.visible { display: flex; }
+
+/* Dot pattern */
+#tutorial-lesson-detail::before {
+  content: '';
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle, #000 1px, transparent 1px);
+  background-size: 6px 6px;
+  opacity: 0.04;
+}
+
+#tutorial-lesson-detail .td-inner {
+  position: relative; z-index: 1;
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+}
+
+/* Top bar */
+#tutorial-lesson-detail .td-topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 21px 10px;
+  flex-shrink: 0;
+}
+#tutorial-lesson-detail .td-badge { font-size: 20px; font-weight: 700; color: #000; }
+#tutorial-lesson-detail .td-project-name { font-size: 18px; font-weight: 700; color: #000; }
+#tutorial-lesson-detail .td-top-spacer { flex: 1; }
+#tutorial-lesson-detail .td-export { font-size: 11px; font-weight: 700; color: #000; }
+#tutorial-lesson-detail .td-zoom { font-size: 11px; font-weight: 700; color: #a2a2a2; }
+
+/* Middle body: left | center | right */
+#tutorial-lesson-detail .td-body { flex: 1; display: flex; min-height: 0; }
+
+/* Left panel */
+#tutorial-lesson-detail .td-left-panel { width: 200px; flex-shrink: 0; padding: 40px 21px 0; }
+#tutorial-lesson-detail .td-panel-title { font-size: 13px; font-weight: 700; color: #000; margin-bottom: 12px; }
+#tutorial-lesson-detail .td-layer-item { font-size: 11px; font-weight: 300; color: #000; margin-bottom: 9px; display: flex; align-items: center; gap: 6px; }
+#tutorial-lesson-detail .td-layer-tag { font-size: 11px; font-weight: 700; min-width: 12px; }
+
+/* Center placeholder */
+#tutorial-lesson-detail .td-center { flex: 1; min-width: 0; }
+
+/* Right panel */
+#tutorial-lesson-detail .td-right-panel { width: 246px; flex-shrink: 0; padding: 10px 16px 0; }
+#tutorial-lesson-detail .td-preview-box { width: 214px; height: 130px; background: #000; border-radius: 6px; margin-bottom: 8px; }
+#tutorial-lesson-detail .td-timecode { font-size: 11px; font-weight: 300; color: #000; margin-bottom: 16px; }
+#tutorial-lesson-detail .td-inspector-section { margin-bottom: 10px; }
+#tutorial-lesson-detail .td-inspector-section .td-section-title { font-size: 13px; font-weight: 700; color: #000; margin-bottom: 4px; }
+#tutorial-lesson-detail .td-prop-row { font-size: 11px; color: #6c6c6c; display: flex; justify-content: space-between; padding: 2px 0; }
+#tutorial-lesson-detail .td-prop-label { font-size: 11px; font-weight: 400; color: #8e8d8d; }
+#tutorial-lesson-detail .td-prop-value { font-size: 11px; color: #6c6c6c; }
+
+/* Bottom area */
+#tutorial-lesson-detail .td-bottom { padding: 0 21px 50px; display: flex; flex-direction: column; flex-shrink: 0; }
+#tutorial-lesson-detail .td-no { font-size: 60px; font-weight: 700; color: #000; line-height: 1; }
+#tutorial-lesson-detail .td-title { font-size: 100px; font-weight: 600; color: #000; letter-spacing: -2px; line-height: 1; }
+#tutorial-lesson-detail .td-tagline { font-size: 24px; font-weight: 700; color: #000; margin-top: 12px; max-width: 500px; }
+#tutorial-lesson-detail .td-steps { display: flex; gap: 40px; margin-top: 16px; }
+#tutorial-lesson-detail .td-steps span { font-size: 18px; font-weight: 300; color: #000; }
+
+/* Go button */
+#tutorial-lesson-detail .td-go {
+  position: absolute; right: 95px; bottom: 50px; z-index: 2;
+  font-size: 100px; font-weight: 700; color: #000;
+  cursor: pointer; user-select: none;
+  transition: color 0.2s;
+}
+#tutorial-lesson-detail .td-go:hover { color: #555; }
+
+/* First-step intro — large text overlay */
+#tutorial-intro-text {
+  position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%);
+  z-index: 9010;
+  pointer-events: none;
+  text-align: center;
+  transition: opacity 0.5s ease;
+}
+#tutorial-intro-text .intro-icon {
+  font-size: 64px; margin-bottom: 20px;
+}
+#tutorial-intro-text .intro-title {
+  font-size: 36px; font-weight: 520; color: #fff;
+  letter-spacing: -1px; margin-bottom: 12px;
+}
+#tutorial-intro-text .intro-subtitle {
+  font-size: 18px; color: #888; max-width: 480px; line-height: 1.5;
+}

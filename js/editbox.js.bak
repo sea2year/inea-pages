@@ -1,0 +1,201 @@
+// ================================================================
+// Edit box ↔ Fabric.js coordinate transforms
+// ================================================================
+function _eboxLocalToWorld(eb, lx, ly) {
+  const cam = eb.camera || { zoom: 1, offsetX: 0, offsetY: 0 };
+  return {
+    x: eb.x + cam.offsetX + lx * cam.zoom,
+    y: eb.y + cam.offsetY + ly * cam.zoom
+  };
+}
+
+function _eboxWorldToLocal(eb, wx, wy) {
+  const cam = eb.camera || { zoom: 1, offsetX: 0, offsetY: 0 };
+  return {
+    x: (wx - eb.x - cam.offsetX) / cam.zoom,
+    y: (wy - eb.y - cam.offsetY) / cam.zoom
+  };
+}
+
+// Load edit box shapes onto Fabric canvas for interactive editing
+function _loadEditBoxToFabric(eb) {
+  console.log('[EB] _loadEditBoxToFabric:', eb.id, 'fabricCanvas:', !!fabricCanvas, 'shapes:', (eb.shapes||[]).length);
+  if (!fabricCanvas) { console.warn('[EB] fabricCanvas is null!'); return; }
+  _clearEditBoxFabricObjects();
+  // Dim regular shapes instead of removing them — they persist in Fabric
+  // and are restored on deactivate
+  fabricCanvas.getObjects().forEach(o => {
+    if (o._shapeId && !o._isEditBoxShape) {
+      o.set({ selectable: false, evented: false, opacity: 0.25 });
+    }
+  });
+
+  const cam = eb.camera || { zoom: 1, offsetX: 0, offsetY: 0 };
+  for (const s of (eb.shapes || [])) {
+    if (s.shapeType === 'line') continue; // lines stay on 2D canvas
+    let obj;
+    const worldPos = _eboxLocalToWorld(eb, s.left != null ? s.left : 0, s.top != null ? s.top : 0);
+    if (s.shapeType === 'rect') {
+      obj = new fabric.Rect({
+        left: worldPos.x, top: worldPos.y,
+        width: (s.width || 100) * cam.zoom,
+        height: (s.height || 100) * cam.zoom,
+        fill: s.fill || 'rgba(0,102,255,0.15)',
+        stroke: s.stroke || '#0066ff',
+        strokeWidth: (s.strokeWidth || 2),
+        opacity: s.opacity != null ? s.opacity : 1,
+        angle: s.angle || 0,
+        scaleX: s.scaleX || 1, scaleY: s.scaleY || 1,
+        originX: 'left', originY: 'top',
+        selectable: true, evented: true, hasControls: true, hasBorders: true
+      });
+    } else if (s.shapeType === 'ellipse') {
+      obj = new fabric.Ellipse({
+        left: worldPos.x,
+        top: worldPos.y,
+        rx: (s.width || 100) * cam.zoom / 2,
+        ry: (s.height || 100) * cam.zoom / 2,
+        fill: s.fill || 'rgba(0,102,255,0.15)',
+        stroke: s.stroke || '#0066ff',
+        strokeWidth: (s.strokeWidth || 2),
+        opacity: s.opacity != null ? s.opacity : 1,
+        angle: s.angle || 0,
+        scaleX: s.scaleX || 1, scaleY: s.scaleY || 1,
+        originX: 'left', originY: 'top',
+        selectable: true, evented: true, hasControls: true, hasBorders: true
+      });
+    } else if (s.shapeType === 'text') {
+      obj = new fabric.IText(s.text || '', {
+        left: worldPos.x, top: worldPos.y,
+        fontSize: (s.fontSize || 24) * cam.zoom,
+        fontFamily: s.fontFamily || 'Inter, system-ui, sans-serif',
+        fontWeight: s.fontWeight || 'Bold',
+        fill: s.fill || '#000000',
+        textAlign: s.textAlign || 'left',
+        width: (s.width || 200) * cam.zoom,
+        opacity: s.opacity != null ? s.opacity : 1,
+        angle: s.angle || 0,
+        scaleX: s.scaleX || 1, scaleY: s.scaleY || 1,
+        selectable: true, evented: true, hasControls: true, hasBorders: true,
+        editingBorderColor: '#0066ff', cursorColor: '#0066ff', cursorWidth: 1.5,
+        selectionColor: 'rgba(0,102,255,0.25)'
+      });
+    }
+    if (obj) {
+      obj._isEditBoxShape = true;
+      obj._editBoxId = eb.id;
+      obj._shapeId = s.id;
+      obj._shapeType = s.shapeType;
+      fabricCanvas.add(obj);
+    }
+  }
+  const count = fabricCanvas.getObjects().filter(o => o._isEditBoxShape).length;
+  fabricCanvas.requestRenderAll();
+  _fcSyncContainerState();
+  console.log('[EB] loaded', count, 'shapes for editBox:', eb.id);
+}
+
+// Restore regular (non-edit-box) Fabric shapes after edit box deactivation
+function _restoreRegularShapes() {
+  if (!fabricCanvas) return;
+  fabricCanvas.getObjects().forEach(o => {
+    if (o._shapeId && !o._isEditBoxShape) {
+      o.set({ selectable: true, evented: true, opacity: 1 });
+    }
+  });
+}
+
+// Serialize Fabric objects back to edit box shapes array
+function _saveFabricToEditBox(eb) {
+  if (!fabricCanvas) return;
+  const cam = eb.camera || { zoom: 1, offsetX: 0, offsetY: 0 };
+  const shapes = [];
+  // Also keep line shapes (not on fabric)
+  for (const s of (eb.shapes || [])) {
+    if (s.shapeType === 'line') shapes.push(s);
+  }
+  fabricCanvas.getObjects().forEach(obj => {
+    if (!obj._isEditBoxShape || obj._editBoxId !== eb.id) return;
+    const entry = _fabricEditBoxObjToShapeData(obj, eb);
+    if (entry) shapes.push(entry);
+  });
+  eb.shapes = shapes;
+}
+
+// Convert a Fabric edit-box object back to shape data (edit-box-local coords)
+function _fabricEditBoxObjToShapeData(obj, eb) {
+  const cam = eb.camera || { zoom: 1, offsetX: 0, offsetY: 0 };
+  const entry = {
+    id: obj._shapeId,
+    shapeType: obj._shapeType || 'rect'
+  };
+  if (obj._shapeType === 'text') {
+    const local = _eboxWorldToLocal(eb, obj.left, obj.top);
+    entry.text = obj.text || '';
+    entry.left = local.x;
+    entry.top = local.y;
+    entry.fontSize = (obj.fontSize || 24) / cam.zoom;
+    entry.fontFamily = obj.fontFamily || 'Inter';
+    entry.fontWeight = obj.fontWeight || 'Bold';
+    entry.fill = obj.fill;
+    entry.textAlign = obj.textAlign || 'left';
+    entry.width = (obj.width || 200) / cam.zoom;
+    entry.height = (obj.height || 40) / cam.zoom;
+    entry.scaleX = obj.scaleX || 1;
+    entry.scaleY = obj.scaleY || 1;
+    entry.angle = obj.angle || 0;
+    entry.opacity = obj.opacity != null ? obj.opacity : 1;
+  } else if (obj._shapeType === 'ellipse') {
+    // Ellipse uses left/top origin — position is top-left corner
+    const rx = obj.rx * (obj.scaleX || 1);
+    const ry = obj.ry * (obj.scaleY || 1);
+    const local = _eboxWorldToLocal(eb, obj.left, obj.top);
+    entry.left = local.x;
+    entry.top = local.y;
+    entry.width = rx * 2 / cam.zoom;
+    entry.height = ry * 2 / cam.zoom;
+    entry.fill = obj.fill;
+    entry.stroke = obj.stroke;
+    entry.strokeWidth = obj.strokeWidth || 2;
+    entry.opacity = obj.opacity != null ? obj.opacity : 1;
+    entry.angle = obj.angle || 0;
+    entry.scaleX = 1;
+    entry.scaleY = 1;
+  } else {
+    // Rect with originX:'left', originY:'top' — use left/top directly (world coords)
+    const local = _eboxWorldToLocal(eb, obj.left, obj.top);
+    entry.left = local.x;
+    entry.top = local.y;
+    entry.width = obj.width * (obj.scaleX || 1) / cam.zoom;
+    entry.height = obj.height * (obj.scaleY || 1) / cam.zoom;
+    entry.fill = obj.fill;
+    entry.stroke = obj.stroke;
+    entry.strokeWidth = obj.strokeWidth || 2;
+    entry.opacity = obj.opacity != null ? obj.opacity : 1;
+    entry.angle = obj.angle || 0;
+    entry.scaleX = 1;
+    entry.scaleY = 1;
+  }
+  return entry;
+}
+
+// Remove all edit-box Fabric objects from canvas
+function _clearEditBoxFabricObjects() {
+  if (!fabricCanvas) return;
+  const toRemove = [];
+  fabricCanvas.getObjects().forEach(o => { if (o._isEditBoxShape) toRemove.push(o); });
+  toRemove.forEach(o => fabricCanvas.remove(o));
+}
+
+// Sync single edit box shape from Fabric object (on object:modified)
+function _updateEditBoxShapeFromObj(obj) {
+  if (!obj._isEditBoxShape || !obj._editBoxId) return;
+  const eb = findEditBoxById(obj._editBoxId);
+  if (!eb) return;
+  const sid = obj._shapeId;
+  const idx = (eb.shapes || []).findIndex(s => s.id === sid);
+  if (idx < 0) return;
+  const entry = _fabricEditBoxObjToShapeData(obj, eb);
+  if (entry) eb.shapes[idx] = entry;
+}
+

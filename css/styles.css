@@ -1,0 +1,1061 @@
+/* ================================================================
+   CSS Custom Properties — Figma "画板页" design
+   ================================================================ */
+:root {
+  --color-primary: #000000;
+  --color-on-primary: #ffffff;
+  --color-canvas: #ffffff;
+  --color-surface: #ffffff;
+  --color-chrome: #ffffff;
+  --color-chrome-ink: #000000;
+  --color-chrome-ink-soft: #999999;
+  --color-card-border: #dedede;
+  --color-card-border-hover: #cccccc;
+  --color-card-selected: #D4FF00;
+  --color-card-selected-glow: rgba(212,255,0,0.12);
+  --color-grid-line: #ebebeb;
+  --color-grid-checker: #f0f0f0;
+  --color-text-primary: #000000;
+  --color-text-label: #999999;
+  --color-accent: #D4FF00;
+  --color-accent-blue-soft: #e8f0fe;
+  --color-accent-blue: #D4FF00;
+
+  /* Figma-specific tokens */
+  --color-panel-bg: rgba(0,0,0,0.004);
+  --color-panel-border: #dedede;
+  --color-input-bg: #f2f2f2;
+  --color-input-border: #ffffff;
+  --color-slider-track: #f7f7f7;
+  --color-slider-border: #eaeaea;
+  --color-slider-knob: #5e5e5e;
+  --color-divider: #dedede;
+  --color-accent-selected: rgba(212,255,0,0.6);
+
+  --rounded-sm: 4px;
+  --rounded-md: 8px;
+  --rounded-lg: 12px;
+  --rounded-pill: 50px;
+  --rounded-full: 9999px;
+
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+
+  --font-sans: "Inter", "SF Pro Display", system-ui, helvetica, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", menlo, monospace;
+}
+
+/* ================================================================
+   Base & Layout
+   ================================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  background: #ffffff;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app {
+  position: relative;
+  width: 100%; height: 100%;
+}
+
+#main-row {
+  width: 100%; height: 100%;
+  position: relative;
+}
+
+#app.presentation-mode #toolbar,
+#app.presentation-mode #left-panel,
+#app.presentation-mode #preview-screen,
+#app.presentation-mode #right-panel,
+#app.presentation-mode #status-bar { display: none; }
+
+/* ================================================================
+   Toolbar — top-right import/export pill (Figma: 导入导出框)
+   ================================================================ */
+#toolbar {
+  position: absolute;
+  top: 8px;
+  right: 11px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 250px;
+  height: 44px;
+  padding: 0 7px;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 49px;
+  background: rgba(0,0,0,0.004);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 15px 14px 25.6px rgba(101,104,0,0.08);
+}
+
+/* Import button — green circle with + */
+#btn-import-video {
+  width: 29px;
+  height: 29px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #D4FF00;
+  border: none;
+  border-radius: 50%;
+  color: #000;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* Zoom badge */
+#zoom-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 41px;
+  height: 22px;
+  border-radius: 5px;
+  background: #f2f2f2;
+  color: #a2a2a2;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Export button — green pill */
+#btn-export {
+  width: 53px;
+  height: 29px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #D4FF00;
+  border: none;
+  border-radius: 45px;
+  color: #000;
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  margin-left: 5px;
+}
+
+#btn-help {
+  display: none;
+}
+
+/* ================================================================
+   Canvas area
+   ================================================================ */
+#canvas-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #ffffff;
+}
+#canvas-wrap.panning { cursor: grabbing; }
+#canvas-wrap.panning canvas { cursor: grabbing; }
+#canvas-wrap.space-held { cursor: grab; }
+#canvas-wrap.space-held canvas { cursor: grab; }
+#canvas-wrap.connecting { cursor: crosshair; }
+#canvas-wrap.connecting canvas { cursor: crosshair; }
+#canvas-wrap.shape-drawing { cursor: crosshair; }
+#canvas-wrap.shape-drawing canvas { cursor: crosshair; }
+
+canvas {
+  display: block;
+  position: absolute;
+  top: 0; left: 0;
+}
+
+#group-preview-canvas {
+  position: static;
+}
+
+/* Floating toolbar — Figma-style bottom-center (底部工具栏) */
+#float-bar {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding: 6px 5px;
+  background: rgba(0,0,0,0.004);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 39px;
+  box-shadow: 15px 14px 25.6px rgba(101,104,0,0.08);
+  z-index: 30;
+}
+#float-hover {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  background: rgba(0,0,0,0.05);
+  border-radius: 50%;
+  z-index: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+  opacity: 0;
+}
+#float-indicator {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  background: #D4FF00;
+  border-radius: 50%;
+  z-index: 1;
+  transition: left 0.3s ease, top 0.3s ease;
+  pointer-events: none;
+}
+.float-btn {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #000;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+.float-btn:hover {
+  color: #000;
+}
+.float-btn.active-tool {
+  color: #000;
+}
+
+/* Edit mode — Figma: solid green background #D4FF00, gray border, white active indicator */
+.editbox-editing #float-bar {
+  background: #D4FF00;
+  border-color: #dedede;
+  box-shadow: none;
+}
+.editbox-editing #float-indicator {
+  background: #ffffff;
+}
+.editbox-editing .float-btn {
+  color: #000;
+}
+.editbox-editing .float-btn.active-tool {
+  color: #000;
+}
+
+/* Fabric drawing canvas */
+.canvas-container {
+  pointer-events: none !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 5;
+}
+#fabric-canvas {
+  position: absolute;
+  top: 0; left: 0;
+}
+
+.editbox-editing {
+  cursor: default;
+}
+
+/* ================================================================
+   Resize handles — hidden in Figma design
+   ================================================================ */
+.resize-handle {
+  display: none;
+}
+
+/* ================================================================
+   Left Panel — Layers (左边图层栏)
+   ================================================================ */
+#left-panel {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  width: 201px;
+  bottom: 8px;
+  z-index: 10;
+  background: rgba(0,0,0,0.004);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 20px;
+  box-shadow: 15px 14px 25.6px rgba(101,104,0,0.08);
+  color: #000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 420;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 11px 0;
+  height: 44px;
+}
+
+.panel-project-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #000;
+}
+
+.panel-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 16px;
+  border: none;
+  background: transparent;
+  color: #000;
+  cursor: pointer;
+  padding: 0;
+}
+
+.panel-divider {
+  height: 0.5px;
+  background: #dedede;
+  margin: 8px 7px 6px;
+}
+
+.panel-section-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 7px 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #000;
+}
+
+#layer-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+#layer-list::-webkit-scrollbar { width: 4px; }
+#layer-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 2px; }
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 4px 19px;
+  margin: 0 7px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 80ms;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.layer-item:hover { background: rgba(0,0,0,0.04); }
+.layer-item.selected {
+  background: rgba(212,255,0,0.6);
+  border: 0.5px solid var(--color-accent);
+  box-shadow: 0 0 5.8px rgba(212,255,0,1);
+}
+.layer-item.drag-over { background: rgba(212,255,0,0.3); }
+.layer-item.group-item {
+  border-left: 3px solid var(--color-accent);
+  padding-left: 6px;
+}
+
+.layer-thumb {
+  width: 48px; height: 28px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: #e0e0e0;
+  object-fit: cover;
+}
+
+.layer-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.layer-name {
+  font-size: 12.5px;
+  font-weight: 300;
+  color: #000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layers-icon {
+  flex-shrink: 0;
+  display: block;
+}
+
+/* Layer type indicator icon */
+.layer-type-icon {
+  width: 14px; height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  border: 0.5px solid;
+}
+.layer-type-icon.type-video {
+  background: rgba(43,0,255,0.5);
+  border-color: #2B00FF;
+  color: #2B00FF;
+}
+.layer-type-icon.type-editbox {
+  background: rgba(212,255,0,0.7);
+  border-color: #D4FF00;
+  color: #808000;
+}
+.layer-type-icon.type-bgm {
+  background: rgba(255,49,86,0.43);
+  border-color: #FF3156;
+  color: #FF3156;
+}
+.layer-type-icon.type-circle,
+.layer-type-icon.type-square {
+  width: 10px; height: 10px;
+  border: 0.5px solid #7F7F7F;
+  background: transparent;
+  color: transparent;
+}
+.layer-type-icon.type-circle { border-radius: 50%; }
+.layer-type-icon.type-square { border-radius: 2px; }
+
+.layer-name-input {
+  font-size: 11px;
+  font-weight: 450;
+  color: #000;
+  background: #ffffff;
+  border: 1px solid var(--color-accent);
+  border-radius: 3px;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
+  font-family: var(--font-sans);
+}
+
+.layer-dur {
+  font-size: 9px;
+  color: #888888;
+  font-family: var(--font-mono);
+  font-weight: 300;
+}
+
+.layer-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 20px;
+  flex-shrink: 0;
+  cursor: grab;
+  opacity: 0.4;
+}
+.layer-drag-handle:hover { opacity: 0.8; }
+.layer-drag-handle:active { cursor: grabbing; }
+
+.layer-drag-dot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 3px);
+  gap: 2px;
+}
+.layer-drag-dot-grid span {
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: #888888;
+  display: block;
+}
+
+.layer-badge {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 550;
+  color: #000;
+  background: rgba(212,255,0,0.3);
+}
+
+/* ================================================================
+   Preview Screen — top-right (Figma: 预览屏幕, 250x168 at x:1019,y:60)
+   ================================================================ */
+#preview-screen {
+  position: absolute;
+  top: 60px;
+  right: 11px;
+  width: 250px;
+  height: 168px;
+  z-index: 10;
+  /* Container itself is transparent, no border/radius/padding/overflow */
+}
+
+/* Background box — Figma: 背景框 250×168, fill white + shadow, radius 20 */
+#preview-bg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 250px;
+  height: 168px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #DEDEDE;
+  border-radius: 20px;
+  z-index: 0;
+  /* Drop shadow: offset(15,14) blur 25.6, green-tinted rgba(101,104,0,0.08) */
+  box-shadow: 15px 14px 25.6px rgba(101, 104, 0, 0.08);
+}
+
+/* Video content area — Figma: 视频内容 247×137 at (1,2), stroke 1px #EAEAEA */
+#preview-screen #preview-wrapper {
+  position: absolute;
+  top: 2px;
+  left: 1px;
+  width: 247px;
+  height: 137px;
+  overflow: hidden;
+  z-index: 1;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 18px;
+}
+
+/* Status bar — Figma: controls at y:145-168 */
+#preview-screen #preview-status {
+  position: absolute;
+  left: 11px;
+  right: 14px;
+  bottom: 8px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 2;
+}
+
+/* Status dot — Figma: 8×8 ellipse, #D4FF00 */
+#preview-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #D4FF00;
+}
+#preview-dot.paused { background: #ffaa00; }
+
+/* Time text — Figma: Inter Light, 8px, black */
+#preview-time {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 8px;
+  font-weight: 300;
+  color: #000;
+  white-space: nowrap;
+}
+
+#preview-name {
+  font-size: 8px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: auto;
+}
+
+/* ================================================================
+   Right Panel — Properties (Figma: 右侧属性栏, 250x588 at y=235)
+   ================================================================ */
+#right-panel {
+  position: absolute;
+  top: 235px;
+  right: 11px;
+  width: 250px;
+  bottom: 8px;
+  z-index: 10;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid #DEDEDE;
+  border-radius: 20px;
+  box-shadow: 15px 14px 25.6px rgba(101,104,0,0.08);
+  color: #000;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-size: 12px;
+  font-weight: 420;
+}
+
+#right-panel::-webkit-scrollbar { width: 4px; }
+#right-panel::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+
+.panel-section {
+  border-bottom: none;
+  margin: 0 15px;
+  padding: 0;
+}
+.panel-section:first-child { padding-top: 12px; }
+.panel-section:last-child { padding-bottom: 10px; }
+
+/* Section divider line */
+.section-divider {
+  width: 100%;
+  height: 0;
+  border-top: 0.5px solid rgba(0,0,0,0.1);
+  margin: 8px 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  height: 24px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #000;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.section-header:hover { color: #666; }
+
+/* Section header without toggle — no pointer cursor */
+.section-header-static {
+  cursor: default;
+}
+.section-header-static:hover { color: #000; }
+
+/* Collapse toggle button (+ / -) */
+.section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  background: #fff;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  font-size: 12px;
+  color: #000;
+  font-weight: 400;
+}
+.section-toggle:hover { background: #e0e0e0; }
+
+.section-body {
+  padding: 4px 6px;
+}
+.section-body.collapsed { display: none; }
+
+#preview-video {
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* Inspector rows & inputs */
+.inspector-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.inspector-row label {
+  width: auto;
+  font-size: 10px;
+  color: #938e8e;
+  font-weight: 400;
+  flex-shrink: 0;
+  min-width: 48px;
+}
+
+.inspector-row .label-wide {
+  min-width: 56px;
+}
+
+/* Two-column input pair (X/Y, W/h) */
+.inspector-pair {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+.inspector-pair .input-box {
+  box-sizing: border-box;
+  flex: 0 0 96px;
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: #f2f2f2;
+}
+.inspector-pair .input-box .box-label {
+  font-size: 8px;
+  color: #6c6c6c;
+  font-weight: 400;
+  flex-shrink: 0;
+}
+.inspector-pair .input-box input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 8px;
+  color: #6c6c6c;
+  outline: none;
+  padding: 0;
+}
+.inspector-pair .input-box input:focus {
+  color: #000;
+}
+
+.inspector-row input, .inspector-row select {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: #f2f2f2;
+  color: #000;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 420;
+  outline: none;
+}
+
+.inspector-row input:focus, .inspector-row select:focus {
+  border-color: var(--color-accent);
+}
+
+/* Full-width row — no label, children justified to ends */
+.inspector-row-full input[type="range"] {
+  flex: 1;
+}
+.inspector-row-full span {
+  flex-shrink: 0;
+}
+
+/* Pill slider — matching Figma (16px track, 14px circle thumb) */
+.inspector-row input[type="range"] {
+  padding: 0;
+  height: 16px;
+  border: none;
+  border-radius: 46px;
+  background: #f7f7f7;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.inspector-row input[type="range"]::-webkit-slider-runnable-track {
+  height: 16px;
+  border-radius: 46px;
+  background: #f7f7f7;
+}
+.inspector-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #5e5e5e;
+  margin-top: 1px;
+  cursor: pointer;
+}
+
+/* Color bar input */
+.inspector-color-bar {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  gap: 8px;
+  border-radius: 5px;
+  background: #f2f2f2;
+  margin-bottom: 6px;
+}
+.inspector-color-bar .color-swatch {
+  width: 11px; height: 11px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.inspector-color-bar span {
+  font-size: 8px;
+  color: #938e8e;
+}
+.inspector-color-bar input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 8px;
+  color: #6c6c6c;
+  outline: none;
+}
+.inspector-color-bar .opacity-val {
+  font-size: 8px;
+  color: #938e8e;
+  flex-shrink: 0;
+}
+
+.inspector-hint {
+  color: #666;
+  font-size: 12px;
+  font-weight: 420;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* Radio group */
+.radio-group {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.radio-group label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #f2f2f2;
+  color: #000;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.radio-group label.active {
+  background: var(--color-accent);
+  color: #000;
+  border-color: var(--color-accent);
+}
+
+/* Button */
+.inspector-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  height: 22px;
+  border: none;
+  border-radius: 5px;
+  background: #f2f2f2;
+  color: #000;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+}
+.inspector-btn:hover { background: #e0e0e0; }
+.inspector-btn.accent { background: var(--color-accent); }
+.inspector-btn.accent:hover { opacity: 0.85; }
+
+/* Preview wrapper & overlay canvas */
+#props-section .section-header {
+  padding: 4px 6px;
+}
+
+#preview-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+#transform-overlay-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  pointer-events: auto;
+  z-index: 5;
+  display: none;
+  cursor: default;
+}
+
+/* ================================================================
+   Status Bar — hidden in Figma design
+   ================================================================ */
+#status-bar {
+  display: none;
+}
+
+/* ================================================================
+   Help panel
+   ================================================================ */
+#help-panel {
+  display: none;
+  position: fixed;
+  top: 60px; right: 20px;
+  width: 280px;
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--rounded-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  z-index: 100;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 420;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+}
+#help-panel.visible { display: block; }
+
+#help-panel h3 {
+  font-size: 13px; font-weight: 550; margin-bottom: 8px;
+}
+.help-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 5px;
+}
+.help-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px; height: 18px;
+  padding: 0 5px;
+  border-radius: var(--rounded-sm);
+  background: var(--color-canvas);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-panel-border);
+}
+.help-desc { color: #666; }
+
+/* Hidden video for thumbnail extraction */
+#hidden-video {
+  display: none;
+}
+
+/* ================================================================
+   Context Menu
+   ================================================================ */
+#context-menu {
+  position: fixed;
+  z-index: 200;
+  display: none;
+  background: #ffffff;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 160px;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  color: #000;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+.cm-item {
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.cm-item:hover {
+  background: rgba(0,0,0,0.05);
+}
+.cm-item.danger {
+  color: #e04040;
+}
+.cm-item.disabled {
+  color: #aaa;
+  pointer-events: none;
+}
+.cm-sep {
+  height: 1px;
+  background: var(--color-panel-border);
+  margin: 4px 8px;
+}
+
+/* ================================================================
+   Fullscreen & Immersive overlays
+   ================================================================ */
+#fullscreen-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 9999;
+  display: none;
+  justify-content: center;
+  align-items: center;
+}
+#fullscreen-preview-overlay.fullscreen-active {
+  display: flex;
+}
+#fullscreen-preview-overlay .close-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #666;
+  font-size: 12px;
+  font-family: var(--font-sans);
+}
+
+#ebox-immersive-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 9999;
+  display: none;
+  justify-content: center;
+  align-items: center;
+}
+#ebox-immersive-overlay.immersive-active {
+  display: flex;
+}
+#ebox-immersive-overlay .close-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #666;
+  font-size: 12px;
+  font-family: var(--font-sans);
+}
+#ebox-immersive-overlay .float-tools.visible {
+  display: flex !important;
+}
+
+/* ================================================================
+   Volume input
+   ================================================================ */
+#volume-input {
+  background: #f2f2f2 !important;
+  border: 1px solid var(--color-accent) !important;
+  color: #000 !important;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: center;
+  border-radius: var(--rounded-sm);
+  outline: none;
+}

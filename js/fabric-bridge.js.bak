@@ -1,0 +1,982 @@
+// ================================================================
+// Fabric.js Drawing
+// ================================================================
+let fabricCanvas = null;
+
+function initFabricCanvas() {
+  // Make selection controls bold and visible for all objects
+  fabric.Object.prototype.borderColor = '#0066ff';
+  fabric.Object.prototype.borderScaleFactor = 0.6;  // border lineWidth = 1/0.6 ≈ 1.7px
+  fabric.Object.prototype.cornerColor = '#ffffff';
+  fabric.Object.prototype.cornerStrokeColor = '#0066ff';
+  fabric.Object.prototype.cornerSize = 14;
+  fabric.Object.prototype.cornerStyle = 'rect';
+  fabric.Object.prototype.cornerStrokeWidth = 1.5;
+  fabric.Object.prototype.transparentCorners = false;
+  fabric.Object.prototype.padding = 8;
+  fabric.Object.prototype.borderOpacityWhenMoving = 1;
+
+  fabricCanvas = new fabric.Canvas('fabric-canvas', {
+    selection: true,
+    preserveObjectStacking: true,
+    // Rubber-band selection styling
+    selectionColor: 'rgba(0,102,255,0.1)',
+    selectionBorderColor: '#0066ff',
+    selectionLineWidth: 1,
+    // Per-object controls
+    borderColor: '#0066ff',
+    borderScaleFactor: 0.6,
+    cornerColor: '#ffffff',
+    cornerStrokeColor: '#0066ff',
+    cornerSize: 14,
+    cornerStyle: 'rect',
+    transparentCorners: false,
+    padding: 8
+  });
+  syncFabricSizeAndTransform();
+
+  // Set initial button active state
+  document.querySelectorAll('.float-btn[data-tool]').forEach(btn => {
+    btn.classList.toggle('active-tool', btn.dataset.tool === 'select');
+  });
+
+  // Block scroll zoom/pan when edit box is active (Fabric-level guard)
+  fabricCanvas.on('mouse:wheel', (opt) => {
+    if (state.interaction.activeEditBoxId) {
+      opt.e.preventDefault();
+      opt.e.stopPropagation();
+    }
+  });
+
+  fabricCanvas.on('object:modified', (e) => {
+    const obj = e.target;
+    if (obj && obj._isEditBoxShape) {
+      _updateEditBoxShapeFromObj(obj);
+    } else if (obj && obj._shapeId) {
+      _updateShapeDataFromObj(obj);
+    }
+    renderLayerList();
+    render();
+  });
+
+  // Keep layer list in sync when objects are added/removed
+  fabricCanvas.on('object:added', () => { renderLayerList(); });
+  fabricCanvas.on('object:removed', () => { renderLayerList(); _fcSyncContainerState(); });
+  fabricCanvas.on('selection:created', () => {
+    renderLayerList();
+    updateInspectorForFabricSelection();
+    render();
+    fabricCanvas.requestRenderAll();
+  });
+  fabricCanvas.on('selection:updated', () => {
+    updateInspectorForFabricSelection();
+    render();
+    fabricCanvas.requestRenderAll();
+  });
+  fabricCanvas.on('selection:cleared', () => {
+    renderLayerList();
+    updateInspector();
+    render();
+    fabricCanvas.requestRenderAll();
+  });
+
+  // Fabric mouse:down — only fires when drawing-active is on (cursor over a shape).
+  // No cross-layer logic needed: cards/groups receive events through the 2D canvas.
+  fabricCanvas.on('mouse:down', (opt) => {
+    if (state.interaction.activeEditBoxId) return;
+    const target = fabricCanvas.findTarget(opt.e);
+    if (!target && !opt.e.shiftKey && !opt.e.metaKey && !opt.e.ctrlKey) {
+      // Clicked empty Fabric space (unlikely with hover-based routing, but handle edge case)
+      fabricCanvas.discardActiveObject();
+      fabricCanvas.requestRenderAll();
+    }
+  });
+
+  // Text editing: commit on exit, remove if empty
+  fabricCanvas.on('text:editing:exited', (e) => {
+    const obj = e.target;
+    if (!obj || obj._shapeType !== 'text') return;
+    if (!obj.text || obj.text.trim() === '') {
+      // Empty text — remove the object
+      // If it's an edit box shape, also remove from eb.shapes
+      if (obj._isEditBoxShape && obj._editBoxId) {
+        const eb = findEditBoxById(obj._editBoxId);
+        if (eb) eb.shapes = (eb.shapes || []).filter(s => s.id !== obj._shapeId);
+      }
+      fabricCanvas.remove(obj);
+      fabricCanvas.discardActiveObject();
+      fabricCanvas.requestRenderAll();
+      _fcSyncContainerState();
+      updateInspector();
+      render();
+    } else if (!obj._committed) {
+      // First time committing non-empty text — push to undo stack
+      obj._committed = true;
+      pushUndo();
+      if (obj._isEditBoxShape && obj._editBoxId) {
+        const eb = findEditBoxById(obj._editBoxId);
+        if (eb) {
+          eb.shapes = eb.shapes || [];
+          const entry = _fabricEditBoxObjToShapeData(obj, eb);
+          if (entry) { entry.id = obj._shapeId; eb.shapes.push(entry); }
+          _updateEditBoxShapeFromObj(obj);
+        }
+      } else {
+        const shapeEntry = _fabricObjToShapeData(obj, obj._shapeId, 'text');
+        state.shapes.push(shapeEntry);
+        _updateShapeDataFromObj(obj);
+      }
+      updateInspectorForFabricSelection();
+      render();
+    } else {
+      // Subsequent edits — update existing data
+      if (obj._isEditBoxShape) {
+        _updateEditBoxShapeFromObj(obj);
+      } else {
+        _updateShapeDataFromObj(obj);
+      }
+      render();
+    }
+  });
+}
+
+function syncFabricSizeAndTransform() {
+  if (!fabricCanvas) return;
+  const w = canvasWrap.clientWidth;
+  const h = canvasWrap.clientHeight;
+  if (fabricCanvas.width !== w || fabricCanvas.height !== h) {
+    fabricCanvas.setWidth(w);
+    fabricCanvas.setHeight(h);
+  }
+
+  fabricCanvas.calcOffset();
+  const vpt = fabricCanvas.viewportTransform;
+  if (vpt) {
+    vpt[0] = state.canvas.zoom;
+    vpt[1] = 0;
+    vpt[2] = 0;
+    vpt[3] = state.canvas.zoom;
+    vpt[4] = state.canvas.offsetX;
+    vpt[5] = state.canvas.offsetY;
+  }
+  // Force recalc of oCoords — strokeUniform makes coords depend on zoom
+  fabricCanvas.getObjects().forEach(o => o.setCoords());
+  fabricCanvas.requestRenderAll();
+}
+
+function _fcSyncContainerState() {
+  const container = fabricCanvas.wrapperEl;
+  const nonSelectTool = state.drawingTool !== 'select' && state.drawingTool !== 'line';
+  const editBoxActive = !!state.interaction.activeEditBoxId;
+  const hasShapes = fabricCanvas.getObjects().length > 0;
+  // drawing-active ON when:
+  //   - Drawing with a tool, or editing an edit box, or
+  //   - In select mode with shapes (hover will turn it off over cards)
+  // OFF when in select mode with no shapes (events must reach 2D canvas).
+  if (nonSelectTool || editBoxActive || hasShapes) {
+    container.classList.add('drawing-active');
+  } else {
+    container.classList.remove('drawing-active');
+  }
+  // Visual indication for edit mode on the main canvas wrapper
+  if (editBoxActive) {
+    canvasWrap.classList.add('editbox-editing');
+  } else {
+    canvasWrap.classList.remove('editbox-editing');
+  }
+}
+
+// Toggle Fabric pointer-events based on cursor position.
+// Called from mousemove only (not mousedown — CSS pointer-events is evaluated
+// at dispatch time, so changing the class in a handler can't redirect the
+// current event).
+// Logic:
+//   - Over a shape        → drawing-active ON  (Fabric handles)
+//   - Over a 2D card      → drawing-active OFF (events pass through to 2D)
+//   - Empty space + shapes → drawing-active ON  (Fabric frame-selects)
+//   - Empty space, no shapes → drawing-active OFF
+function _updateFabricPointerEvents(clientX, clientY) {
+  if (!fabricCanvas) return;
+  const container = fabricCanvas.wrapperEl;
+  const nonSelectTool = state.drawingTool !== 'select' && state.drawingTool !== 'line';
+  const editBoxActive = !!state.interaction.activeEditBoxId;
+  if (nonSelectTool || editBoxActive) return;
+
+  const hasShapes = fabricCanvas.getObjects().length > 0;
+
+  // 1. Over a Fabric shape → Fabric takes it
+  const canvasPos = fabricCanvas.getPointer({ clientX, clientY });
+  for (const obj of fabricCanvas.getObjects()) {
+    if (obj.selectable === false) continue;
+    if (obj.containsPoint(canvasPos)) {
+      container.classList.add('drawing-active');
+      return;
+    }
+  }
+
+  // 2. Not over a shape. If there are shapes, check if over a 2D card.
+  if (hasShapes) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    // Quick card hit-test (bounding-box only, avoids full hitTest)
+    let overCard = false;
+    for (const card of state.cards) {
+      const cw = getCardWidth(card);
+      const ch = (card.type === 'text') ? (card.height || 40) : CARD_HEIGHT;
+      const wsx = card.x * state.canvas.zoom + state.canvas.offsetX;
+      const wsy = card.y * state.canvas.zoom + state.canvas.offsetY;
+      const wsw = cw * state.canvas.zoom;
+      const wsh = ch * state.canvas.zoom;
+      if (sx >= wsx && sx <= wsx + wsw && sy >= wsy && sy <= wsy + wsh) {
+        overCard = true;
+        break;
+      }
+    }
+    if (overCard) {
+      // Over a card → let 2D canvas handle it
+      container.classList.remove('drawing-active');
+      return;
+    }
+  }
+
+  // 3. Empty space (not over shape, not over card)
+  if (hasShapes) {
+    container.classList.add('drawing-active');  // Fabric frame-select
+  } else {
+    container.classList.remove('drawing-active');
+  }
+}
+
+// ================================================================
+// Unified drag: move Fabric shapes together with 2D cards
+// ================================================================
+
+// Lock Fabric shapes so they don't move via native Fabric drag during unified drag
+function _lockFabricShapesForDrag() {
+  const activeObj = fabricCanvas.getActiveObject();
+  if (!activeObj) return;
+  const objs = activeObj.type === 'activeselection' ? activeObj.getObjects() : [activeObj];
+  objs.forEach(obj => {
+    obj._wasLockedX = obj.lockMovementX;
+    obj._wasLockedY = obj.lockMovementY;
+    obj.set({ lockMovementX: true, lockMovementY: true });
+  });
+}
+
+function _unlockFabricShapesAfterDrag() {
+  fabricCanvas.getObjects().forEach(obj => {
+    if (obj._wasLockedX !== undefined) {
+      obj.set({ lockMovementX: obj._wasLockedX, lockMovementY: obj._wasLockedY });
+      delete obj._wasLockedX;
+      delete obj._wasLockedY;
+    }
+  });
+}
+
+// Record start positions of all selected Fabric shapes
+function _recordFabricShapeStartPos() {
+  const positions = [];
+  const activeObj = fabricCanvas.getActiveObject();
+  if (!activeObj) return positions;
+  const objs = activeObj.type === 'activeselection' ? activeObj.getObjects() : [activeObj];
+  objs.forEach(obj => {
+    positions.push({ obj, left: obj.left, top: obj.top });
+  });
+  return positions;
+}
+
+// Move Fabric shapes by (dx, dy) from their recorded start positions
+function _moveFabricShapesDelta(startPositions, dx, dy) {
+  for (const entry of startPositions) {
+    entry.obj.set({ left: entry.left + dx, top: entry.top + dy });
+    entry.obj.setCoords();
+  }
+  fabricCanvas.requestRenderAll();
+}
+
+function setDrawingTool(tool) {
+  // Clean up any in-progress drawing before switching
+  if (tool !== state.drawingTool) {
+    if (state._drawing && state._drawing.obj) {
+      fabricCanvas.remove(state._drawing.obj);
+      fabricCanvas.requestRenderAll();
+    }
+    state._drawing = null;
+    if (state._pathDraw) {
+      fabricCanvas.remove(state._pathDraw.obj);
+      fabricCanvas.requestRenderAll();
+    }
+    state._pathDraw = null;
+    state.interaction.mode = 'idle';
+  }
+
+  state.drawingTool = tool;
+
+  document.querySelectorAll('.float-btn[data-tool]').forEach(btn => {
+    btn.classList.toggle('active-tool', btn.dataset.tool === tool);
+  });
+
+  // Shape drawing cursor
+  const shapeTools = ['rect', 'ellipse', 'line', 'path'];
+  if (shapeTools.includes(tool)) {
+    canvasWrap.classList.add('shape-drawing');
+  } else {
+    canvasWrap.classList.remove('shape-drawing');
+  }
+
+  if (fabricCanvas) {
+    const container = fabricCanvas.wrapperEl;
+    if (tool === 'select') {
+      fabricCanvas.isDrawingMode = false;
+      fabricCanvas.selection = true;
+      // Re-enable selectable/evented on objects (may have been disabled by previous tool)
+      fabricCanvas.forEachObject(o => {
+        if (o._isEditBoxShape) {
+          o.selectable = true;
+          o.evented = true;
+        } else if (o._shapeId && !state.interaction.activeEditBoxId) {
+          o.selectable = true;
+          o.evented = true;
+        }
+      });
+      fabricCanvas.requestRenderAll();
+      _fcSyncContainerState();
+    } else if (tool === 'line') {
+      // Line tool works on 2D canvas — keep Fabric interactive but deselect
+      fabricCanvas.discardActiveObject();
+      container.classList.remove('drawing-active');
+      fabricCanvas.requestRenderAll();
+    } else {
+      fabricCanvas.discardActiveObject();
+      if (tool !== 'path') {
+        container.classList.add('drawing-active');
+      } else {
+        container.classList.remove('drawing-active');
+      }
+      fabricCanvas.isDrawingMode = false;
+      fabricCanvas.selection = false;
+      fabricCanvas.forEachObject(o => {
+        o.selectable = false;
+        o.evented = false;
+      });
+      fabricCanvas.requestRenderAll();
+    }
+  }
+
+}
+
+// ================================================================
+// Shape Helper Utilities
+// ================================================================
+function getShapeBounds(s) {
+  if (s.shapeType === 'rect' || s.shapeType === 'text') {
+    return { x: s.left, y: s.top, w: s.width || 100, h: s.height || 40 };
+  } else if (s.shapeType === 'ellipse') {
+    return { x: s.left, y: s.top, w: s.width || 100, h: s.height || 100 };
+  } else if (s.shapeType === 'line') {
+    const minX = Math.min(s.x1, s.x2), maxX = Math.max(s.x1, s.x2);
+    const minY = Math.min(s.y1, s.y2), maxY = Math.max(s.y1, s.y2);
+    return { x: minX, y: minY, w: Math.max(maxX - minX, 2), h: Math.max(maxY - minY, 2) };
+  }
+  return null;
+}
+
+function _offsetShape(s, dx, dy) {
+  if (s.shapeType === 'line') { s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy; }
+  else { if (s.left != null) s.left += dx; if (s.top != null) s.top += dy; }
+}
+
+function _serializeShape(obj) {
+  if (!obj || !obj._shapeId) return null;
+  const data = {
+    id: obj._shapeId,
+    shapeType: obj._shapeType || 'rect',
+    left: obj.left, top: obj.top,
+    width: obj.type === 'ellipse' ? (obj.rx * 2) : (obj.width * (obj.scaleX || 1)),
+    height: obj.type === 'ellipse' ? (obj.ry * 2) : (obj.height * (obj.scaleY || 1)),
+    fill: obj.fill || null,
+    stroke: obj.stroke || null,
+    strokeWidth: obj.strokeWidth || 2,
+    opacity: obj.opacity != null ? obj.opacity : 1,
+    angle: obj.angle || 0,
+  };
+  if (obj._shapeType === 'text') {
+    data.text = obj.text || '';
+    data.fontSize = obj.fontSize || 24;
+    data.fontFamily = obj.fontFamily || 'Inter';
+    data.fontWeight = obj.fontWeight || 'Bold';
+    data.textAlign = obj.textAlign || 'left';
+  }
+  return data;
+}
+
+function createCompositionCard(editBoxId) {
+  const eb = findEditBoxById(editBoxId);
+  if (!eb) return;
+  pushUndo();
+  const compId = 'comp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  const totalDuration = 5;
+  const compCard = {
+    id: compId,
+    type: 'composition',
+    editBoxId: eb.id,
+    x: eb.x + eb.width + 40,
+    y: eb.y,
+    width: totalDuration * PIXELS_PER_SECOND,
+    height: CARD_HEIGHT,
+    duration: totalDuration,
+    totalDuration: totalDuration,
+    trimStart: 0,
+    trimEnd: totalDuration,
+    trimIn: 0,
+    trimOut: totalDuration,
+    label: eb.shapes && eb.shapes.length > 0 ? '合成 ' + (eb.shapes.length) + ' 图形' : '合成',
+    layer: state.cards.length
+  };
+  state.cards.push(compCard);
+  state.compositionCards.push(compCard);
+  state.selection.cardIds = [compId];
+  state.selection.editBoxId = null;
+  state.selection.groupIds = [];
+  render();
+}
+
+// ================================================================
+// Fabric Shape Drawing Helpers
+// ================================================================
+function createFabricShape(type, x, y) {
+  const z = state.canvas.zoom;
+  // x,y are already in world coordinates (from screenToWorld).
+  // Fabric's viewportTransform applies zoom, so internal coords = world coords.
+  const opts = {
+    left: x,
+    top: y,
+    width: 0,
+    height: 0,
+    fill: 'rgba(0,102,255,0.15)',
+    stroke: '#0066ff',
+    strokeWidth: 2 / z,
+    strokeUniform: true,
+    selectable: false,
+    evented: false
+  };
+
+  switch (type) {
+    case 'rect':
+      return new fabric.Rect({ ...opts, originX: 'left', originY: 'top' });
+    case 'ellipse':
+      return new fabric.Ellipse({ ...opts, rx: 0, ry: 0, originX: 'left', originY: 'top' });
+    default:
+      return null;
+  }
+}
+
+function updateFabricShape(drawing, mx, my) {
+  const z = state.canvas.zoom;
+  const startX = drawing.startX;
+  const startY = drawing.startY;
+  const type = drawing.shapeType;
+
+  // rect / ellipse
+  let w = mx - startX;
+  let h = my - startY;
+  const absW = Math.abs(w);
+  const absH = Math.abs(h);
+
+  if (type === 'ellipse') {
+    drawing.obj.set({
+      rx: absW / 2,
+      ry: absH / 2,
+      left: (w >= 0 ? startX : mx),
+      top: (h >= 0 ? startY : my)
+    });
+  } else {
+    drawing.obj.set({
+      width: absW,
+      height: absH,
+      left: (w >= 0 ? startX : mx),
+      top: (h >= 0 ? startY : my)
+    });
+  }
+  drawing.obj.setCoords();
+}
+
+// Recalculate fabric.Path bounds after modifying path data array
+function _recalcPathBounds(pathObj) {
+  // Trigger Fabric's path setter to recalculate dimensions
+  pathObj.set({ path: [...pathObj.path] });
+}
+
+// Finalize path drawing — create shape entry and switch to select
+function _commitPathDraw() {
+  const pathDraw = state._pathDraw;
+  if (!pathDraw) return;
+
+  const obj = pathDraw.obj;
+  const points = pathDraw.points;
+
+  // Auto-close path if last point near first
+  if (points.length > 1) {
+    const last = points[points.length - 1];
+    const first = points[0];
+    if (Math.abs(last.x - first.x) < 10 && Math.abs(last.y - first.y) < 10) {
+      obj.path.push(['Z']);
+    }
+  }
+
+  _recalcPathBounds(obj);
+
+  const z = state.canvas.zoom;
+  obj.set({
+    stroke: '#0066ff',
+    strokeWidth: 2 / z,
+    strokeUniform: true,
+    fill: 'rgba(0,102,255,0.08)',
+    selectable: true,
+    evented: true,
+    hasControls: true,
+    hasBorders: true,
+    lockUniScaling: false
+  });
+  obj.setCoords();
+
+  const id = 'shape_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  obj._shapeId = id;
+  obj._shapeType = 'path';
+
+  const shapeEntry = _fabricObjToShapeData(obj, id, 'path');
+  pushUndo();
+  state.shapes.push(shapeEntry);
+
+  state._pathDraw = null;
+  state.interaction.mode = 'idle';
+
+  setDrawingTool('select');
+  fabricCanvas.setActiveObject(obj);
+  fabricCanvas.requestRenderAll();
+  _fcSyncContainerState();
+  updateInspectorForFabricSelection();
+  render();
+}
+
+// 2D canvas line preview during line drawing drag
+function renderLinePreview() {
+  const d = state._drawing;
+  if (!d || d.shapeType !== 'line') return;
+
+  const z = state.canvas.zoom;
+  ctx.strokeStyle = '#0066ff';
+  ctx.lineWidth = 2 / z;
+  ctx.setLineDash([6 / z, 3 / z]);
+  ctx.beginPath();
+  ctx.moveTo(d.startX, d.startY);
+  ctx.lineTo(d.currentX, d.currentY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw endpoints
+  ctx.fillStyle = '#0066ff';
+  ctx.beginPath();
+  ctx.arc(d.startX, d.startY, 4 / z, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(d.currentX, d.currentY, 4 / z, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Render all line shapes (pure 2D canvas) in world space
+function renderLines() {
+  const z = state.canvas.zoom;
+  for (const s of state.shapes) {
+    if (s.shapeType !== 'line') continue;
+    ctx.save();
+    ctx.globalAlpha = s.opacity != null ? s.opacity : 1;
+    ctx.strokeStyle = s.stroke || '#0066ff';
+    ctx.lineWidth = (s.strokeWidth || 2) / z;
+    ctx.lineCap = 'round';
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(s.x1, s.y1);
+    ctx.lineTo(s.x2, s.y2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// Render endpoint handles for the selected line
+function renderLineEndpointHandles() {
+  const shapeId = state.selection.shapeId;
+  if (!shapeId) return;
+  const s = state.shapes.find(sh => sh.id === shapeId);
+  if (!s || s.shapeType !== 'line') return;
+  const z = state.canvas.zoom;
+  const r = 5 / z;
+  for (const ep of [{ x: s.x1, y: s.y1 }, { x: s.x2, y: s.y2 }]) {
+    // White stroke
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2 / z;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(ep.x, ep.y, r + 1.5 / z, 0, Math.PI * 2);
+    ctx.stroke();
+    // Blue fill
+    ctx.fillStyle = '#0066ff';
+    ctx.beginPath();
+    ctx.arc(ep.x, ep.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Serialize a Fabric shape object to state.shapes entry
+function _fabricObjToShapeData(obj, id, shapeType) {
+  const z = state.canvas.zoom;
+  const entry = { id, shapeType };
+  if (shapeType === 'text') {
+    entry.text = obj.text || '';
+    entry.fontSize = obj.fontSize;
+    entry.fontFamily = obj.fontFamily;
+    entry.fontWeight = obj.fontWeight;
+    entry.fill = obj.fill;
+    entry.textAlign = obj.textAlign;
+    entry.left = obj.left; entry.top = obj.top;
+    entry.scaleX = obj.scaleX; entry.scaleY = obj.scaleY;
+    entry.angle = obj.angle || 0;
+    entry.opacity = obj.opacity != null ? obj.opacity : 1;
+    entry.width = obj.width;
+    entry.height = obj.height;
+  } else if (shapeType === 'path') {
+    entry.pathData = obj.path;
+    entry.stroke = obj.stroke;
+    entry.strokeWidth = obj.strokeWidth * z;
+    entry.fill = obj.fill;
+    entry.opacity = obj.opacity != null ? obj.opacity : 1;
+  } else {
+    entry.left = obj.left; entry.top = obj.top;
+    entry.width = obj.width; entry.height = obj.height;
+    entry.fill = obj.fill;
+    entry.stroke = obj.stroke;
+    entry.strokeWidth = obj.strokeWidth * z;
+    entry.opacity = obj.opacity != null ? obj.opacity : 1;
+    entry.angle = obj.angle;
+    entry.scaleX = obj.scaleX; entry.scaleY = obj.scaleY;
+  }
+  return entry;
+}
+
+// Update state.shapes entry from a Fabric object (on object:modified)
+function _updateShapeDataFromObj(obj) {
+  const sid = obj._shapeId;
+  if (!sid) return;
+  const idx = state.shapes.findIndex(s => s.id === sid);
+  if (idx < 0) return;
+  const shapeType = obj._shapeType || state.shapes[idx].shapeType;
+  state.shapes[idx] = _fabricObjToShapeData(obj, sid, shapeType);
+}
+
+// Recreate all Fabric shape objects from state.shapes (on undo/redo)
+function _syncShapesFromState() {
+  if (!fabricCanvas) return;
+  // Remove all existing shape objects
+  const toRemove = [];
+  fabricCanvas.getObjects().forEach(o => { if (o._shapeId) toRemove.push(o); });
+  toRemove.forEach(o => fabricCanvas.remove(o));
+  // Recreate from state (skip lines — they are pure 2D canvas)
+  for (const s of state.shapes) {
+    if (s.shapeType === 'line') continue;
+    _createShapeFromData(s);
+  }
+  fabricCanvas.discardActiveObject();
+  fabricCanvas.requestRenderAll();
+  _fcSyncContainerState();
+}
+
+// Create a Fabric object from shape data entry
+function _createShapeFromData(s) {
+  if (!fabricCanvas) return;
+  const z = state.canvas.zoom;
+  let obj;
+  if (s.shapeType === 'ellipse') {
+    obj = new fabric.Ellipse({
+      left: s.left, top: s.top,
+      rx: (s.width || 50) / 2, ry: (s.height || 50) / 2,
+      fill: s.fill || 'rgba(0,102,255,0.15)',
+      stroke: s.stroke || '#0066ff',
+      strokeWidth: (s.strokeWidth || 2) / z,
+      strokeUniform: true,
+      opacity: s.opacity != null ? s.opacity : 1,
+      angle: s.angle || 0,
+      scaleX: s.scaleX || 1, scaleY: s.scaleY || 1,
+      originX: 'left', originY: 'top',
+      selectable: true, evented: true, hasControls: true, hasBorders: true
+    });
+  } else if (s.shapeType === 'text') {
+    obj = new fabric.IText(s.text || '', {
+      left: s.left, top: s.top,
+      fontSize: s.fontSize || 24,
+      fontFamily: s.fontFamily || 'Inter, system-ui, sans-serif',
+      fontWeight: s.fontWeight || 'Bold',
+      fill: s.fill || '#000000',
+      textAlign: s.textAlign || 'left',
+      opacity: s.opacity != null ? s.opacity : 1,
+      angle: s.angle || 0,
+      scaleX: s.scaleX || 1, scaleY: s.scaleY || 1,
+      editingBorderColor: '#0066ff',
+      cursorColor: '#0066ff',
+      selectionColor: 'rgba(0,102,255,0.25)',
+      selectable: true, evented: true, hasControls: true, hasBorders: true
+    });
+    obj._committed = true;
+  } else if (s.shapeType === 'path') {
+    obj = new fabric.Path(s.pathData || [], {
+      stroke: s.stroke || '#0066ff',
+      strokeWidth: (s.strokeWidth || 2) / z,
+      strokeUniform: true,
+      fill: s.fill || 'rgba(0,102,255,0.08)',
+      opacity: s.opacity != null ? s.opacity : 1,
+      selectable: true, evented: true, hasControls: true, hasBorders: true
+    });
+  } else { // rect
+    obj = new fabric.Rect({
+      left: s.left, top: s.top,
+      width: s.width || 50, height: s.height || 50,
+      fill: s.fill || 'rgba(0,102,255,0.15)',
+      stroke: s.stroke || '#0066ff',
+      strokeWidth: (s.strokeWidth || 2) / z,
+      strokeUniform: true,
+      opacity: s.opacity != null ? s.opacity : 1,
+      angle: s.angle || 0,
+      scaleX: s.scaleX || 1, scaleY: s.scaleY || 1,
+      originX: 'left', originY: 'top',
+      selectable: true, evented: true, hasControls: true, hasBorders: true
+    });
+  }
+  obj._shapeId = s.id;
+  obj._shapeType = s.shapeType;
+  fabricCanvas.add(obj);
+}
+
+// Update inspector when a Fabric shape is selected
+function updateInspectorForFabricSelection() {
+  const active = fabricCanvas && fabricCanvas.getActiveObject();
+  if (!active || !active._shapeId) {
+    // Fall back to normal inspector
+    updateInspector();
+    return;
+  }
+  // Text objects have their own inspector
+  if (active._shapeType === 'text') {
+    updateInspectorForFabricText();
+    return;
+  }
+
+  // Show shape-specific inspector
+  const st = active._shapeType;
+  const z = state.canvas.zoom;
+  const typeNames = { rect: '矩形', ellipse: '圆形', line: '直线', path: '路径' };
+  let fill = active.fill || 'rgba(0,102,255,0.15)';
+  let stroke = active.stroke || '#0066ff';
+  let strokeWidth = Math.round((active.strokeWidth || 2 / z) * z);
+  let opacity = active.opacity != null ? active.opacity : 1;
+
+  const isLine = st === 'line';
+  const isPath = st === 'path';
+  const hasFill = !isLine; // lines don't have fill
+  const hasSize = !isLine && !isPath; // only rect/ellipse have width/height fields
+
+  let html = '<div class="inspector-row" style="font-weight:550;">图形属性</div>';
+  html += `<div class="inspector-row"><label>类型</label><span style="font-size:11px;color:#999;">${typeNames[st] || st}</span></div>`;
+
+  if (hasFill) {
+    html += `<div class="inspector-row"><label>填充</label><input type="color" id="insp-shape-fill" value="${_colorToHex(fill)}"></div>`;
+  }
+
+  html += `<div class="inspector-row"><label>描边</label><input type="color" id="insp-shape-stroke" value="${_colorToHex(stroke)}"></div>`;
+  html += `<div class="inspector-row"><label>线宽</label><input type="number" id="insp-shape-strokew" value="${strokeWidth}" min="1" max="20" step="1"></div>`;
+  html += `<div class="inspector-row"><label>不透明度</label><input type="range" id="insp-shape-opacity" min="0" max="100" value="${Math.round(opacity * 100)}"><span style="font-size:10px;color:#999;width:28px;">${Math.round(opacity * 100)}%</span></div>`;
+
+  if (hasSize) {
+    let width, height;
+    if (st === 'ellipse') {
+      width = Math.round(active.rx * 2 * active.scaleX);
+      height = Math.round(active.ry * 2 * active.scaleY);
+    } else {
+      width = Math.round(active.width * active.scaleX);
+      height = Math.round(active.height * active.scaleY);
+    }
+    html += `<div class="inspector-row"><label>宽</label><input type="number" id="insp-shape-w" value="${width}" min="1" step="1"></div>`;
+    html += `<div class="inspector-row"><label>高</label><input type="number" id="insp-shape-h" value="${height}" min="1" step="1"></div>`;
+  }
+
+  propsContent.innerHTML = html;
+  _bindShapeInspectorEvents();
+}
+
+// ================================================================
+// Text inspector (Fabric.IText)
+// ================================================================
+function updateInspectorForFabricText() {
+  const active = fabricCanvas && fabricCanvas.getActiveObject();
+  if (!active || active._shapeType !== 'text') return;
+
+  const fontFamilies = ['Inter', 'Arial', 'Georgia', 'monospace', 'system-ui'];
+  const ff = active.fontFamily || 'Inter, system-ui, sans-serif';
+  const ffBase = ff.split(',')[0].replace(/['"]/g, '').trim();
+
+  let html = '<div class="inspector-row" style="font-weight:550;">文字属性</div>';
+  html += `<div class="inspector-row"><label>类型</label><span style="font-size:11px;color:#999;">文字</span></div>`;
+  html += `<div class="inspector-row"><label>字体</label><select id="insp-text-font">`;
+  fontFamilies.forEach(f => {
+    html += `<option value="${f}" ${ffBase === f ? 'selected' : ''}>${f}</option>`;
+  });
+  html += `</select></div>`;
+  html += `<div class="inspector-row"><label>字号</label><input type="number" id="insp-text-size" value="${active.fontSize || 24}" min="8" max="200" step="1"></div>`;
+  html += `<div class="inspector-row"><label>粗细</label><select id="insp-text-weight">
+    <option value="normal" ${active.fontWeight === 'normal' ? 'selected' : ''}>常规</option>
+    <option value="bold" ${active.fontWeight !== 'normal' ? 'selected' : ''}>粗体</option>
+  </select></div>`;
+  html += `<div class="inspector-row"><label>颜色</label><input type="color" id="insp-text-color" value="${_colorToHex(active.fill || '#000000')}"></div>`;
+  html += `<div class="inspector-row"><label>对齐</label><select id="insp-text-align">
+    <option value="left" ${active.textAlign === 'left' ? 'selected' : ''}>左对齐</option>
+    <option value="center" ${active.textAlign === 'center' ? 'selected' : ''}>居中</option>
+    <option value="right" ${active.textAlign === 'right' ? 'selected' : ''}>右对齐</option>
+  </select></div>`;
+  html += `<div class="inspector-row"><label>不透明度</label><input type="range" id="insp-text-opacity" min="0" max="100" value="${Math.round((active.opacity != null ? active.opacity : 1) * 100)}"><span style="font-size:10px;color:#999;width:28px;">${Math.round((active.opacity != null ? active.opacity : 1) * 100)}%</span></div>`;
+
+  propsContent.innerHTML = html;
+  _bindTextInspectorEvents();
+}
+
+function _bindTextInspectorEvents() {
+  const active = fabricCanvas && fabricCanvas.getActiveObject();
+  if (!active || active._shapeType !== 'text') return;
+
+  const fontEl = document.getElementById('insp-text-font');
+  const sizeEl = document.getElementById('insp-text-size');
+  const weightEl = document.getElementById('insp-text-weight');
+  const colorEl = document.getElementById('insp-text-color');
+  const alignEl = document.getElementById('insp-text-align');
+  const opEl = document.getElementById('insp-text-opacity');
+
+  const apply = () => {
+    if (fontEl) active.set({ fontFamily: fontEl.value });
+    if (sizeEl) active.set({ fontSize: parseInt(sizeEl.value) || 24 });
+    if (weightEl) active.set({ fontWeight: weightEl.value });
+    if (colorEl) active.set({ fill: colorEl.value });
+    if (alignEl) active.set({ textAlign: alignEl.value });
+    if (opEl) active.set({ opacity: parseInt(opEl.value) / 100 });
+    active.setCoords();
+    fabricCanvas.requestRenderAll();
+    _updateShapeDataFromObj(active);
+  };
+
+  if (fontEl) fontEl.addEventListener('input', apply);
+  if (sizeEl) sizeEl.addEventListener('input', apply);
+  if (weightEl) weightEl.addEventListener('change', apply);
+  if (colorEl) colorEl.addEventListener('input', apply);
+  if (alignEl) alignEl.addEventListener('change', apply);
+  if (opEl) opEl.addEventListener('input', apply);
+}
+
+function _bindShapeInspectorEvents() {
+  const active = fabricCanvas && fabricCanvas.getActiveObject();
+  if (!active || !active._shapeId) return;
+  const z = state.canvas.zoom;
+
+  const fillEl = document.getElementById('insp-shape-fill');
+  const strokeEl = document.getElementById('insp-shape-stroke');
+  const swEl = document.getElementById('insp-shape-strokew');
+  const opEl = document.getElementById('insp-shape-opacity');
+  const wEl = document.getElementById('insp-shape-w');
+  const hEl = document.getElementById('insp-shape-h');
+
+  const apply = () => {
+    if (fillEl) {
+      active.set({ fill: fillEl.value });
+    }
+    if (strokeEl) {
+      active.set({ stroke: strokeEl.value });
+    }
+    if (swEl) {
+      active.set({ strokeWidth: parseInt(swEl.value) / z });
+    }
+    if (opEl) {
+      active.set({ opacity: parseInt(opEl.value) / 100 });
+    }
+    if (wEl) {
+      const newW = parseInt(wEl.value);
+      if (active._shapeType === 'ellipse') {
+        active.set({ rx: newW / 2 / active.scaleX });
+      } else {
+        active.set({ width: newW / active.scaleX });
+      }
+    }
+    if (hEl) {
+      const newH = parseInt(hEl.value);
+      if (active._shapeType === 'ellipse') {
+        active.set({ ry: newH / 2 / active.scaleY });
+      } else {
+        active.set({ height: newH / active.scaleY });
+      }
+    }
+    active.setCoords();
+    fabricCanvas.requestRenderAll();
+    _updateShapeDataFromObj(active);
+    render();
+  };
+
+  if (fillEl) fillEl.addEventListener('input', apply);
+  if (strokeEl) strokeEl.addEventListener('input', apply);
+  if (swEl) swEl.addEventListener('input', apply);
+  if (opEl) opEl.addEventListener('input', apply);
+  if (wEl) wEl.addEventListener('input', apply);
+  if (hEl) hEl.addEventListener('input', apply);
+}
+
+// ================================================================
+// Line inspector (pure 2D canvas lines)
+// ================================================================
+function updateLineInspector(shape) {
+  const stroke = shape.stroke || '#0066ff';
+  const strokeWidth = shape.strokeWidth || 2;
+  const opacity = shape.opacity != null ? shape.opacity : 1;
+
+  let html = '<div class="inspector-row" style="font-weight:550;">直线属性</div>';
+  html += `<div class="inspector-row"><label>类型</label><span style="font-size:11px;color:#999;">直线</span></div>`;
+  html += `<div class="inspector-row"><label>颜色</label><input type="color" id="insp-line-color" value="${_colorToHex(stroke)}"></div>`;
+  html += `<div class="inspector-row"><label>线宽</label><input type="number" id="insp-line-strokew" value="${strokeWidth}" min="1" max="20" step="1"></div>`;
+  html += `<div class="inspector-row"><label>不透明度</label><input type="range" id="insp-line-opacity" min="0" max="100" value="${Math.round(opacity * 100)}"><span style="font-size:10px;color:#999;width:28px;">${Math.round(opacity * 100)}%</span></div>`;
+
+  propsContent.innerHTML = html;
+  _bindLineInspectorEvents(shape);
+}
+
+function _bindLineInspectorEvents(shape) {
+  const colorEl = document.getElementById('insp-line-color');
+  const swEl = document.getElementById('insp-line-strokew');
+  const opEl = document.getElementById('insp-line-opacity');
+
+  const apply = () => {
+    if (colorEl) shape.stroke = colorEl.value;
+    if (swEl) shape.strokeWidth = parseInt(swEl.value) || 2;
+    if (opEl) shape.opacity = parseInt(opEl.value) / 100;
+    render();
+  };
+
+  if (colorEl) colorEl.addEventListener('input', apply);
+  if (swEl) swEl.addEventListener('input', apply);
+  if (opEl) opEl.addEventListener('input', apply);
+}
+
+function _colorToHex(c) {
+  if (!c) return '#000000';
+  if (typeof c === 'string' && c.startsWith('#')) return c;
+  if (typeof c === 'string' && c.startsWith('rgba')) {
+    const m = c.match(/[\d.]+/g);
+    if (m && m.length >= 3) {
+      return '#' + [m[0], m[1], m[2]].map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+    }
+  }
+  return '#000000';
+}
+
