@@ -1351,22 +1351,37 @@ function showTutorialIndex() {
 // Init
 // ================================================================
 
-// Pre-populate demo cards on load
-window.addEventListener('DOMContentLoaded', () => {
-  const cards = _genPlaceholderCards([
-    { label: '航拍素材', duration: 20, color: '#3b82f6', x: 80, y: 80 },
-    { label: '采访片段', duration: 35, color: '#f59e0b', x: 80, y: 240 },
-    { label: '产品特写', duration: 15, color: '#10b981', x: 80, y: 400 },
-    { label: '空镜过渡', duration: 25, color: '#8b5cf6', x: 80, y: 560 },
-    { label: '背景音乐', duration: 60, color: '#ec4899', x: 80, y: 720, type: 'audio' },
-  ]);
-  state.cards = cards;
-  state.canvas.offsetX = 0;
-  state.canvas.offsetY = 0;
-  state.canvas.zoom = 0.8;
-  if (typeof renderLayerList === 'function') renderLayerList();
-  resizeCanvas();
-  render();
+// Load real demo media files on page load
+window.addEventListener('DOMContentLoaded', async () => {
+  const mediaFiles = [
+    { path: 'media/无人机操作.mp4', type: 'video' },
+    { path: 'media/无人机飞行.mp4', type: 'video' },
+    { path: 'media/海滩.mp4', type: 'video' },
+    { path: 'media/Minstrel.mp3', type: 'audio' },
+  ];
+
+  if (statusHint) statusHint.textContent = '加载素材中...';
+
+  for (const mf of mediaFiles) {
+    try {
+      const resp = await fetch(mf.path);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const blob = await resp.blob();
+      const filename = mf.path.replace('media/', '');
+      const file = new File([blob], filename, {
+        type: mf.type === 'video' ? 'video/mp4' : 'audio/mpeg'
+      });
+      if (mf.type === 'video') {
+        await importVideoFile(file);
+      } else {
+        await importAudioFile(file);
+      }
+    } catch (e) {
+      console.error('Failed to load media:', mf.path, e);
+    }
+  }
+
+  if (statusHint) statusHint.textContent = `共 ${state.cards.length} 个素材`;
 });
 
 console.log('[TUTORIAL] Tutorial engine loaded. 4 lessons ready.');
