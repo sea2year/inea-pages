@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=11');
+console.log('[inea] render-v4.js v=12');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1268,7 +1268,8 @@ function renderConnection(conn) {
     const badgeW = 44 / z;
     const badgeH = 18 / z;
     const badgeR = 9 / z;
-    const labelFontSize = 12 / Math.pow(z, 1.2);    ctx.fillStyle = highlight ? '#b3d900' : '#ffffff';
+    const labelFontSize = Math.max(6, Math.min(24, 12 / z));
+    ctx.fillStyle = highlight ? '#b3d900' : '#ffffff';
     ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
     ctx.lineWidth = 1.2 / z;
     ctx.beginPath();
@@ -1344,7 +1345,8 @@ function renderConnection(conn) {
     const badgeW = 38 / z3;
     const badgeH = 18 / z3;
     const badgeR = 9 / z3;
-    const labelFontSize = 12 / Math.pow(z3, 1.2);    const midColor = toColors ? toColors.border : 'rgb(101,84,203)';
+    const labelFontSize = Math.max(6, Math.min(24, 12 / z3));
+    const midColor = toColors ? toColors.border : 'rgb(101,84,203)';
     ctx.fillStyle = highlight ? lightenColor(midColor) : '#ffffff';
     ctx.strokeStyle = highlight ? lightenColor(midColor) : midColor;
     ctx.lineWidth = 1.2 / z3;
@@ -1463,7 +1465,7 @@ function renderConnection(conn) {
   // Badge text
   const label = TRANSITION_LABELS[conn.transition] || '切';
   ctx.fillStyle = highlight ? '#ffffff' : badgeStroke;
-  ctx.font = `${isHovered ? '550' : '450'} ${12 / Math.pow(state.canvas.zoom, 1.2)}px "Inter", system-ui, sans-serif`;
+  ctx.font = `${isHovered ? '550' : '450'} ${Math.max(6, Math.min(24, 12 / state.canvas.zoom))}px "Inter", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, mid.x, mid.y);
