@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=17');
+console.log('[inea] render-v4.js v=18');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1462,9 +1462,9 @@ function renderConnection(conn) {
   const dpr2 = window.devicePixelRatio || 1;
   ctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
 
-  // Badge size proportional to card screen height (15%, clamped 6–20px)
+  // Badge size proportional to card screen height (15%, lower clamp 4px)
   const cardScreenH = 116 * state.canvas.zoom;
-  const badgeH = Math.max(6, Math.min(20, cardScreenH * 0.15));
+  const badgeH = Math.max(4, cardScreenH * 0.15);
   const s = badgeH / 12; // scale factor from baseline (H=12)
   const badgeW = Math.round(18 * s);
   const badgeR = Math.max(1, Math.round(2 * s));
@@ -1495,8 +1495,8 @@ function renderConnection(conn) {
   // Store badge bounds for hit testing (screen-space)
   conn._badgeBounds = { x: sx - badgeW / 2, y: sy - badgeH / 2, w: badgeW, h: badgeH, screen: true };
 
-  // Delete button (visible when hovered)
-  if (isHovered) {
+  // Delete button (visible when hovered, hidden when badge too small)
+  if (isHovered && badgeH >= 7) {
     const delR = Math.max(3, Math.round(5 * s));
     const delOff = Math.round(5 * s);
     const delX = sx + badgeW / 2 + delOff;
