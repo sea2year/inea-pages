@@ -206,12 +206,12 @@
   var enterBtn = document.getElementById('loading-enter-btn');
 
   function setFill(progress) {
-    // progress: 0 to 1, scaleX 0 → 1 from left edge
-    fill.style.transform = 'skewX(-14deg) scaleX(' + progress + ')';
+    // progress: 0→1, translateX: -105% → 0%
+    fill.style.transform = 'skewX(-14deg) translateX(' + (-105 + progress * 105) + '%)';
   }
 
-  // Start at 0
-  fill.style.transform = 'skewX(-14deg) scaleX(0)';
+  // Start off-screen left
+  fill.style.transform = 'skewX(-14deg) translateX(-105%)';
 
   var mediaFiles = [
     { path: 'media/无人机操作.mp4', type: 'video', name: '无人机操作.mp4' },
