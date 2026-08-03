@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=13');
+console.log('[inea] render-v4.js v=14');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1269,7 +1269,8 @@ function renderConnection(conn) {
     const sx = mid.x * z + ox, sy = mid.y * z + oy;
 
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const dpr2 = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
 
     const badgeW = 44, badgeH = 18, badgeR = 9;
     ctx.fillStyle = highlight ? '#b3d900' : '#ffffff';
@@ -1349,7 +1350,8 @@ function renderConnection(conn) {
     const sx = mid.x * z3 + ox, sy = mid.y * z3 + oy;
 
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const dpr2 = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
 
     const badgeW = 38, badgeH = 18, badgeR = 9;
     const midColor = toColors ? toColors.border : 'rgb(101,84,203)';
@@ -1457,7 +1459,8 @@ function renderConnection(conn) {
   const sx = mid.x * state.canvas.zoom + ox, sy = mid.y * state.canvas.zoom + oy;
 
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const dpr2 = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
 
   const badgeW = 28, badgeH = 18, badgeR = 2;
 
