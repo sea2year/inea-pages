@@ -1114,8 +1114,8 @@ canvas {
   font-family: var(--font-mono); font-size: 13px; font-weight: 500;
   letter-spacing: 0.08em;
   color: #555; background: transparent;
-  border: 1px solid #ccc; border-radius: 50%;
-  width: 64px; height: 64px;
+  border: none;
+  width: auto; height: auto;
   padding: 0;
   cursor: default;
   transition: all 0.5s ease;
