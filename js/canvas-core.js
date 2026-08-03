@@ -162,17 +162,20 @@ function getCardColors(card) {
   }
 
   // Non-dynamic or legacy: preserve existing hardcoded type colors
-  // (render.js still uses per-type logic via direct color values for non-dynamic cards)
+  const t = card.type;
   return {
-    border: (card.type === 'audio') ? 'rgb(243,93,93)' : ((card.type === 'composition') ? '#D4FF00' : 'rgb(101,84,203)'),
+    border: (t === 'audio') ? 'rgb(243,93,93)' : ((t === 'image') ? 'rgb(60,150,130)' : ((t === 'composition') ? '#D4FF00' : 'rgb(101,84,203)')),
     shadow: 'rgba(101,84,203,0.18)',
-    gradientTop: 'rgba(255,255,255,0)',
-    gradientBot: 'rgba(101,84,203,0.25)',
-    label: '#1a1a1a',
-    duration: '#999',
+    gradientTop: (t === 'audio') ? 'rgba(247,152,170,0.42)' : 'rgba(255,255,255,0)',
+    gradientBot: (t === 'audio') ? 'rgba(255,255,255,0)' : ((t === 'composition') ? 'rgba(212,255,0,0.25)' : 'rgba(101,84,203,0.25)'),
+    badgeFill: (t === 'audio') ? 'rgba(247,152,170,0.8)' : ((t === 'image') ? 'rgba(160,210,200,0.8)' : 'rgba(188,183,220,0.8)'),
+    badgeStroke: (t === 'audio') ? 'rgb(243,93,120)' : ((t === 'image') ? 'rgb(60,150,130)' : 'rgb(101,84,203)'),
+    label: (t === 'audio') ? 'rgb(243,93,93)' : ((t === 'image') ? 'rgb(60,150,130)' : '#1a1a1a'),
+    duration: (t === 'audio') ? 'rgba(243,93,120,0.6)' : ((t === 'image') ? 'rgb(80,160,140)' : '#999'),
     handleColor: (alpha) => {
-      if (card.type === 'audio') return `rgba(243,93,93,${alpha})`;
-      if (card.type === 'composition') return `rgba(212,255,0,${alpha})`;
+      if (t === 'audio') return `rgba(243,93,93,${alpha})`;
+      if (t === 'image') return `rgba(60,150,130,${alpha})`;
+      if (t === 'composition') return `rgba(212,255,0,${alpha})`;
       return `rgba(101,84,203,${alpha})`;
     },
   };

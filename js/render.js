@@ -77,7 +77,7 @@ function renderCard(card) {
     }
     // Selection outline
     if (isSelected) {
-      ctx.strokeStyle = 'rgb(101, 84, 203)';
+      ctx.strokeStyle = colors.border;
       ctx.lineWidth = 2 / state.canvas.zoom;
       ctx.beginPath();
       roundRectPath(x, y, cw, ch, 4);
@@ -90,7 +90,7 @@ function renderCard(card) {
   const cardBorderColor = colors.border;
 
   // --- Card background ---
-  // Figma gradient fill: video=purple tint, audio=pink tint
+  // Figma gradient fill: per-type tint from color system
   const drawGradient = card.type === 'video' || card.type === 'audio' || card.type === 'composition' || card.type === 'synthesized-video';
   if (isSelected) {
     ctx.save();
@@ -101,16 +101,8 @@ function renderCard(card) {
     roundRect(x, y, cw, ch, r, true, false);
     if (drawGradient) {
       const grad = ctx.createLinearGradient(x, y, x, y + ch);
-      if (card.type === 'audio') {
-        grad.addColorStop(0, 'rgba(247,152,170,0.42)');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
-      } else if (card.type === 'composition') {
-        grad.addColorStop(0, 'rgba(255,255,255,0)');
-        grad.addColorStop(1, 'rgba(212,255,0,0.25)');
-      } else {
-        grad.addColorStop(0, 'rgba(255,255,255,0)');
-        grad.addColorStop(1, 'rgba(101,84,203,0.25)');
-      }
+      grad.addColorStop(0, colors.gradientTop);
+      grad.addColorStop(1, colors.gradientBot);
       ctx.fillStyle = grad;
       roundRect(x, y, cw, ch, r, true, false);
     }
@@ -124,16 +116,8 @@ function renderCard(card) {
     roundRect(x, y, cw, ch, r, true, false);
     if (drawGradient) {
       const grad = ctx.createLinearGradient(x, y, x, y + ch);
-      if (card.type === 'audio') {
-        grad.addColorStop(0, 'rgba(247,152,170,0.42)');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
-      } else if (card.type === 'composition') {
-        grad.addColorStop(0, 'rgba(255,255,255,0)');
-        grad.addColorStop(1, 'rgba(212,255,0,0.25)');
-      } else {
-        grad.addColorStop(0, 'rgba(255,255,255,0)');
-        grad.addColorStop(1, 'rgba(101,84,203,0.25)');
-      }
+      grad.addColorStop(0, colors.gradientTop);
+      grad.addColorStop(1, colors.gradientBot);
       ctx.fillStyle = grad;
       roundRect(x, y, cw, ch, r, true, false);
     }
@@ -154,16 +138,8 @@ function renderCard(card) {
     roundRect(x, y, cw, ch, r, true, false);
     if (drawGradient) {
       const grad = ctx.createLinearGradient(x, y, x, y + ch);
-      if (card.type === 'audio') {
-        grad.addColorStop(0, 'rgba(247,152,170,0.42)');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
-      } else if (card.type === 'composition') {
-        grad.addColorStop(0, 'rgba(255,255,255,0)');
-        grad.addColorStop(1, 'rgba(212,255,0,0.25)');
-      } else {
-        grad.addColorStop(0, 'rgba(255,255,255,0)');
-        grad.addColorStop(1, 'rgba(101,84,203,0.25)');
-      }
+      grad.addColorStop(0, colors.gradientTop);
+      grad.addColorStop(1, colors.gradientBot);
       ctx.fillStyle = grad;
       roundRect(x, y, cw, ch, r, true, false);
     }
@@ -186,8 +162,8 @@ function renderCard(card) {
     const badgeW = 31, badgeH = 13;
     const badgeX = x + cw - badgeW - 5;
     const badgeY = y + 3;
-    ctx.fillStyle = 'rgba(247, 152, 170, 0.8)';
-    ctx.strokeStyle = 'rgb(243, 93, 120)';
+    ctx.fillStyle = colors.badgeFill;
+    ctx.strokeStyle = colors.badgeStroke;
     ctx.lineWidth = 1 / state.canvas.zoom;
     ctx.beginPath();
     roundRectPath(badgeX, badgeY, badgeW, badgeH, badgeH / 2);
@@ -234,7 +210,7 @@ function renderCard(card) {
     // Separator + label at card bottom (Figma: name x:12, duration x:73, near bottom)
     const sepY = y + ch - 13;
     const labelTextY = y + ch - 6;
-    ctx.strokeStyle = 'rgb(243, 93, 93)';
+    ctx.strokeStyle = colors.border;
     ctx.lineWidth = 0.5 / state.canvas.zoom;
     ctx.beginPath();
     ctx.moveTo(x + 13, sepY);
@@ -242,7 +218,7 @@ function renderCard(card) {
     ctx.stroke();
 
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgb(243, 93, 93)';
+    ctx.fillStyle = colors.label;
     ctx.font = `700 10px "Inter", system-ui, sans-serif`;
     let _label = card.label;
     const _maxLabelW = cw - 90;
@@ -253,7 +229,7 @@ function renderCard(card) {
 
     if (card.duration > 0) {
       const dur = card.trimOut - card.trimIn;
-      ctx.fillStyle = 'rgba(243, 93, 120, 0.6)';
+      ctx.fillStyle = colors.duration;
       ctx.font = `400 8px "Inter", system-ui, sans-serif`;
       ctx.fillText(formatTime(dur), x + 73, labelTextY);
     }
@@ -261,7 +237,7 @@ function renderCard(card) {
 
     // Pink handles (Figma: left/right 11px bars)
     const _handleW = 11;
-    ctx.fillStyle = 'rgb(243,93,93)';
+    ctx.fillStyle = colors.border;
     ctx.fillRect(x, y, _handleW, ch);
     ctx.fillRect(x + cw - _handleW, y, _handleW, ch);
 
@@ -461,8 +437,8 @@ function renderCard(card) {
     const vBadgeW = 31, vBadgeH = 13;
     const vBadgeX = x + cw - vBadgeW - 5;
     const vBadgeY = y + 3;
-    ctx.fillStyle = 'rgba(188, 183, 220, 0.8)';
-    ctx.strokeStyle = 'rgb(101, 84, 203)';
+    ctx.fillStyle = colors.badgeFill;
+    ctx.strokeStyle = colors.badgeStroke;
     ctx.lineWidth = 1 / state.canvas.zoom;
     ctx.beginPath();
     roundRectPath(vBadgeX, vBadgeY, vBadgeW, vBadgeH, vBadgeH / 2);
@@ -479,8 +455,8 @@ function renderCard(card) {
     const iBadgeW = 31, iBadgeH = 13;
     const iBadgeX = x + cw - iBadgeW - 5;
     const iBadgeY = y + 3;
-    ctx.fillStyle = 'rgba(160, 210, 200, 0.8)';
-    ctx.strokeStyle = 'rgb(60, 150, 130)';
+    ctx.fillStyle = colors.badgeFill;
+    ctx.strokeStyle = colors.badgeStroke;
     ctx.lineWidth = 1 / state.canvas.zoom;
     ctx.beginPath();
     roundRectPath(iBadgeX, iBadgeY, iBadgeW, iBadgeH, iBadgeH / 2);
@@ -579,17 +555,17 @@ function renderCard(card) {
 
   // Label text color & font per card type
   if (card.type === 'video' || card.type === 'synthesized-video') {
-    ctx.fillStyle = 'rgb(101, 84, 203)';
+    ctx.fillStyle = colors.label;
     ctx.font = `700 12px "Inter", system-ui, sans-serif`;
   } else if (card.type === 'image') {
-    ctx.fillStyle = 'rgb(60, 150, 130)';
+    ctx.fillStyle = colors.label;
     ctx.font = `700 12px "Inter", system-ui, sans-serif`;
   } else if (card.type === 'audio') {
     // BGM: red/pink name with white glow
     ctx.save();
     ctx.shadowColor = 'rgba(255, 255, 255, 1)';
     ctx.shadowBlur = 6.7;
-    ctx.fillStyle = 'rgb(243, 93, 93)';
+    ctx.fillStyle = colors.label;
     ctx.font = `700 10px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
     const _bgmLabelX = x + 6;
@@ -605,7 +581,7 @@ function renderCard(card) {
     if (cw > 140 && card.duration > 0) {
       const dur = card.trimOut - card.trimIn;
       const durStr = formatTime(dur) + ' / ' + formatTime(card.duration);
-      ctx.fillStyle = 'rgba(243, 93, 120, 0.6)';
+      ctx.fillStyle = colors.duration;
       ctx.font = `400 8px "Inter", system-ui, sans-serif`;
       ctx.textAlign = 'right';
       ctx.fillText(durStr, x + cw - 6, labelY + CARD_LABEL_HEIGHT / 2);
@@ -639,13 +615,13 @@ function renderCard(card) {
       const dur = card.trimOut - card.trimIn;
       if (isVideo) {
         // Figma: "00:10" format, Inter Regular 8px, at x+75, left-aligned
-        ctx.fillStyle = 'rgb(123, 114, 177)';
+        ctx.fillStyle = colors.duration;
         ctx.font = `400 8px "Inter", system-ui, sans-serif`;
         ctx.textAlign = 'left';
         ctx.fillText(formatTime(dur), x + 75, labelTextY);
         ctx.textAlign = 'start';
       } else if (isImage) {
-        ctx.fillStyle = 'rgb(80, 160, 140)';
+        ctx.fillStyle = colors.duration;
         ctx.font = `400 8px "Inter", system-ui, sans-serif`;
         ctx.textAlign = 'left';
         ctx.fillText(formatTime(dur), x + 75, labelTextY);
