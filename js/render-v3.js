@@ -94,9 +94,9 @@ function renderCard(card) {
   // Card border color per type (from dynamic color system)
   const cardBorderColor = colors.border;
 
-  // Perf: skip expensive effects when zoomed far out (they're invisible anyway)
+  // Perf: skip shadows & gradients at extreme zoom levels (invisible)
   const zoom = state.canvas.zoom;
-  const skipEffects = zoom < 0.2;
+  const skipEffects = zoom < 0.2 || zoom > 3;
   const shadowBlur = skipEffects ? 0 : Math.min(12 / zoom, 24);
 
   // --- Card background ---
