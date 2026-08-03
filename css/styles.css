@@ -1083,63 +1083,65 @@ canvas {
   display: flex; align-items: center; justify-content: center;
 }
 
-/* Main logo — still, no animation */
+/* Main logo — static */
 .loading-logo-img {
   position: relative; z-index: 10;
   width: 170px; height: auto;
-  opacity: 0.88;
 }
 
 /* ---- Slice glitch layers ---- */
-/* Container holds all slices, same size as logo */
+/* Container exactly matches logo image dimensions */
 .glitch-slices {
   position: absolute;
-  width: 170px;
-  height: calc(170px * 122 / 540); /* 38.4px ≈ logo aspect */
+  width: 170px; height: 39px;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 5;
+  z-index: 15;
   overflow: hidden;
 }
 
-/* Each slice is a logo copy clipped to a horizontal band, shifted sideways */
+/* Each slice covers full logo area, clipped to a horizontal band */
 .glitch-slice {
-  position: absolute; left: 0;
-  width: 100%; height: 20%;
-  background: url('../assets/logo.png') center/contain no-repeat;
-  opacity: 0;
-}
-.glitch-slice:nth-child(1) { top: 0%;   background-position: 0 0%;      animation: slice-a 0.35s infinite; }
-.glitch-slice:nth-child(2) { top: 20%;  background-position: 0 25%;     animation: slice-b 0.38s infinite 0.05s; }
-.glitch-slice:nth-child(3) { top: 40%;  background-position: 0 50%;     animation: slice-a 0.33s infinite 0.1s; }
-.glitch-slice:nth-child(4) { top: 60%;  background-position: 0 75%;     animation: slice-c 0.4s infinite 0.15s; }
-.glitch-slice:nth-child(5) { top: 80%;  background-position: 0 100%;    animation: slice-b 0.36s infinite 0.08s; }
-
-/* Shift left + red tint */
-@keyframes slice-a {
-  0%, 87%, 100% { opacity: 0; transform: translateX(0); }
-  88% { opacity: 0.7; transform: translateX(-18px); filter: brightness(2) sepia(1) hue-rotate(-20deg) saturate(8); }
-  89% { opacity: 0; transform: translateX(0); }
-  93% { opacity: 0.65; transform: translateX(-12px); filter: brightness(1.8) sepia(1) hue-rotate(-15deg) saturate(6); }
-  94% { opacity: 0; transform: translateX(0); }
+  position: absolute; inset: 0;
+  background: url('../assets/logo.png') 0 0 / 170px 39px no-repeat;
 }
 
-/* Shift right + cyan tint */
-@keyframes slice-b {
-  0%, 85%, 100% { opacity: 0; transform: translateX(0); }
-  86% { opacity: 0.7; transform: translateX(16px); filter: brightness(2.2) sepia(1) hue-rotate(180deg) saturate(6); }
-  87% { opacity: 0; transform: translateX(0); }
-  91% { opacity: 0.6; transform: translateX(10px); filter: brightness(1.6) sepia(1) hue-rotate(170deg) saturate(5); }
-  92% { opacity: 0; transform: translateX(0); }
+/* 5 horizontal bands via clip-path: inset(top% 0 bottom% 0) */
+.gs1 { clip-path: inset(0%  0 80% 0); animation: gs-a 2.8s infinite; }
+.gs2 { clip-path: inset(10% 0 70% 0); animation: gs-b 3.1s infinite 0.2s; }
+.gs3 { clip-path: inset(30% 0 50% 0); animation: gs-c 2.5s infinite 0.6s; }
+.gs4 { clip-path: inset(50% 0 30% 0); animation: gs-a 3.4s infinite 0.9s; }
+.gs5 { clip-path: inset(70% 0 10% 0); animation: gs-b 2.9s infinite 0.4s; }
+.gs6 { clip-path: inset(80% 0  0% 0); animation: gs-c 3.2s infinite 1.1s; }
+.gs7 { clip-path: inset(20% 0 60% 0); animation: gs-a 2.6s infinite 1.4s; }
+.gs8 { clip-path: inset(60% 0 20% 0); animation: gs-b 3.0s infinite 0.7s; }
+
+/* --- Glitch keyframes: burst of slices shifting opposite directions --- */
+/* Red shift left */
+@keyframes gs-a {
+  0%, 77%, 100% { opacity: 0; filter: none; }
+  78% { opacity: 0.85; transform: translateX(-24px); filter: brightness(2.5) sepia(1) hue-rotate(-30deg) saturate(10); }
+  80% { opacity: 0; }
+  88% { opacity: 0.7; transform: translateX(-16px); filter: brightness(1.8) sepia(1) hue-rotate(-20deg) saturate(6); }
+  90% { opacity: 0; }
 }
 
-/* Shift left + green tint */
-@keyframes slice-c {
-  0%, 89%, 100% { opacity: 0; transform: translateX(0); }
-  90% { opacity: 0.65; transform: translateX(-22px); filter: brightness(1.7) sepia(1) hue-rotate(70deg) saturate(7); }
-  91% { opacity: 0; transform: translateX(0); }
-  95% { opacity: 0.5; transform: translateX(-8px); filter: brightness(1.4) sepia(1) hue-rotate(80deg) saturate(5); }
-  96% { opacity: 0; transform: translateX(0); }
+/* Cyan shift right */
+@keyframes gs-b {
+  0%, 82%, 100% { opacity: 0; filter: none; }
+  83% { opacity: 0.85; transform: translateX(20px); filter: brightness(2.5) sepia(1) hue-rotate(170deg) saturate(10); }
+  85% { opacity: 0; }
+  93% { opacity: 0.65; transform: translateX(12px); filter: brightness(1.6) sepia(1) hue-rotate(160deg) saturate(5); }
+  95% { opacity: 0; }
+}
+
+/* Green shift left */
+@keyframes gs-c {
+  0%, 79%, 100% { opacity: 0; filter: none; }
+  80% { opacity: 0.8; transform: translateX(-30px); filter: brightness(2.2) sepia(1) hue-rotate(60deg) saturate(9); }
+  82% { opacity: 0; }
+  89% { opacity: 0.6; transform: translateX(-10px); filter: brightness(1.5) sepia(1) hue-rotate(50deg) saturate(5); }
+  91% { opacity: 0; }
 }
 
 /* ---- Orbit ring SVG ---- */
