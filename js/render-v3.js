@@ -2605,21 +2605,15 @@ function startCardLabelEdit(cardId) {
   el.id = '__inea-label-editor';
   el.contentEditable = 'true';
   el.textContent = card.label || '';
-  const textW = Math.max(40, ((el.textContent || '').length || 1) * baseFontSize * 0.6 + 20);
   el.style.cssText = ''
     + 'position:fixed;z-index:200;'
     + 'font-family:"Inter",system-ui,sans-serif;font-weight:700;'
     + 'color:#000;background:#fff;'
     + 'border:1px solid #aaa;outline:none;'
     + 'overflow:hidden;white-space:nowrap;box-sizing:border-box;'
-    + 'display:flex;align-items:center;'
-    + 'font-size:' + baseFontSize + 'px;'
-    + 'height:' + baseHeight + 'px;'
-    + 'width:' + textW + 'px;'
-    + 'padding:2px 4px;border-radius:3px;';
+    + 'display:flex;align-items:center;';
   document.body.appendChild(el);
   el.focus();
-  // Select all text
   const range = document.createRange();
   range.selectNodeContents(el);
   const sel = window.getSelection();
@@ -2627,17 +2621,32 @@ function startCardLabelEdit(cardId) {
   sel.addRange(range);
 
   const reposition = () => {
+    const zoom = state.canvas.zoom;
     const s = worldToScreen(card.x, card.y);
+    const fontSize = baseFontSize * zoom;
+    const h = baseHeight * zoom;
+    const padY = Math.max(1, 2 * zoom);
+    const padX = Math.max(2, 4 * zoom);
+    const br = 3 * zoom;
+    const textW = Math.max(40, ((el.textContent || '').length || 1) * fontSize * 0.6 + 20);
+    const maxW = Math.max(30, (getCardWidth(card) - 28) * zoom);
+
     let labelScreenY;
     if (isVideo) {
       labelScreenY = s.y;
     } else if (isAudio) {
-      labelScreenY = s.y + (ch - 13) * state.canvas.zoom;
+      labelScreenY = s.y + (ch - 13) * zoom;
     } else {
-      labelScreenY = s.y + CARD_THUMB_HEIGHT * state.canvas.zoom;
+      labelScreenY = s.y + CARD_THUMB_HEIGHT * zoom;
     }
-    el.style.left = (s.x + 14 * state.canvas.zoom) + 'px';
+
+    el.style.left = (s.x + 14 * zoom) + 'px';
     el.style.top = labelScreenY + 'px';
+    el.style.fontSize = fontSize + 'px';
+    el.style.height = h + 'px';
+    el.style.width = Math.min(maxW, textW) + 'px';
+    el.style.padding = padY + 'px ' + padX + 'px';
+    el.style.borderRadius = br + 'px';
   };
   reposition();
 
