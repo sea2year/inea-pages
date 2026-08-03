@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=23');
+console.log('[inea] render-v4.js v=24');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -45,8 +45,11 @@ function renderGrid() {
 // ================================================================
 function renderCard(card) {
   const cw = getCardWidth(card);
+  const isVideoLike = card.type === 'video' || card.type === 'synthesized-video';
+  const labelH = isVideoLike ? Math.max(CARD_LABEL_HEIGHT, 14 / state.canvas.zoom) : CARD_LABEL_HEIGHT;
   const ch = card.type === 'image' ? (card.height || CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT) :
-             (card.type === 'video' || card.type === 'composition' || card.type === 'synthesized-video') ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
+             isVideoLike ? CARD_THUMB_HEIGHT + labelH :
+             (card.type === 'composition') ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
              card.type === 'audio' ? 41 : CARD_HEIGHT;
   const x = card.x;
   const y = card.y;
@@ -56,8 +59,7 @@ function renderCard(card) {
   const isHovered = state.hoveredCardId === card.id;
   const showHandles = isSelected;
   const colors = getCardColors(card);
-  const contentY = y + CARD_LABEL_HEIGHT; // thumbnail area starts below label (Figma layout)
-  const isVideoLike = card.type === 'video' || card.type === 'synthesized-video';
+  const contentY = isVideoLike ? y + labelH : y + CARD_LABEL_HEIGHT;
   // Figma: card body (background, border, clip) is just the thumbnail; label floats above
   const bodyY = isVideoLike ? contentY : y;
   const bodyH = isVideoLike ? CARD_THUMB_HEIGHT : ch;
@@ -222,14 +224,13 @@ function renderCard(card) {
       ctx.stroke();
     }
 
-    // Separator + label at card bottom (Figma: name x:12, duration x:73, near bottom)
-    const sepY = y + ch - 13;
-    const labelTextY = y + ch;
+    // Label at card top (Figma: title above thumbnail)
+    const labelTextY = y + labelH;
     ctx.strokeStyle = colors.border;
     ctx.lineWidth = 0.5 / state.canvas.zoom;
     ctx.beginPath();
-    ctx.moveTo(x + 13, sepY);
-    ctx.lineTo(x + cw - 13, sepY);
+    ctx.moveTo(x + 13, y + labelH);
+    ctx.lineTo(x + cw - 13, y + labelH);
     ctx.stroke();
 
     ctx.textBaseline = 'bottom';
@@ -1887,12 +1888,10 @@ function hitTest(sx, sy) {
         }
       }
 
-      // Video label region (bottom strip where name/duration is shown)
-      // Font is 10/zoom world units tall (inverse-scaled), so hit area height scales with zoom too
-      const _videoCh = CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT;
-      const _labelHitH = Math.max(CARD_LABEL_HEIGHT, Math.min(_videoCh, 12 / state.canvas.zoom));
+      // Video label region (top strip where card title is shown)
+      const _videoLabelH = Math.max(CARD_LABEL_HEIGHT, 14 / state.canvas.zoom);
       if ((card.type === 'video' || card.type === 'synthesized-video') &&
-          wy >= card.y + _videoCh - _labelHitH && wy <= card.y + _videoCh) {
+          wy >= card.y && wy <= card.y + _videoLabelH) {
         return { type: 'card-label', cardId: card.id };
       }
 
@@ -2709,7 +2708,7 @@ function startCardLabelEdit(cardId) {
     const s = worldToScreen(card.x, card.y);
     let labelScreenY;
     if (isVideo) {
-      labelScreenY = s.y + CARD_THUMB_HEIGHT * state.canvas.zoom;
+      labelScreenY = s.y;
     } else if (isAudio) {
       labelScreenY = s.y + (ch - 13) * state.canvas.zoom;
     } else {
