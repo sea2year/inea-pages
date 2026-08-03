@@ -54,6 +54,7 @@ function renderCard(card) {
   const isSelected = state.selection.cardIds.includes(card.id);
   const isHovered = state.hoveredCardId === card.id;
   const showHandles = isSelected;
+  const colors = getCardColors(card);
 
   // --- Image cards: pure image, no frame ---
   if (card.type === 'image') {
@@ -85,15 +86,15 @@ function renderCard(card) {
     return;
   }
 
-  // Card border color per type (Figma)
-  const cardBorderColor = card.type === 'video' || card.type === 'synthesized-video' ? 'rgb(101, 84, 203)' : (card.type === 'audio' ? 'rgb(243, 93, 93)' : (card.type === 'composition' ? '#D4FF00' : '#e6e6e6'));
+  // Card border color per type (from dynamic color system)
+  const cardBorderColor = colors.border;
 
   // --- Card background ---
   // Figma gradient fill: video=purple tint, audio=pink tint
   const drawGradient = card.type === 'video' || card.type === 'audio' || card.type === 'composition' || card.type === 'synthesized-video';
   if (isSelected) {
     ctx.save();
-    ctx.shadowColor = 'rgba(101,84,203,0.18)';
+    ctx.shadowColor = colors.shadow;
     ctx.shadowBlur = 12 / state.canvas.zoom;
     // Draw background
     ctx.fillStyle = '#ffffff';
@@ -663,7 +664,7 @@ function renderCard(card) {
   // --- Left/Right handles (Figma: inside clip, on top of content) ---
   if (card.type === 'video' || card.type === 'audio' || card.type === 'synthesized-video' || card.type === 'image') {
     const handleW = 11;
-    ctx.fillStyle = (card.type === 'video' || card.type === 'synthesized-video') ? 'rgb(101,84,203)' : (card.type === 'audio' ? 'rgb(243,93,93)' : (card.type === 'image' ? 'rgb(60,150,130)' : '#D4FF00'));
+    ctx.fillStyle = colors.border;
     ctx.fillRect(x, y, handleW, ch);
     ctx.fillRect(x + cw - handleW, y, handleW, ch);
   }
@@ -675,8 +676,8 @@ function renderCard(card) {
   if (showHandles && (card.type === 'video' || card.type === 'audio' || card.type === 'bgm' || card.type === 'composition' || card.type === 'synthesized-video' || card.type === 'image')) {
     const handleW = 6 / state.canvas.zoom;
     const handleAlpha = isHovered && !isSelected ? 0.6 : 1;
-    // Handle color per card type (Figma: purple for video, red for audio)
-    const handleColor = (card.type === 'video' || card.type === 'synthesized-video') ? `rgba(101,84,203,${handleAlpha})` : (card.type === 'composition' ? `rgba(212,255,0,${handleAlpha})` : `rgba(243,93,93,${handleAlpha})`);
+    // Handle color per card type (dynamic via accentColor)
+    const handleColor = colors.handleColor(handleAlpha);
 
     // Left trim handle
     ctx.fillStyle = handleColor;
@@ -711,18 +712,20 @@ function renderCard(card) {
   const anchor = getAnchorPos(card, side);
   const r = isHoveredAnchor ? anchorR * 1.4 : anchorR;
 
-  // Outer glow (purple for transition anchors on right side, green for left)
+  // Outer glow (dynamic accent color for video, side-based for legacy)
   if (isHoveredAnchor || (isConnSource && state.interaction.connectingFrom.side === side)) {
-  const glowColor = side === 'right' ? 'rgba(130,110,220,0.25)' : 'rgba(212,255,0,0.25)';
+  const glowColor = card.accentColor
+    ? `rgba(${card.accentColor.r},${card.accentColor.g},${card.accentColor.b},0.25)`
+    : (side === 'right' ? 'rgba(130,110,220,0.25)' : 'rgba(212,255,0,0.25)');
   ctx.fillStyle = glowColor;
   ctx.beginPath();
   ctx.arc(anchor.x, anchor.y, r + 4 / state.canvas.zoom, 0, Math.PI * 2);
   ctx.fill();
   }
 
-  // Inner dot (purple for transition anchor, green highlight on hover)
-  ctx.fillStyle = isHoveredAnchor ? '#D4FF00' : '#ffffff';
-  ctx.strokeStyle = isHoveredAnchor ? '#D4FF00' : 'rgb(101,84,203)';
+  // Inner dot (dynamic accent on hover, card border color for default)
+  ctx.fillStyle = isHoveredAnchor ? colors.border : '#ffffff';
+  ctx.strokeStyle = colors.border;
   ctx.lineWidth = 1.5 / state.canvas.zoom;
   ctx.beginPath();
   ctx.arc(anchor.x, anchor.y, r, 0, Math.PI * 2);
@@ -731,7 +734,7 @@ function renderCard(card) {
 
   // Connecting-from indicator arrow
   if (isConnSource && state.interaction.connectingFrom.side === side) {
-  ctx.fillStyle = '#D4FF00';
+  ctx.fillStyle = colors.border;
   ctx.beginPath();
   ctx.arc(anchor.x, anchor.y, r * 1.6, 0, Math.PI * 2);
   ctx.fill();

@@ -134,6 +134,50 @@ function getCardWidth(card) {
   return Math.max(CARD_MIN_WIDTH, dur * PIXELS_PER_SECOND);
 }
 
+// ================================================================
+// Dynamic card coloring
+// ================================================================
+function isDynamicCard(card) {
+  return card.type === 'video' || card.type === 'synthesized-video';
+}
+
+function getCardColors(card) {
+  if (isDynamicCard(card) && card.accentColor) {
+    const { r, g, b } = card.accentColor;
+    const blendWhite38 = (c) => Math.round(c + (255 - c) * 0.38);
+    const blendWhite35 = (c) => Math.round(c * 0.65 + 255 * 0.35);
+
+    return {
+      border: `rgb(${r},${g},${b})`,
+      shadow: `rgba(${r},${g},${b},0.18)`,
+      gradientTop: `rgba(255,255,255,0)`,
+      gradientBot: `rgba(${r},${g},${b},0.25)`,
+      badgeFill: `rgba(${blendWhite38(r)},${blendWhite38(g)},${blendWhite38(b)},0.8)`,
+      badgeStroke: `rgb(${r},${g},${b})`,
+      badgeText: `rgb(${r},${g},${b})`,
+      label: `rgb(${r},${g},${b})`,
+      duration: `rgb(${blendWhite35(r)},${blendWhite35(g)},${blendWhite35(b)})`,
+      handleColor: (alpha) => `rgba(${r},${g},${b},${alpha})`,
+    };
+  }
+
+  // Non-dynamic or legacy: preserve existing hardcoded type colors
+  // (render.js still uses per-type logic via direct color values for non-dynamic cards)
+  return {
+    border: (card.type === 'audio') ? 'rgb(243,93,93)' : ((card.type === 'composition') ? '#D4FF00' : 'rgb(101,84,203)'),
+    shadow: 'rgba(101,84,203,0.18)',
+    gradientTop: 'rgba(255,255,255,0)',
+    gradientBot: 'rgba(101,84,203,0.25)',
+    label: '#1a1a1a',
+    duration: '#999',
+    handleColor: (alpha) => {
+      if (card.type === 'audio') return `rgba(243,93,93,${alpha})`;
+      if (card.type === 'composition') return `rgba(212,255,0,${alpha})`;
+      return `rgba(101,84,203,${alpha})`;
+    },
+  };
+}
+
 function findGroupContainingCard(cardId) {
   for (const group of state.groups) {
     if (group.cardIds.includes(cardId)) return group;

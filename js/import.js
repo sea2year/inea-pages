@@ -182,6 +182,71 @@ async function generateThumbnails(file) {
 }
 
 // ================================================================
+// Import: Extract dominant color from thumbnail strip
+// ================================================================
+function extractDominantColor(stripCanvas) {
+  const stripCtx = stripCanvas.getContext('2d');
+  const imageData = stripCtx.getImageData(0, 0, stripCanvas.width, stripCanvas.height);
+  const data = imageData.data;
+  const buckets = {};
+  let totalR = 0, totalG = 0, totalB = 0, totalCount = 0;
+
+  for (let i = 0; i < data.length; i += 8) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    if (r < 40 && g < 40 && b < 40) continue;
+    if (Math.abs(r - 58) < 10 && Math.abs(g - 58) < 10 && Math.abs(b - 58) < 10) continue;
+
+    const br = Math.min(7, r >> 5);
+    const bg = Math.min(7, g >> 5);
+    const bb = Math.min(7, b >> 5);
+    const bucketKey = (br << 6) | (bg << 3) | bb;
+
+    if (!buckets[bucketKey]) {
+      buckets[bucketKey] = { count: 0, r: 0, g: 0, b: 0 };
+    }
+    buckets[bucketKey].count++;
+    buckets[bucketKey].r += r;
+    buckets[bucketKey].g += g;
+    buckets[bucketKey].b += b;
+
+    totalR += r;
+    totalG += g;
+    totalB += b;
+    totalCount++;
+  }
+
+  let bestBucket = null;
+  let bestCount = 0;
+  for (const key in buckets) {
+    if (buckets[key].count > bestCount) {
+      bestCount = buckets[key].count;
+      bestBucket = buckets[key];
+    }
+  }
+
+  if (bestBucket && totalCount > 0) {
+    return {
+      r: Math.round(bestBucket.r / bestBucket.count),
+      g: Math.round(bestBucket.g / bestBucket.count),
+      b: Math.round(bestBucket.b / bestBucket.count)
+    };
+  }
+
+  if (totalCount > 0) {
+    return {
+      r: Math.round(totalR / totalCount),
+      g: Math.round(totalG / totalCount),
+      b: Math.round(totalB / totalCount)
+    };
+  }
+
+  return { r: 128, g: 128, b: 128 };
+}
+
+// ================================================================
 // Import: Waveform generation
 // ================================================================
 async function generateWaveform(file, samples = WAVEFORM_SAMPLES) {
@@ -320,6 +385,7 @@ async function importVideoFile(file) {
     card.thumbStrip = thumbResult.strip;
     card.duration = thumbResult.duration;
     card.trimOut = thumbResult.duration;
+    card.accentColor = extractDominantColor(thumbResult.strip);
   } catch (e) {
     console.error('Thumbnail generation failed', file.name, e);
   }
@@ -600,6 +666,7 @@ function replaceCardContent(card) {
         card.thumbStrip = thumbResult.strip;
         card.duration = thumbResult.duration;
         card.trimOut = thumbResult.duration;
+        card.accentColor = extractDominantColor(thumbResult.strip);
       } catch (err) {
         console.error('Thumbnail generation failed', err);
       }
@@ -725,6 +792,7 @@ async function convertImageToStillVideo(card) {
         sctx.drawImage(img, i * thumbW, 0, thumbW, thumbH);
       }
       card.thumbStrip = stripCanvas;
+      card.accentColor = extractDominantColor(stripCanvas);
     } catch (e) {
       console.warn('Thumbnail generation from image failed', e);
     }
