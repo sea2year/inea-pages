@@ -9,12 +9,14 @@ var _perf = {
   cardDrawImage: 0,
   cardGradient: 0,
   cardClipPath: 0,
-  cardLabelBadge: 0,
+  cardLabelText: 0,
+  cardTrim: 0,
+  cardAnchor: 0,
   frameCount: 0,
   reset() {
     this.gridTime = 0; this.cardTotal = 0; this.cardCount = 0;
     this.cardDrawImage = 0; this.cardGradient = 0; this.cardClipPath = 0;
-    this.cardLabelBadge = 0; this.frameCount = 0;
+    this.cardLabelText = 0; this.cardTrim = 0; this.cardAnchor = 0; this.frameCount = 0;
   },
   snapshot(renderMs) {
     this.samples.push({
@@ -55,10 +57,11 @@ function _showPerfOverlay() {
     'render() total:   ' + pad(avg('total').toFixed(2), 6) + 'ms  (max ' + max('total').toFixed(2) + ')\n' +
     '  grid:           ' + pad(avg('grid').toFixed(2), 6) + 'ms\n' +
     '  cards (' + avg('cardN').toFixed(0) + '):     ' + pad(avg('cards').toFixed(2), 6) + 'ms\n' +
-    '    └ drawImage:  ' + pad(avg('drawImage').toFixed(2), 6) + 'ms\n' +
+'    └ drawImage:  ' + pad(avg('drawImage').toFixed(2), 6) + 'ms\n' +
     '    └ gradient:   ' + pad(avg('gradient').toFixed(2), 6) + 'ms\n' +
-    '    └ clipPath:   ' + pad(avg('clipPath').toFixed(2), 6) + 'ms\n' +
-    '    └ label/badge:' + pad(avg('labelBadge').toFixed(2), 6) + 'ms';
+    '    └ label+text: ' + pad(avg('labelText').toFixed(2), 6) + 'ms\n' +
+    '    └ trim handle:' + pad(avg('trim').toFixed(2), 6) + 'ms\n' +
+    '    └ anchors:    ' + pad(avg('anchor').toFixed(2), 6) + 'ms';
 }
 function pad(s, n) { while (s.length < n) s = ' ' + s; return s; }
 
@@ -609,6 +612,7 @@ function renderCard(card) {
   ctx.restore();
   var _ctPostDraw = performance.now();
   _perf.cardDrawImage += _ctPostDraw - _ctPostBg;
+  var _ctPostClip = performance.now();
   } // end video card content
 
   // --- Video label (Figma: above card body, outside clip) ---
@@ -660,6 +664,9 @@ function renderCard(card) {
     ctx.textBaseline = 'alphabetic';
   }
 
+  var _ctPostLabel = performance.now();
+  _perf.cardLabelText += _ctPostLabel - _ctPostClip;
+
   // --- Trim handles (only for video/audio, outside clip) ---
   if (showHandles && (card.type === 'video' || card.type === 'audio' || card.type === 'bgm' || card.type === 'composition' || card.type === 'synthesized-video' || card.type === 'image')) {
     const handleW = 6 / state.canvas.zoom;
@@ -686,6 +693,9 @@ function renderCard(card) {
     ctx.fill();
     ctx.fillRect(x + cw - handleW, bodyY + r, handleW, bodyH - r * 2);
   }
+
+  var _ctPostTrim = performance.now();
+  _perf.cardTrim += _ctPostTrim - _ctPostLabel;
 
   // Anchor points (left + right) — for video/synthesized-video cards
   if (card.type === 'video' || card.type === 'synthesized-video') {
@@ -889,7 +899,7 @@ function renderCard(card) {
   }
   } // end video guard
   var _ctEnd = performance.now();
-  _perf.cardLabelBadge += _ctEnd - (typeof _ctPostDraw !== 'undefined' ? _ctPostDraw : _ctPostBg);
+  _perf.cardAnchor += _ctEnd - _ctPostTrim;
 }
 
 function formatTime(sec) {
