@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=30');
+console.log('[inea] render-v4.js v=31');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -535,7 +535,6 @@ function renderCard(card) {
 
   // --- Video label (Figma: above card body, outside clip) ---
   if (card.type === 'video' || card.type === 'synthesized-video') {
-    const vLabelY = y;
     ctx.fillStyle = colors.label;
     ctx.font = `700 ${12 / zoom}px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'bottom';
@@ -561,25 +560,6 @@ function renderCard(card) {
       ctx.textAlign = 'start';
     }
 
-    ctx.textBaseline = 'alphabetic';
-
-    // Video type badge (top-right, same y as label)
-    const vBadgeW = 40, vBadgeH = 13;
-    const vBadgeX = x + cw - vBadgeW - 5;
-    const vBadgeY = vLabelY + 2;
-    ctx.fillStyle = colors.badgeFill;
-    ctx.strokeStyle = colors.badgeStroke;
-    ctx.lineWidth = 1 / state.canvas.zoom;
-    ctx.beginPath();
-    roundRectPath(vBadgeX, vBadgeY, vBadgeW, vBadgeH, vBadgeH / 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '400 6px "Inter", system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Video', vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2);
-    ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
   }
 
