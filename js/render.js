@@ -55,6 +55,7 @@ function renderCard(card) {
   const isHovered = state.hoveredCardId === card.id;
   const showHandles = isSelected;
   const colors = getCardColors(card);
+  const contentY = y + CARD_LABEL_HEIGHT; // thumbnail area starts below label (Figma layout)
 
   // --- Image cards: pure image, no frame ---
   if (card.type === 'image') {
@@ -393,10 +394,10 @@ function renderCard(card) {
   if (card.isFreezeFrame && card.frameImage) {
     // Freeze frame: draw the captured frame image covering the thumb area
     try {
-      ctx.drawImage(card.frameImage, x, y, cw, thumbAreaH);
+      ctx.drawImage(card.frameImage, x, contentY, cw, thumbAreaH);
     } catch (e) {
       ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(x, y, cw, thumbAreaH);
+      ctx.fillRect(x, contentY, cw, thumbAreaH);
     }
   } else if (card.thumbStrip && card.duration > 0) {
     try {
@@ -406,30 +407,30 @@ function renderCard(card) {
       const srcX = stripW * fracIn;
       const srcW = stripW * (fracOut - fracIn);
       if (srcW > 0) {
-        ctx.drawImage(card.thumbStrip, srcX, 0, srcW, card.thumbStrip.height, x, y, cw, thumbAreaH);
+        ctx.drawImage(card.thumbStrip, srcX, 0, srcW, card.thumbStrip.height, x, contentY, cw, thumbAreaH);
       } else {
         ctx.fillStyle = '#3a3a3a';
-        ctx.fillRect(x, y, cw, thumbAreaH);
+        ctx.fillRect(x, contentY, cw, thumbAreaH);
       }
     } catch (e) {
       ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(x, y, cw, thumbAreaH);
+      ctx.fillRect(x, contentY, cw, thumbAreaH);
     }
   } else if (card.thumbStrip) {
     // fallback: still use cropped if possible, otherwise scale full strip
     try {
-      ctx.drawImage(card.thumbStrip, x, y, cw, thumbAreaH);
+      ctx.drawImage(card.thumbStrip, x, contentY, cw, thumbAreaH);
     } catch (e) {
       ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(x, y, cw, thumbAreaH);
+      ctx.fillRect(x, contentY, cw, thumbAreaH);
     }
   } else {
     ctx.fillStyle = '#e0e0e0';
-    ctx.fillRect(x, y, cw, thumbAreaH);
+    ctx.fillRect(x, contentY, cw, thumbAreaH);
     ctx.fillStyle = '#999';
     ctx.font = `400 12px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
-    ctx.fillText('生成缩略图...', x + 12, y + thumbAreaH / 2);
+    ctx.fillText('生成缩略图...', x + 12, contentY + thumbAreaH / 2);
   }
 
   // --- Video card type badge (top-right, Figma: purple pill) ---
@@ -519,7 +520,7 @@ function renderCard(card) {
         for (const marker of card.markers) {
           const mx = x + cw * ((marker.time - card.trimIn) / trimDur);
           if (mx < x + 2 || mx > x + cw - 2) continue;
-          const flagY = y + CARD_THUMB_HEIGHT;
+          const flagY = contentY + CARD_THUMB_HEIGHT;
           const flagH = 10;
           ctx.fillStyle = marker.color;
           ctx.beginPath();
@@ -537,7 +538,9 @@ function renderCard(card) {
   }
 
   // --- Label bar ---
-  const labelY = wfY + wfH;
+  // Figma layout: video/synthesized cards have label at top; others at bottom
+  const isFigmaCard = card.type === 'video' || card.type === 'synthesized-video';
+  const labelY = isFigmaCard ? y : wfY + wfH;
 
   // Separator line (NOT for video or composition cards — Figma has no separator)
   if (card.type !== 'video' && card.type !== 'composition' && card.type !== 'synthesized-video' && card.type !== 'image') {
