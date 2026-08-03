@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=16');
+console.log('[inea] render-v4.js v=17');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1462,14 +1462,21 @@ function renderConnection(conn) {
   const dpr2 = window.devicePixelRatio || 1;
   ctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
 
-  const badgeW = 18, badgeH = 12, badgeR = 2;
+  // Badge size proportional to card screen height (15%, clamped 6–20px)
+  const cardScreenH = 116 * state.canvas.zoom;
+  const badgeH = Math.max(6, Math.min(20, cardScreenH * 0.15));
+  const s = badgeH / 12; // scale factor from baseline (H=12)
+  const badgeW = Math.round(18 * s);
+  const badgeR = Math.max(1, Math.round(2 * s));
+  const lineW = Math.max(1, Math.round(s));
+  const fontSize = Math.round(9 * s);
 
   // Badge background — use right card color
   const badgeColor = toColors ? toColors.badgeFill : 'rgb(202, 193, 254)';
   const badgeStroke = toColors ? toColors.badgeStroke : 'rgb(101,84,203)';
   ctx.fillStyle = highlight ? lightenColor(badgeStroke) : badgeColor;
   ctx.strokeStyle = highlight ? lightenColor(badgeStroke) : badgeStroke;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = lineW;
   ctx.beginPath();
   roundRectPath(sx - badgeW / 2, sy - badgeH / 2, badgeW, badgeH, badgeR);
   ctx.fill();
@@ -1478,7 +1485,7 @@ function renderConnection(conn) {
   // Badge text
   const label = TRANSITION_LABELS[conn.transition] || '切';
   ctx.fillStyle = highlight ? '#ffffff' : badgeStroke;
-  ctx.font = `${isHovered ? '550' : '450'} 9px "Inter", system-ui, sans-serif`;
+  ctx.font = `${isHovered ? '550' : '450'} ${fontSize}px "Inter", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, sx, sy);
@@ -1490,14 +1497,15 @@ function renderConnection(conn) {
 
   // Delete button (visible when hovered)
   if (isHovered) {
-    const delR = 5;
-    const delX = sx + badgeW / 2 + 5;
+    const delR = Math.max(3, Math.round(5 * s));
+    const delOff = Math.round(5 * s);
+    const delX = sx + badgeW / 2 + delOff;
     const delY = sy;
 
     // Outer circle
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#e04040';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = lineW;
     ctx.beginPath();
     ctx.arc(delX, delY, delR, 0, Math.PI * 2);
     ctx.fill();
@@ -1505,8 +1513,8 @@ function renderConnection(conn) {
 
     // X mark
     ctx.strokeStyle = '#e04040';
-    ctx.lineWidth = 1;
-    const xPad = 1.5;
+    ctx.lineWidth = lineW;
+    const xPad = 1.5 * s;
     ctx.beginPath();
     ctx.moveTo(delX - xPad, delY - xPad);
     ctx.lineTo(delX + xPad, delY + xPad);
