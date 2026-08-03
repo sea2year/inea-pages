@@ -14,28 +14,25 @@
 <!-- Loading overlay -->
 <div id="loading-overlay">
   <div class="loading-inner">
+    <!-- SVG ring + logo -->
     <div class="loading-logo-wrap">
-      <div class="glitch-slices">
-        <div class="glitch-slice gs1"></div>
-        <div class="glitch-slice gs2"></div>
-        <div class="glitch-slice gs3"></div>
-        <div class="glitch-slice gs4"></div>
-        <div class="glitch-slice gs5"></div>
-        <div class="glitch-slice gs6"></div>
-        <div class="glitch-slice gs7"></div>
-        <div class="glitch-slice gs8"></div>
-      </div>
-      <img class="loading-logo-img" src="assets/logo.png" alt="INEA" />
-      <svg class="loading-orbit" viewBox="0 0 200 200">
-        <defs>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="1.2" result="blur" />
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-        <circle class="orbit-ring" cx="100" cy="100" r="88" fill="none" stroke="#e8e8e8" stroke-width="0.5" />
-        <g id="orbit-dots"></g>
+      <svg class="loading-ring-svg" viewBox="0 0 220 220">
+        <!-- Background track ring -->
+        <circle cx="110" cy="110" r="94" fill="none" stroke="#eee" stroke-width="1" />
+        <!-- Progress arc — 4 segments, one per file (total circumference = 2π×94 ≈ 590.6) -->
+        <circle id="loading-arc" cx="110" cy="110" r="94" fill="none"
+          stroke="#D4FF00" stroke-width="1.8" stroke-linecap="round"
+          stroke-dasharray="0 999" transform="rotate(-90 110 110)" />
+        <!-- Dot markers at 4 cardinal positions -->
+        <circle cx="110" cy="16" r="2.5" fill="#e0e0e0" class="ring-dot" id="rd0" />
+        <circle cx="204" cy="110" r="2.5" fill="#e0e0e0" class="ring-dot" id="rd1" />
+        <circle cx="110" cy="204" r="2.5" fill="#e0e0e0" class="ring-dot" id="rd2" />
+        <circle cx="16" cy="110" r="2.5" fill="#e0e0e0" class="ring-dot" id="rd3" />
       </svg>
+      <img class="loading-logo-img" src="assets/logo.png" alt="INEA" />
+    </div>
+    <div class="loading-line-track">
+      <div class="loading-line-fill" id="loading-line"></div>
     </div>
     <div class="loading-text" id="loading-text">正在准备素材...</div>
     <button id="loading-enter-btn">进入画板</button>
@@ -219,43 +216,30 @@
 <script src="js/ui-panels.js"></script>
 <script src="js/main.js"></script>
 <script>
-// Loading screen — glitch logo + orbit dots + enter button
+// Loading screen — geometric ring arc + line + enter button
 (function() {
   var loadingOverlay = document.getElementById('loading-overlay');
   var loadingText = document.getElementById('loading-text');
+  var loadingLine = document.getElementById('loading-line');
+  var loadingArc = document.getElementById('loading-arc');
   var enterBtn = document.getElementById('loading-enter-btn');
-  var dotsGroup = document.getElementById('orbit-dots');
-  var TOTAL_DOTS = 24;
-  var DOT_R = 2.4;
-  var ORBIT_R = 88;
-  var CX = 100, CY = 100;
   var ACCENT = '#D4FF00';
-  var DOT_DIM = '#d8d8d8';
 
-  // Create orbit dots — larger, with glow on lit state
-  var dots = [];
-  for (var j = 0; j < TOTAL_DOTS; j++) {
-    var angle = (j / TOTAL_DOTS) * Math.PI * 2 - Math.PI / 2;
-    var cx = CX + ORBIT_R * Math.cos(angle);
-    var cy = CY + ORBIT_R * Math.sin(angle);
-    var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', cx);
-    circle.setAttribute('cy', cy);
-    circle.setAttribute('r', DOT_R);
-    circle.setAttribute('fill', DOT_DIM);
-    circle.setAttribute('class', 'orbit-dot');
-    dotsGroup.appendChild(circle);
-    dots.push(circle);
-  }
+  // Ring circumference = 2π × 94 ≈ 590.62
+  var FULL = 590.62;
+  var quarter = FULL / 4;
 
-  var dotsPerFile = Math.floor(TOTAL_DOTS / 4); // 6 dots per file
+  var dotIds = ['rd0', 'rd1', 'rd2', 'rd3'];
 
-  function lightDots(count) {
-    for (var k = 0; k < TOTAL_DOTS; k++) {
-      var lit = k < count;
-      dots[k].setAttribute('fill', lit ? ACCENT : DOT_DIM);
-      dots[k].setAttribute('opacity', lit ? 1 : 0.3);
-      dots[k].setAttribute('filter', lit ? 'url(#glow)' : 'none');
+  function setProgress(fileIndex) {
+    var pct = (fileIndex / 4) * 100;
+    var dashLen = fileIndex * quarter;
+    loadingArc.setAttribute('stroke-dasharray', dashLen + ' ' + (FULL - dashLen));
+    loadingLine.style.width = pct + '%';
+    // Light up dot markers
+    for (var d = 0; d < 4; d++) {
+      var el = document.getElementById(dotIds[d]);
+      if (el) el.setAttribute('fill', d < fileIndex ? ACCENT : '#e0e0e0');
     }
   }
 
@@ -282,15 +266,13 @@
         } else {
           await importAudioFile(file);
         }
-        lightDots((i + 1) * dotsPerFile);
       } catch (e) {
         console.error('Load failed:', mf.path, e);
-        lightDots((i + 1) * dotsPerFile);
       }
+      setProgress(i + 1);
     }
 
     loadingText.textContent = state.cards.length + ' 个素材已就绪';
-    lightDots(TOTAL_DOTS);
     enterBtn.classList.add('visible');
 
     enterBtn.addEventListener('click', function() {
