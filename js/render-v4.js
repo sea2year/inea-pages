@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=14');
+console.log('[inea] render-v4.js v=15');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1282,7 +1282,7 @@ function renderConnection(conn) {
     ctx.stroke();
 
     ctx.fillStyle = highlight ? '#ffffff' : '#808000';
-    ctx.font = `${isHovered ? '550' : '450'} 12px "Inter", system-ui, sans-serif`;
+    ctx.font = `${isHovered ? '550' : '450'} 10px "Inter", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('关键帧', sx, sy);
@@ -1364,7 +1364,7 @@ function renderConnection(conn) {
     ctx.stroke();
 
     ctx.fillStyle = highlight ? '#ffffff' : midColor;
-    ctx.font = `${isHovered ? '550' : '450'} 12px "Inter", system-ui, sans-serif`;
+    ctx.font = `${isHovered ? '550' : '450'} 10px "Inter", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('补间', sx, sy);
@@ -1478,7 +1478,7 @@ function renderConnection(conn) {
   // Badge text
   const label = TRANSITION_LABELS[conn.transition] || '切';
   ctx.fillStyle = highlight ? '#ffffff' : badgeStroke;
-  ctx.font = `${isHovered ? '550' : '450'} 12px "Inter", system-ui, sans-serif`;
+  ctx.font = `${isHovered ? '550' : '450'} 10px "Inter", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, sx, sy);
