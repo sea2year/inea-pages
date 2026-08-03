@@ -2597,22 +2597,19 @@ function startCardLabelEdit(cardId) {
   const ta = document.createElement('textarea');
   ta.value = card.label || '';
   ta.id = '__inea-label-editor';
-  ta.style.cssText = `
-    position: fixed;
-    z-index: 200;
-    font-family: "Inter", system-ui, sans-serif;
-    font-weight: 700;
-    color: #000;
-    background: #fff;
-    border: 1px solid #aaa;
-    border-radius: 3px;
-    padding: 2px 4px;
-    outline: none;
-    resize: none;
-    line-height: 1.2;
-    overflow: hidden;
-    white-space: nowrap;
-  `;
+  ta.style.position = 'fixed';
+  ta.style.zIndex = '200';
+  ta.style.fontFamily = '"Inter", system-ui, sans-serif';
+  ta.style.fontWeight = '700';
+  ta.style.color = '#000';
+  ta.style.background = '#fff';
+  ta.style.border = '1px solid #aaa';
+  ta.style.outline = 'none';
+  ta.style.resize = 'none';
+  ta.style.lineHeight = '1.2';
+  ta.style.overflow = 'hidden';
+  ta.style.whiteSpace = 'nowrap';
+  ta.style.boxSizing = 'border-box';
   document.body.appendChild(ta);
   ta.focus();
   ta.select();
@@ -2645,9 +2642,10 @@ function startCardLabelEdit(cardId) {
     ta.style.top = labelScreenY + 'px';
     ta.style.width = Math.min(maxW, textW) + 'px';
     ta.style.height = labelH + 'px';
-    ta.style.fontSize = fontSize + 'px';
     ta.style.padding = `${Math.max(1, 2 * zoom)}px ${Math.max(2, 4 * zoom)}px`;
     ta.style.borderRadius = `${3 * zoom}px`;
+    ta.style.setProperty('font-size', fontSize + 'px', 'important');
+    ta.style.setProperty('line-height', '1.2', 'important');
   };
   reposition();
 
