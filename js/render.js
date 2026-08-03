@@ -437,45 +437,6 @@ function renderCard(card) {
     ctx.fillText('生成缩略图...', x + 12, contentY + thumbAreaH / 2);
   }
 
-  // --- Video card type badge (top-right, Figma: above card body, in label area) ---
-  if (card.type === 'video' || card.type === 'synthesized-video') {
-    const vBadgeW = 31, vBadgeH = 13;
-    const vBadgeX = x + cw - vBadgeW - 5;
-    const vBadgeY = y + 2;
-    ctx.fillStyle = colors.badgeFill;
-    ctx.strokeStyle = colors.badgeStroke;
-    ctx.lineWidth = 1 / state.canvas.zoom;
-    ctx.beginPath();
-    roundRectPath(vBadgeX, vBadgeY, vBadgeW, vBadgeH, vBadgeH / 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '400 6px "Inter", system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Video', vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2);
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
-  } else if (card.type === 'image') {
-    const iBadgeW = 31, iBadgeH = 13;
-    const iBadgeX = x + cw - iBadgeW - 5;
-    const iBadgeY = y + 2;
-    ctx.fillStyle = colors.badgeFill;
-    ctx.strokeStyle = colors.badgeStroke;
-    ctx.lineWidth = 1 / state.canvas.zoom;
-    ctx.beginPath();
-    roundRectPath(iBadgeX, iBadgeY, iBadgeW, iBadgeH, iBadgeH / 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '400 6px "Inter", system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Image', iBadgeX + iBadgeW / 2, iBadgeY + iBadgeH / 2);
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
-  }
-
   // --- Waveform area (audio/BGM only; video cards match Figma: no waveform) ---
   const wfY = y + CARD_THUMB_HEIGHT;
   const wfH = (card.type === 'video' || card.type === 'composition' || card.type === 'synthesized-video' || card.type === 'image') ? 0 : CARD_WAVEFORM_HEIGHT;
@@ -579,6 +540,25 @@ function renderCard(card) {
       ctx.textAlign = 'start';
     }
 
+    ctx.textBaseline = 'alphabetic';
+
+    // Video type badge (top-right, same y as label)
+    const vBadgeW = 31, vBadgeH = 13;
+    const vBadgeX = x + cw - vBadgeW - 5;
+    const vBadgeY = vLabelY + 2;
+    ctx.fillStyle = colors.badgeFill;
+    ctx.strokeStyle = colors.badgeStroke;
+    ctx.lineWidth = 1 / state.canvas.zoom;
+    ctx.beginPath();
+    roundRectPath(vBadgeX, vBadgeY, vBadgeW, vBadgeH, vBadgeH / 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '400 6px "Inter", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Video', vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2);
+    ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
   }
 
