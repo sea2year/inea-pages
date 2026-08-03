@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Canvas Perf Benchmark</title>
+<style>
+body{font:14px/1.5 monospace;max-width:800px;margin:40px auto;background:#1a1a1a;color:#ddd}
+h1{color:#D4FF00}
+table{border-collapse:collapse;width:100%;margin:16px 0}
+th,td{border:1px solid #444;padding:8px 12px;text-align:right}
+th{background:#333;color:#D4FF00}
+td:first-child{text-align:left}
+.warn{color:#ff6b6b}
+.ok{color:#4ecdc4}
+.fast{color:#6bff6b}
+</style></head><body>
+<h1>Canvas RenderCard @ 400% Zoom — Benchmark</h1>
+<p>模拟 5 张视频卡片的渲染操作，每张重复 200 次取平均。物理 canvas = 2560×1440 × 2 (retina) = 5120×2880，world transform scale=4.</p>
+<div id="results">Running...</div>
+<script>
+(function() {
+  const W = 2560, H = 1440, DPR = 2;
+  const c = document.createElement('canvas');
+  c.width = W * DPR;
+  c.height = H * DPR;
+  const ctx = c.getContext('2d');
+
+  // 4x zoom world transform
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.scale(4, 4);
+
+  // Prepare test image
+  const img = document.createElement('canvas');
+  img.width = 200; img.height = 100;
+  const ictx = img.getContext('2d');
+  for (let i = 0; i < 200; i++) {
+    ictx.fillStyle = `hsl(${i*3},70%,50%)`;
+    ictx.fillRect(i, 0, 1, 100);
+  }
+
+  function roundRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+  function roundRect(x, y, w, h, r, fill, stroke) {
+    roundRectPath(x, y, w, h, r);
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+  }
+
+  function bench(label, fn, n) {
+    fn(); fn(); // warmup x2
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) fn();
+    const t1 = performance.now();
+    return { label, total: t1 - t0, avg: (t1 - t0) / n };
+  }
+
+  const N = 200, CARDS = 5;
+  const results = [];
+
+  // 1. roundRect fill + stroke (card background + border)
+  results.push(bench('roundRect fill+stroke (5 cards)', () => {
+    for (let c = 0; c < CARDS; c++) {
+      const x = c * 300, y = 100;
+      ctx.fillStyle = '#ffffff';
+      roundRect(x, y, 260, 170, 10, true, false);
+      ctx.strokeStyle = '#ff6600';
+      ctx.lineWidth = 1 / 4;
+      roundRect(x, y, 260, 170, 10, false, true);
+    }
+  }, N));
+
+  // 2. gradient + roundRect
+  results.push(bench('createLinearGradient + roundRect (5 cards)', () => {
+    for (let c = 0; c < CARDS; c++) {
+      const x = c * 300, y = 100;
+      const grad = ctx.createLinearGradient(x, y, x, y + 170);
+      grad.addColorStop(0, 'rgba(255,255,255,0)');
+      grad.addColorStop(1, 'rgba(255,100,0,0.25)');
+      ctx.fillStyle = grad;
+      roundRect(x, y, 260, 170, 10, true, false);
+    }
+  }, N));
+
+  // 3. shadowBlur + roundRect
+  results.push(bench('shadowBlur + roundRect (5 cards)', () => {
+    for (let c = 0; c < CARDS; c++) {
+      const x = c * 300, y = 100;
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,100,0,0.18)';
+      ctx.shadowBlur = Math.min(12 / 4, 24);
+      ctx.fillStyle = '#ffffff';
+      roundRect(x, y, 260, 170, 10, true, false);
+      ctx.restore();
+    }
+  }, N));
+
+  // 4. clip path + restore
+  results.push(bench('roundRectPath + clip + restore (5 cards)', () => {
+    for (let c = 0; c < CARDS; c++) {
+      const x = c * 300, y = 100;
+      ctx.save();
+      roundRectPath(x, y, 260, 170, 10);
+      ctx.clip();
+      ctx.fillStyle = '#333';
+      ctx.fillRect(x, y, 260, 170);
+      ctx.restore();
+    }
+  }, N));
+
+  // 5. drawImage upscaled (50px source → 200px dest at 4x = 800px physical)
+  results.push(bench('drawImage upscale (' + CARDS + ' cards)', () => {
+    for (let c = 0; c < CARDS; c++) {
+      ctx.drawImage(img, c * 300 + 13, 100 + 2, 234, 146);
+    }
+  }, N));
+
+  // 6. arc + fill + stroke (anchors, 10 dots)
+  results.push(bench('arc fill+stroke (10 anchors)', () => {
+    for (let i = 0; i < 10; i++) {
+      const ax = 10 + i * 100, ay = 50;
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#ff6600';
+      ctx.lineWidth = 1.5 / 4;
+      ctx.beginPath();
+      ctx.arc(ax, ay, 5 / 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }, N));
+
+  // 7. fillText with measureText
+  results.push(bench('fillText + measureText (5 cards)', () => {
+    ctx.font = '700 12px Inter, system-ui, sans-serif';
+    for (let c = 0; c < CARDS; c++) {
+      const label = 'Video Card ' + (c + 1);
+      ctx.fillStyle = '#ff6600';
+      ctx.fillText(label, c * 300 + 14, 40);
+    }
+  }, N));
+
+  // 8. Combined: full renderCard simulation per card
+  results.push(bench('FULL renderCard (background+gradient+shadow+clip+drawImage+label+anchors) x5', () => {
+    for (let c = 0; c < CARDS; c++) {
+      const x = c * 300, y = 100;
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,100,0,0.18)';
+      ctx.shadowBlur = 3;
+      ctx.fillStyle = '#ffffff';
+      roundRect(x, y, 260, 170, 10, true, false);
+      const grad = ctx.createLinearGradient(x, y, x, y + 170);
+      grad.addColorStop(0, 'rgba(255,255,255,0)');
+      grad.addColorStop(1, 'rgba(255,100,0,0.25)');
+      ctx.fillStyle = grad;
+      roundRect(x, y, 260, 170, 10, true, false);
+      ctx.restore();
+      ctx.strokeStyle = '#ff6600';
+      ctx.lineWidth = 1 / 4;
+      roundRect(x, y, 260, 170, 10, false, true);
+      ctx.save();
+      roundRectPath(x, y, 260, 170, 10);
+      ctx.clip();
+      ctx.drawImage(img, x + 13, y + 2, 234, 146);
+      ctx.restore();
+      ctx.font = '700 12px Inter, system-ui, sans-serif';
+      ctx.fillStyle = '#ff6600';
+      ctx.fillText('Video Card ' + (c + 1), x + 14, 30);
+      ctx.strokeStyle = '#ff6600';
+      ctx.lineWidth = 1.5 / 4;
+      ctx.beginPath();
+      ctx.arc(x + 130, y + 170, 5 / 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.stroke();
+    }
+  }, N));
+
+  // Render table
+  const rows = results.map(r => {
+    const cls = r.avg < 0.1 ? 'fast' : (r.avg < 0.5 ? 'ok' : 'warn');
+    const perCard = (r.avg / CARDS).toFixed(3);
+    return `<tr>
+      <td>${r.label}</td>
+      <td>${r.total.toFixed(1)}ms</td>
+      <td class="${cls}">${r.avg.toFixed(3)}ms</td>
+      <td>${perCard}ms</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('results').innerHTML = `<table>
+    <tr><th>Operation</th><th>Total (${N}×)</th><th>Avg</th><th>Per Card</th></tr>
+    ${rows}
+  </table>
+  <p><span class="fast">&#x25CF;</span> &lt;0.1ms fast &nbsp;
+  <span class="ok">&#x25CF;</span> 0.1-0.5ms ok &nbsp;
+  <span class="warn">&#x25CF;</span> >0.5ms slow per op</p>
+  <p>FULL renderCard × 5 cards = <b>${(results[results.length-1].avg).toFixed(2)}ms</b> per call.
+  If this exceeds 16ms, single-thread rendering causes frame drops at 60fps.</p>`;
+})();
+</script>
+</body></html>
