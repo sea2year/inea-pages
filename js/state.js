@@ -150,16 +150,20 @@ function _captureCardCanvasData(cards) {
 }
 
 function _restoreCardCanvasData(cards, canvasData) {
-  if (!canvasData) return;
+  if (!canvasData) return Promise.resolve();
+  const promises = [];
   for (let i = 0; i < cards.length; i++) {
     const cd = canvasData[i];
     if (!cd) continue;
     if (cd.thumbStrip) {
       const img = new Image();
+      const p = new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+      promises.push(p);
       img.src = cd.thumbStrip;
       cards[i].thumbStrip = img;
     }
   }
+  return promises.length > 0 ? Promise.all(promises) : Promise.resolve();
 }
 
 // JSON.stringify replacer: convert TypedArrays to regular arrays
@@ -186,7 +190,7 @@ function pushUndo() {
   if (_undoStack.length > MAX_UNDO) _undoStack.shift();
 }
 
-function undo() {
+async function undo() {
   if (_undoStack.length === 0) return;
   const currentCanvasData = _captureCardCanvasData(state.cards);
   const current = {
@@ -209,7 +213,7 @@ function undo() {
   state.editBoxes = prev.editBoxes || [];
   state.compositionCards = prev.compositionCards || [];
   state.markerCards = prev.markerCards || [];
-  _restoreCardCanvasData(state.cards, prev._canvasData);
+  await _restoreCardCanvasData(state.cards, prev._canvasData);
   state.selection.cardIds = [];
   state.selection.groupIds = [];
   state.selection.connectionId = null;
@@ -230,7 +234,7 @@ function undo() {
   render();
 }
 
-function redo() {
+async function redo() {
   if (_redoStack.length === 0) return;
   const currentCanvasData = _captureCardCanvasData(state.cards);
   const current = {
@@ -253,7 +257,7 @@ function redo() {
   state.editBoxes = next.editBoxes || [];
   state.compositionCards = next.compositionCards || [];
   state.markerCards = next.markerCards || [];
-  _restoreCardCanvasData(state.cards, next._canvasData);
+  await _restoreCardCanvasData(state.cards, next._canvasData);
   state.selection.cardIds = [];
   state.selection.groupIds = [];
   state.selection.connectionId = null;
