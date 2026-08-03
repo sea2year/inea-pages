@@ -554,6 +554,14 @@ function renderCard(card) {
 
   // --- Video label (Figma: above card body, outside clip) ---
   if (card.type === 'video' || card.type === 'synthesized-video') {
+    // Debug: thin line at card-body top to verify new code is running
+    ctx.strokeStyle = 'rgba(255,0,0,0.5)';
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(x, bodyY);
+    ctx.lineTo(x + cw, bodyY);
+    ctx.stroke();
+
     const vLabelY = y;
     ctx.fillStyle = colors.label;
     ctx.font = `700 12px "Inter", system-ui, sans-serif`;
