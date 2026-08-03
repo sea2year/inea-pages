@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=24');
+console.log('[inea] render-v4.js v=25');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2677,8 +2677,12 @@ function startCardLabelEdit(cardId) {
   const prev = document.getElementById('__inea-label-editor');
   if (prev) prev.remove();
 
-  const baseFontSize = isAudio ? 10 : 12;
-  const baseHeight = isAudio ? 14 : CARD_LABEL_HEIGHT;
+  let baseFontSize = isAudio ? 10 : 12;
+  let baseHeight = isAudio ? 14 : CARD_LABEL_HEIGHT;
+  if (isVideo) {
+    baseFontSize = 10;
+    baseHeight = Math.round(Math.max(CARD_LABEL_HEIGHT, 14 / state.canvas.zoom) * state.canvas.zoom);
+  }
 
   const el = document.createElement('div');
   el.id = '__inea-label-editor';
@@ -2708,6 +2712,12 @@ function startCardLabelEdit(cardId) {
     const s = worldToScreen(card.x, card.y);
     let labelScreenY;
     if (isVideo) {
+      const _h = Math.round(Math.max(CARD_LABEL_HEIGHT, 14 / state.canvas.zoom) * state.canvas.zoom);
+      el.style.height = _h + 'px';
+      el.style.display = 'flex';
+      el.style.alignItems = 'flex-end';
+      el.style.fontSize = '10px';
+      el.style.padding = '0 4px 1px 4px';
       labelScreenY = s.y;
     } else if (isAudio) {
       labelScreenY = s.y + (ch - 13) * state.canvas.zoom;
