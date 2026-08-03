@@ -1061,54 +1061,115 @@ canvas {
 }
 
 /* ================================================================
-   Loading Screen — Breathing Logo + Orbit Progress
+   Loading Screen — Glitch Logo + Orbit Progress + Enter Button
    ================================================================ */
 #loading-overlay {
   position: fixed; inset: 0; z-index: 100000;
-  background: #fafafa;
+  background: #f8f8f8;
   display: flex; align-items: center; justify-content: center;
-  transition: opacity 0.5s ease 0.2s;
+  transition: opacity 0.6s ease;
   opacity: 1;
 }
 #loading-overlay.hidden { opacity: 0; pointer-events: none; }
 
 .loading-inner {
-  display: flex; flex-direction: column; align-items: center; gap: 28px;
+  display: flex; flex-direction: column; align-items: center; gap: 32px;
 }
 
-/* Logo with breathing animation */
+/* Logo with glitch + breathe */
 .loading-logo-wrap {
   position: relative;
-  width: 300px; height: 300px;
+  width: 340px; height: 340px;
   display: flex; align-items: center; justify-content: center;
 }
 .loading-logo-img {
-  width: 160px; height: auto;
+  position: relative; z-index: 1;
+  width: 170px; height: auto;
   opacity: 0.9;
-  animation: logo-breathe 1.8s ease-in-out infinite;
+  animation: logo-breathe 2.2s ease-in-out infinite;
 }
 @keyframes logo-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.85; }
-  50%      { transform: scale(1.04); opacity: 1; }
+  0%, 100% { transform: scale(1); opacity: 0.82; }
+  50%      { transform: scale(1.05); opacity: 1; }
 }
 
-/* Orbit ring SVG — same size as the container */
+/* Glitch pseudo-elements behind the logo */
+.loading-logo-glitch {
+  position: absolute;
+  width: 170px;
+  height: calc(170px * 122 / 540); /* aspect from 540x122 */
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+}
+.loading-logo-glitch::before,
+.loading-logo-glitch::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: url('../assets/logo.png') center/contain no-repeat;
+  opacity: 0;
+}
+.loading-logo-glitch::before {
+  animation: glitch-1 0.3s infinite;
+  mix-blend-mode: multiply;
+}
+.loading-logo-glitch::after {
+  animation: glitch-2 0.3s infinite;
+  mix-blend-mode: screen;
+}
+@keyframes glitch-1 {
+  0%,   90%, 100% { opacity: 0; transform: none; }
+  91%  { opacity: 0.6; transform: translate(-4px, 1px); filter: hue-rotate(90deg) brightness(1.5); }
+  92%  { opacity: 0;   transform: none; }
+  94%  { opacity: 0.5; transform: translate(3px, -2px); }
+  96%  { opacity: 0;   transform: none; }
+}
+@keyframes glitch-2 {
+  0%,  90%, 100% { opacity: 0; transform: none; }
+  92%  { opacity: 0.7; transform: translate(4px, -1px); filter: hue-rotate(-60deg) brightness(1.5); }
+  93%  { opacity: 0;   transform: none; }
+  95%  { opacity: 0.5; transform: translate(-3px, 2px); }
+  98%  { opacity: 0;   transform: none; }
+}
+
+/* Orbit ring SVG */
 .loading-orbit {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   pointer-events: none;
 }
 .orbit-ring {
-  opacity: 0.3;
+  opacity: 0.2;
 }
 
 /* Individual orbit dot */
 .orbit-dot {
-  transition: fill 0.5s ease, opacity 0.5s ease;
+  transition: fill 0.4s ease, opacity 0.4s ease, filter 0.4s ease;
 }
 
 .loading-text {
   font-family: var(--font-mono); font-size: 11px;
   color: #b0b0b0;
   letter-spacing: 0.06em;
+}
+
+/* Enter button */
+#loading-enter-btn {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 500;
+  letter-spacing: 0.08em;
+  color: #333; background: transparent;
+  border: 1px solid #d4d4d4; border-radius: 8px;
+  padding: 10px 40px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.5s ease 0.3s;
+  pointer-events: none;
+}
+#loading-enter-btn.visible {
+  opacity: 1; transform: translateY(0); pointer-events: auto;
+}
+#loading-enter-btn:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
