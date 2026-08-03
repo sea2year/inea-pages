@@ -387,7 +387,12 @@ function renderCard(card) {
     // ===== Video/BGM card content =====
 
   // --- Thumbnail strip (crop based on trim range) ---
+  const thumbInset = 3;
   const thumbAreaH = CARD_THUMB_HEIGHT;
+  const thumbX = x + thumbInset;
+  const thumbY = contentY + thumbInset;
+  const thumbW = cw - thumbInset * 2;
+  const thumbH = thumbAreaH - thumbInset * 2;
 
   // Recreate frameImage from dataURL if lost (e.g., after undo/redo)
   if (card.isFreezeFrame && card.frameImageDataURL && (!card.frameImage || !card.frameImage.src)) {
@@ -398,10 +403,10 @@ function renderCard(card) {
   if (card.isFreezeFrame && card.frameImage) {
     // Freeze frame: draw the captured frame image covering the thumb area
     try {
-      ctx.drawImage(card.frameImage, x, contentY, cw, thumbAreaH);
+      ctx.drawImage(card.frameImage, thumbX, thumbY, thumbW, thumbH);
     } catch (e) {
       ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(x, contentY, cw, thumbAreaH);
+      ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
     }
   } else if (card.thumbStrip && card.duration > 0) {
     try {
@@ -411,30 +416,30 @@ function renderCard(card) {
       const srcX = stripW * fracIn;
       const srcW = stripW * (fracOut - fracIn);
       if (srcW > 0) {
-        ctx.drawImage(card.thumbStrip, srcX, 0, srcW, card.thumbStrip.height, x, contentY, cw, thumbAreaH);
+        ctx.drawImage(card.thumbStrip, srcX, 0, srcW, card.thumbStrip.height, thumbX, thumbY, thumbW, thumbH);
       } else {
         ctx.fillStyle = '#3a3a3a';
-        ctx.fillRect(x, contentY, cw, thumbAreaH);
+        ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
       }
     } catch (e) {
       ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(x, contentY, cw, thumbAreaH);
+      ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
     }
   } else if (card.thumbStrip) {
     // fallback: still use cropped if possible, otherwise scale full strip
     try {
-      ctx.drawImage(card.thumbStrip, x, contentY, cw, thumbAreaH);
+      ctx.drawImage(card.thumbStrip, thumbX, thumbY, thumbW, thumbH);
     } catch (e) {
       ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(x, contentY, cw, thumbAreaH);
+      ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
     }
   } else {
     ctx.fillStyle = '#e0e0e0';
-    ctx.fillRect(x, contentY, cw, thumbAreaH);
+    ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
     ctx.fillStyle = '#999';
     ctx.font = `400 12px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
-    ctx.fillText('生成缩略图...', x + 12, contentY + thumbAreaH / 2);
+    ctx.fillText('生成缩略图...', thumbX + 12, thumbY + thumbH / 2);
   }
 
   // --- Waveform area (audio/BGM only; video cards match Figma: no waveform) ---
