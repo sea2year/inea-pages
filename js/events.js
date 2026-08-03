@@ -922,6 +922,25 @@ canvasWrap.addEventListener('mousedown', (e) => {
     const frac = 1 - (world.y - _volTrackY) / _volTrackH;
     card.volume = Math.round(Math.max(0, Math.min(1, frac)) * 100) / 100;
     render();
+  } else if (hit.type === 'card-label') {
+    state.selection.connectionId = null;
+    state.selection.groupIds = [];
+    state.selection.shapeId = null;
+    if (fabricCanvas) { fabricCanvas.discardActiveObject(); fabricCanvas.requestRenderAll(); }
+    state.selection.cardIds = [hit.cardId];
+    // Double-click detection for label editing
+    const labelNow = Date.now();
+    const labelPrev = state.interaction._lastLabelClick || 0;
+    const labelPrevId = state.interaction._lastLabelClickId;
+    state.interaction._lastLabelClick = labelNow;
+    state.interaction._lastLabelClickId = hit.cardId;
+    if (labelNow - labelPrev < 400 && labelPrevId === hit.cardId) {
+      render();
+      setTimeout(() => startCardLabelEdit(hit.cardId), 60);
+      return;
+    }
+    render();
+    return;
   } else if (hit.type === 'card-body') {
     state.selection.connectionId = null;
     state.selection.groupIds = [];
@@ -1825,6 +1844,8 @@ window.addEventListener('mousemove', (e) => {
     _setCanvasCursor('grab');
   } else if (hit.type === 'group-body') {
     _setCanvasCursor('default');
+  } else if (hit.type === 'card-label') {
+    _setCanvasCursor('text');
   } else if (hit.type === 'card-body') {
     _setCanvasCursor('pointer');
   } else if (hit.type === 'playhead') {

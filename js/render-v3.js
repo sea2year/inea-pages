@@ -1768,6 +1768,10 @@ function hitTest(sx, sy) {
             return { type: 'playhead', mode: 'linear', cardId: card.id };
           }
         }
+        // Composition label region (bottom strip)
+        if (wy >= card.y + CARD_THUMB_HEIGHT) {
+          return { type: 'card-label', cardId: card.id };
+        }
         return { type: 'card-body', cardId: card.id };
       }
 
@@ -1822,6 +1826,12 @@ function hitTest(sx, sy) {
         }
       }
 
+      // Video label region (below top anchor edge, within CARD_LABEL_HEIGHT strip)
+      if ((card.type === 'video' || card.type === 'synthesized-video') &&
+          wy >= card.y + 4 / zoom && wy <= card.y + CARD_LABEL_HEIGHT) {
+        return { type: 'card-label', cardId: card.id };
+      }
+
       // Playhead hit test (priority over volume and card-body click)
       const pb = state.playback;
       if ((pb.isPlaying || pb.pausedAt > 0) && pb._playheadCardId === card.id && pb._playheadX != null) {
@@ -1845,6 +1855,10 @@ function hitTest(sx, sy) {
           }
         }
         return { type: 'volume', cardId: card.id };
+      }
+      // Audio label region (bottom strip, 13px tall)
+      if (card.type === 'audio' && wy >= card.y + ch - 13) {
+        return { type: 'card-label', cardId: card.id };
       }
       // Card body
       return { type: 'card-body', cardId: card.id };
@@ -2561,6 +2575,94 @@ function startTextCardEdit(cardId) {
   ta.addEventListener('blur', commit);
   ta.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); commit(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+    ev.stopPropagation();
+  });
+}
+
+// ================================================================
+// Card label inline editing (double-click on label area)
+// ================================================================
+function startCardLabelEdit(cardId) {
+  const card = state.cards.find(c => c.id === cardId);
+  if (!card) return;
+
+  const isVideo = card.type === 'video' || card.type === 'synthesized-video';
+  const isAudio = card.type === 'audio';
+  const isComp = card.type === 'composition';
+  if (!isVideo && !isAudio && !isComp) return;
+
+  const zoom = state.canvas.zoom;
+  const cw = getCardWidth(card);
+  const s = worldToScreen(card.x, card.y);
+
+  let labelScreenY, labelH, fontSize, color;
+
+  if (isVideo) {
+    labelScreenY = s.y;
+    labelH = CARD_LABEL_HEIGHT * zoom;
+    fontSize = 12 * zoom;
+    color = getCardColors(card).label;
+  } else if (isAudio) {
+    const ch = 41;
+    labelScreenY = s.y + (ch - 13) * zoom;
+    labelH = 14 * zoom;
+    fontSize = 10 * zoom;
+    color = getCardColors(card).label;
+  } else {
+    // composition
+    labelScreenY = s.y + CARD_THUMB_HEIGHT * zoom;
+    labelH = CARD_LABEL_HEIGHT * zoom;
+    fontSize = 12 * zoom;
+    color = '#000000';
+  }
+
+  const ta = document.createElement('textarea');
+  ta.value = card.label || '';
+  ta.style.cssText = `
+    position: fixed;
+    left: ${s.x + 14 * zoom}px;
+    top: ${labelScreenY}px;
+    width: ${Math.max(60, (cw - 28) * zoom)}px;
+    height: ${labelH}px;
+    z-index: 200;
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: ${fontSize}px;
+    font-weight: 700;
+    color: ${color};
+    background: rgba(40,40,40,0.95);
+    border: 1px solid ${color};
+    border-radius: 3px;
+    padding: 2px 4px;
+    outline: none;
+    resize: none;
+    line-height: 1.2;
+    overflow: hidden;
+    white-space: nowrap;
+  `;
+  ta.id = '__inea-label-editor';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+
+  const commit = () => {
+    const existingCard = state.cards.find(c => c.id === cardId);
+    if (existingCard && ta.value.trim()) {
+      pushUndo();
+      existingCard.label = ta.value.trim();
+    }
+    ta.remove();
+    render();
+  };
+
+  const cancel = () => {
+    ta.remove();
+    render();
+  };
+
+  ta.addEventListener('blur', commit);
+  ta.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
     if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
     ev.stopPropagation();
   });
