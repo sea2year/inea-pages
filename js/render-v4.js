@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=1');
+console.log('[inea] render-v4.js v=2');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1402,27 +1402,8 @@ function renderConnection(conn) {
 
   const lw = highlight ? (2.5 / state.canvas.zoom) : (1.5 / state.canvas.zoom);
 
-  // Arrowhead at p3 (target) — compute base first (bezier ends at base, not tip)
-  const ax = p3.x - p2.x;
-  const ay = p3.y - p2.y;
-  const alen = Math.sqrt(ax * ax + ay * ay);
-  let tipX = p3.x, tipY = p3.y, baseX = p3.x, baseY = p3.y;
-  let perpX = 0, perpY = 0;
-  if (alen > 0.01) {
-    const anx = ax / alen;
-    const any = ay / alen;
-    const arrowLen = 12 / state.canvas.zoom;
-    const arrowW = 5 / state.canvas.zoom;
-    tipX = p3.x;
-    tipY = p3.y;
-    baseX = tipX - anx * arrowLen;
-    baseY = tipY - any * arrowLen;
-    perpX = -any * arrowW;
-    perpY = anx * arrowW;
-  }
-
-  // Bezier curve (ends at arrow base, not tip)
-  const lineGrad = ctx.createLinearGradient(p0.x, p0.y, baseX, baseY);
+  // Bezier curve goes all the way to p3 — shape invariant under zoom
+  const lineGrad = ctx.createLinearGradient(p0.x, p0.y, p3.x, p3.y);
   lineGrad.addColorStop(0, highlight ? lightenColor(gradFrom) : gradFrom);
   lineGrad.addColorStop(1, highlight ? lightenColor(gradTo) : gradTo);
   ctx.strokeStyle = lineGrad;
@@ -1431,11 +1412,24 @@ function renderConnection(conn) {
   ctx.setLineDash([]);
   ctx.beginPath();
   ctx.moveTo(p0.x, p0.y);
-  ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, baseX, baseY);
+  ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
   ctx.stroke();
 
-  // Arrowhead triangle (from tip back to base)
+  // Arrowhead drawn on top of the curve end (p3) — fixed screen size
+  const ax = p3.x - p2.x;
+  const ay = p3.y - p2.y;
+  const alen = Math.sqrt(ax * ax + ay * ay);
   if (alen > 0.01) {
+    const anx = ax / alen;
+    const any = ay / alen;
+    const arrowLen = 12 / state.canvas.zoom;
+    const arrowW = 5 / state.canvas.zoom;
+    const tipX = p3.x;
+    const tipY = p3.y;
+    const baseX = tipX - anx * arrowLen;
+    const baseY = tipY - any * arrowLen;
+    const perpX = -any * arrowW;
+    const perpY = anx * arrowW;
     ctx.fillStyle = highlight ? lightenColor(gradTo) : gradTo;
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
@@ -1584,26 +1578,6 @@ function renderConnectionPreview() {
     p2 = { x: p3.x - offX * sign, y: p3.y };
   }
 
-  // Compute arrowhead base first (bezier ends at base, not tip)
-  const ax2 = p3.x - p2.x;
-  const ay2 = p3.y - p2.y;
-  const alen2 = Math.sqrt(ax2 * ax2 + ay2 * ay2);
-  let base2X = p3.x, base2Y = p3.y;
-  let tip2X = p3.x, tip2Y = p3.y;
-  let perp2X = 0, perp2Y = 0;
-  if (alen2 > 0.01) {
-    const anx2 = ax2 / alen2;
-    const any2 = ay2 / alen2;
-    const arrowLen2 = 10 / state.canvas.zoom;
-    const arrowW2 = 4 / state.canvas.zoom;
-    tip2X = p3.x;
-    tip2Y = p3.y;
-    base2X = tip2X - anx2 * arrowLen2;
-    base2Y = tip2Y - any2 * arrowLen2;
-    perp2X = -any2 * arrowW2;
-    perp2Y = anx2 * arrowW2;
-  }
-
   // Keyframe (top) connections use green; others use source card color
   let previewColor;
   if (isTopSide) {
@@ -1619,14 +1593,29 @@ function renderConnectionPreview() {
   ctx.lineWidth = 2 / state.canvas.zoom;
   ctx.lineCap = 'round';
   ctx.setLineDash([6 / state.canvas.zoom, 4 / state.canvas.zoom]);
+
+  // Bezier goes all the way to p3 (mouse) — shape invariant under zoom
   ctx.beginPath();
   ctx.moveTo(p0.x, p0.y);
-  ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, base2X, base2Y);
+  ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Arrowhead at cursor (skip for keyframe/top connections)
+  // Arrowhead drawn on top — fixed screen size
+  const ax2 = p3.x - p2.x;
+  const ay2 = p3.y - p2.y;
+  const alen2 = Math.sqrt(ax2 * ax2 + ay2 * ay2);
   if (!isTopSide && alen2 > 0.01) {
+    const anx2 = ax2 / alen2;
+    const any2 = ay2 / alen2;
+    const arrowLen2 = 10 / state.canvas.zoom;
+    const arrowW2 = 4 / state.canvas.zoom;
+    const tip2X = p3.x;
+    const tip2Y = p3.y;
+    const base2X = tip2X - anx2 * arrowLen2;
+    const base2Y = tip2Y - any2 * arrowLen2;
+    const perp2X = -any2 * arrowW2;
+    const perp2Y = anx2 * arrowW2;
     let arrowColor;
     if (sourceCard) {
       const srcColors = getCardColors(sourceCard);
