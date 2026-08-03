@@ -1887,9 +1887,11 @@ function hitTest(sx, sy) {
         }
       }
 
-      // Video label region (below top anchor edge, within CARD_LABEL_HEIGHT strip)
+      // Video label region (bottom strip where name/duration is shown)
+      // Font is 10/zoom world units tall (inverse-scaled), so hit area height scales with zoom too
+      const _labelHitH = Math.max(CARD_LABEL_HEIGHT, Math.min(ch, 12 / state.canvas.zoom));
       if ((card.type === 'video' || card.type === 'synthesized-video') &&
-          wy >= card.y + 4 / zoom && wy <= card.y + CARD_LABEL_HEIGHT) {
+          wy >= card.y + ch - _labelHitH && wy <= card.y + ch) {
         return { type: 'card-label', cardId: card.id };
       }
 
