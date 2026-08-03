@@ -1061,7 +1061,7 @@ canvas {
 }
 
 /* ================================================================
-   Loading Screen — Glitch Logo + Orbit Progress + Enter Button
+   Loading Screen — Horizontal-Slice Glitch Logo + Orbit + Enter Button
    ================================================================ */
 #loading-overlay {
   position: fixed; inset: 0; z-index: 100000;
@@ -1076,63 +1076,73 @@ canvas {
   display: flex; flex-direction: column; align-items: center; gap: 32px;
 }
 
-/* Logo with glitch + breathe */
+/* ---- Glitch Container ---- */
 .loading-logo-wrap {
   position: relative;
   width: 340px; height: 340px;
   display: flex; align-items: center; justify-content: center;
 }
+
+/* Main logo — still, no animation */
 .loading-logo-img {
-  position: relative; z-index: 1;
+  position: relative; z-index: 10;
   width: 170px; height: auto;
-  opacity: 0.9;
-  animation: logo-breathe 2.2s ease-in-out infinite;
-}
-@keyframes logo-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.82; }
-  50%      { transform: scale(1.05); opacity: 1; }
+  opacity: 0.88;
 }
 
-/* Glitch pseudo-elements behind the logo */
-.loading-logo-glitch {
+/* ---- Slice glitch layers ---- */
+/* Container holds all slices, same size as logo */
+.glitch-slices {
   position: absolute;
   width: 170px;
-  height: calc(170px * 122 / 540); /* aspect from 540x122 */
+  height: calc(170px * 122 / 540); /* 38.4px ≈ logo aspect */
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 0;
+  z-index: 5;
+  overflow: hidden;
 }
-.loading-logo-glitch::before,
-.loading-logo-glitch::after {
-  content: '';
-  position: absolute; inset: 0;
+
+/* Each slice is a logo copy clipped to a horizontal band, shifted sideways */
+.glitch-slice {
+  position: absolute; left: 0;
+  width: 100%; height: 20%;
   background: url('../assets/logo.png') center/contain no-repeat;
   opacity: 0;
 }
-.loading-logo-glitch::before {
-  animation: glitch-1 0.3s infinite;
-  mix-blend-mode: multiply;
-}
-.loading-logo-glitch::after {
-  animation: glitch-2 0.3s infinite;
-  mix-blend-mode: screen;
-}
-@keyframes glitch-1 {
-  0%,   90%, 100% { opacity: 0; transform: none; }
-  91%  { opacity: 0.6; transform: translate(-4px, 1px); filter: hue-rotate(90deg) brightness(1.5); }
-  92%  { opacity: 0;   transform: none; }
-  94%  { opacity: 0.5; transform: translate(3px, -2px); }
-  96%  { opacity: 0;   transform: none; }
-}
-@keyframes glitch-2 {
-  0%,  90%, 100% { opacity: 0; transform: none; }
-  92%  { opacity: 0.7; transform: translate(4px, -1px); filter: hue-rotate(-60deg) brightness(1.5); }
-  93%  { opacity: 0;   transform: none; }
-  95%  { opacity: 0.5; transform: translate(-3px, 2px); }
-  98%  { opacity: 0;   transform: none; }
+.glitch-slice:nth-child(1) { top: 0%;   background-position: 0 0%;      animation: slice-a 0.35s infinite; }
+.glitch-slice:nth-child(2) { top: 20%;  background-position: 0 25%;     animation: slice-b 0.38s infinite 0.05s; }
+.glitch-slice:nth-child(3) { top: 40%;  background-position: 0 50%;     animation: slice-a 0.33s infinite 0.1s; }
+.glitch-slice:nth-child(4) { top: 60%;  background-position: 0 75%;     animation: slice-c 0.4s infinite 0.15s; }
+.glitch-slice:nth-child(5) { top: 80%;  background-position: 0 100%;    animation: slice-b 0.36s infinite 0.08s; }
+
+/* Shift left + red tint */
+@keyframes slice-a {
+  0%, 87%, 100% { opacity: 0; transform: translateX(0); }
+  88% { opacity: 0.7; transform: translateX(-18px); filter: brightness(2) sepia(1) hue-rotate(-20deg) saturate(8); }
+  89% { opacity: 0; transform: translateX(0); }
+  93% { opacity: 0.65; transform: translateX(-12px); filter: brightness(1.8) sepia(1) hue-rotate(-15deg) saturate(6); }
+  94% { opacity: 0; transform: translateX(0); }
 }
 
-/* Orbit ring SVG */
+/* Shift right + cyan tint */
+@keyframes slice-b {
+  0%, 85%, 100% { opacity: 0; transform: translateX(0); }
+  86% { opacity: 0.7; transform: translateX(16px); filter: brightness(2.2) sepia(1) hue-rotate(180deg) saturate(6); }
+  87% { opacity: 0; transform: translateX(0); }
+  91% { opacity: 0.6; transform: translateX(10px); filter: brightness(1.6) sepia(1) hue-rotate(170deg) saturate(5); }
+  92% { opacity: 0; transform: translateX(0); }
+}
+
+/* Shift left + green tint */
+@keyframes slice-c {
+  0%, 89%, 100% { opacity: 0; transform: translateX(0); }
+  90% { opacity: 0.65; transform: translateX(-22px); filter: brightness(1.7) sepia(1) hue-rotate(70deg) saturate(7); }
+  91% { opacity: 0; transform: translateX(0); }
+  95% { opacity: 0.5; transform: translateX(-8px); filter: brightness(1.4) sepia(1) hue-rotate(80deg) saturate(5); }
+  96% { opacity: 0; transform: translateX(0); }
+}
+
+/* ---- Orbit ring SVG ---- */
 .loading-orbit {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
