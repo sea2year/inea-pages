@@ -2106,32 +2106,30 @@ window.addEventListener('mouseup', (e) => {
           state.selection.groupIds = [];
           updateInspector();
         } else {
-        const fromCenterX = fromCard.x + getCardWidth(fromCard) / 2;
-        const toCenterX = toCard.x + getCardWidth(toCard) / 2;
-        const toSide = fromCenterX < toCenterX ? 'left' : 'right';
-        const compatible = (fromSide === 'right' && toSide === 'left') ||
-                           (fromSide === 'left' && toSide === 'right');
-        if (compatible) {
-          const connId = 'conn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-          let transDur = 0.5;
-          if (fromCard && toCard) {
-            const fromEndX = fromCard.x + getCardWidth(fromCard);
-            const gap = toCard.x - fromEndX;
-            transDur = Math.max(0.5, Math.min(5, gap / PIXELS_PER_SECOND));
-          }
-          const isTween = state.interaction._isTweenConnection;
-          state.connections.push({
-            id: connId,
-            fromCardId: fromCard.id,
-            fromSide,
-            toCardId: toCard.id,
-            toSide,
-            type: isTween ? 'tween' : 'transition',
-            transition: isTween ? 'cut' : 'dissolve',
-            transitionDuration: isTween ? 0 : Math.round(transDur * 10) / 10,
-            easing: 'linear'
-          });
+        // Always connect left→right, regardless of drag direction
+        let leftCard = fromCard;
+        let rightCard = toCard;
+        if (fromCard.x + getCardWidth(fromCard) / 2 > toCard.x + getCardWidth(toCard) / 2) {
+          leftCard = toCard;
+          rightCard = fromCard;
         }
+        const connId = 'conn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        let transDur = 0.5;
+        const fromEndX = leftCard.x + getCardWidth(leftCard);
+        const gap = rightCard.x - fromEndX;
+        transDur = Math.max(0.5, Math.min(5, gap / PIXELS_PER_SECOND));
+        const isTween = state.interaction._isTweenConnection;
+        state.connections.push({
+          id: connId,
+          fromCardId: leftCard.id,
+          fromSide: 'right',
+          toCardId: rightCard.id,
+          toSide: 'left',
+          type: isTween ? 'tween' : 'transition',
+          transition: isTween ? 'cut' : 'dissolve',
+          transitionDuration: isTween ? 0 : Math.round(transDur * 10) / 10,
+          easing: 'linear'
+        });
         }
       }
     }
