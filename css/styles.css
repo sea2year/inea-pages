@@ -1102,26 +1102,28 @@ canvas {
   letter-spacing: 0.06em;
 }
 
-/* ---- START button: centered on right edge ---- */
+/* ---- Percentage / START button: centered on right edge ---- */
 #loading-enter-btn {
   position: absolute;
   right: 48px; top: 50%;
   transform: translateY(-50%);
-  font-family: var(--font-mono); font-size: 15px; font-weight: 500;
-  letter-spacing: 0.12em;
+  font-family: var(--font-mono); font-size: 13px; font-weight: 500;
+  letter-spacing: 0.08em;
   color: #555; background: transparent;
   border: 1px solid #ccc; border-radius: 50%;
   width: 64px; height: 64px;
   padding: 0;
-  cursor: pointer;
-  opacity: 0;
-  transition: all 0.5s ease 0.3s;
+  cursor: default;
+  transition: all 0.5s ease;
   pointer-events: none;
 }
-#loading-enter-btn.visible {
-  opacity: 1; pointer-events: auto;
+#loading-enter-btn.done {
+  cursor: pointer;
+  pointer-events: auto;
+  font-size: 14px;
+  letter-spacing: 0.12em;
 }
-#loading-enter-btn:hover {
+#loading-enter-btn.done:hover {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: #000;

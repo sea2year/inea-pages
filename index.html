@@ -259,7 +259,7 @@
     clearInterval(tipTimer);
     loadingText.textContent = state.cards.length + ' / ' + total;
     loadingPct.textContent = 'START';
-    enterBtn.classList.add('visible');
+    enterBtn.classList.add('done');
 
     enterBtn.addEventListener('click', function() {
       overlay.classList.add('hidden');
