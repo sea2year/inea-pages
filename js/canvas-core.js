@@ -142,23 +142,29 @@ function isDynamicCard(card) {
 }
 
 function getCardColors(card) {
-  if (isDynamicCard(card) && card.accentColor) {
-    const { r, g, b } = card.accentColor;
-    const blendWhite38 = (c) => Math.round(c + (255 - c) * 0.38);
-    const blendWhite35 = (c) => Math.round(c * 0.65 + 255 * 0.35);
+  if (isDynamicCard(card)) {
+    // Self-heal: re-extract from thumbStrip if accentColor was lost (e.g. after undo/redo or trim)
+    if (!card.accentColor && card.thumbStrip && typeof extractDominantColor === 'function') {
+      card.accentColor = extractDominantColor(card.thumbStrip);
+    }
+    if (card.accentColor) {
+      const { r, g, b } = card.accentColor;
+      const blendWhite38 = (c) => Math.round(c + (255 - c) * 0.38);
+      const blendWhite35 = (c) => Math.round(c * 0.65 + 255 * 0.35);
 
-    return {
-      border: `rgb(${r},${g},${b})`,
-      shadow: `rgba(${r},${g},${b},0.18)`,
-      gradientTop: `rgba(255,255,255,0)`,
-      gradientBot: `rgba(${r},${g},${b},0.25)`,
-      badgeFill: `rgba(${blendWhite38(r)},${blendWhite38(g)},${blendWhite38(b)},0.8)`,
-      badgeStroke: `rgb(${r},${g},${b})`,
-      badgeText: `rgb(${r},${g},${b})`,
-      label: `rgb(${r},${g},${b})`,
-      duration: `rgb(${blendWhite35(r)},${blendWhite35(g)},${blendWhite35(b)})`,
-      handleColor: (alpha) => `rgba(${r},${g},${b},${alpha})`,
-    };
+      return {
+        border: `rgb(${r},${g},${b})`,
+        shadow: `rgba(${r},${g},${b},0.18)`,
+        gradientTop: `rgba(255,255,255,0)`,
+        gradientBot: `rgba(${r},${g},${b},0.25)`,
+        badgeFill: `rgba(${blendWhite38(r)},${blendWhite38(g)},${blendWhite38(b)},0.8)`,
+        badgeStroke: `rgb(${r},${g},${b})`,
+        badgeText: `rgb(${r},${g},${b})`,
+        label: `rgb(${r},${g},${b})`,
+        duration: `rgb(${blendWhite35(r)},${blendWhite35(g)},${blendWhite35(b)})`,
+        handleColor: (alpha) => `rgba(${r},${g},${b},${alpha})`,
+      };
+    }
   }
 
   // Non-dynamic or legacy: preserve existing hardcoded type colors
