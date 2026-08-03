@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=27');
+console.log('[inea] render-v4.js v=28');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2705,16 +2705,22 @@ function startCardLabelEdit(cardId) {
     if (isVideo) {
       labelScreenH = Math.round(Math.max(CARD_LABEL_HEIGHT * zoom, 14));
       labelScreenY = s.y;
+      // Cap editor height: fill label area up to 100% zoom, lock at 20px beyond
+      const editorH = Math.min(labelScreenH, CARD_LABEL_HEIGHT);
+      el.style.height = editorH + 'px';
+      el.style.top = (labelScreenY + labelScreenH - editorH) + 'px';
     } else if (isAudio) {
       labelScreenH = 14;
       labelScreenY = s.y + (41 - 13) * zoom;
+      el.style.height = labelScreenH + 'px';
+      el.style.top = labelScreenY + 'px';
     } else {
       labelScreenH = Math.round(CARD_LABEL_HEIGHT * zoom);
       labelScreenY = s.y + CARD_THUMB_HEIGHT * zoom;
+      el.style.height = labelScreenH + 'px';
+      el.style.top = labelScreenY + 'px';
     }
 
-    el.style.height = labelScreenH + 'px';
-    el.style.top = labelScreenY + 'px';
     el.style.left = (s.x + 12 * zoom) + 'px';
     el.style.maxWidth = Math.max(40, getCardWidth(card) * zoom - 24 * zoom - 8) + 'px';
   };
