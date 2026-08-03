@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=22');
+console.log('[inea] render-v4.js v=23');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1889,9 +1889,10 @@ function hitTest(sx, sy) {
 
       // Video label region (bottom strip where name/duration is shown)
       // Font is 10/zoom world units tall (inverse-scaled), so hit area height scales with zoom too
-      const _labelHitH = Math.max(CARD_LABEL_HEIGHT, Math.min(ch, 12 / state.canvas.zoom));
+      const _videoCh = CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT;
+      const _labelHitH = Math.max(CARD_LABEL_HEIGHT, Math.min(_videoCh, 12 / state.canvas.zoom));
       if ((card.type === 'video' || card.type === 'synthesized-video') &&
-          wy >= card.y + ch - _labelHitH && wy <= card.y + ch) {
+          wy >= card.y + _videoCh - _labelHitH && wy <= card.y + _videoCh) {
         return { type: 'card-label', cardId: card.id };
       }
 
@@ -2708,7 +2709,7 @@ function startCardLabelEdit(cardId) {
     const s = worldToScreen(card.x, card.y);
     let labelScreenY;
     if (isVideo) {
-      labelScreenY = s.y + (CARD_HEIGHT - CARD_LABEL_HEIGHT) * state.canvas.zoom;
+      labelScreenY = s.y + CARD_THUMB_HEIGHT * state.canvas.zoom;
     } else if (isAudio) {
       labelScreenY = s.y + (ch - 13) * state.canvas.zoom;
     } else {
