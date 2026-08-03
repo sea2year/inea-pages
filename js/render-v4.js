@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=4');
+console.log('[inea] render-v4.js v=5');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1262,16 +1262,17 @@ function renderConnection(conn) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Midpoint badge
+    // Midpoint badge — inverse-scale for zoom invariance
+    const z = state.canvas.zoom;
     const mid = bezierPoint(0.5, p0, p1, p2, p3);
-    const badgeW = 44;
-    const badgeH = 18;
-    const badgeR = 9;
-    const labelFontSize = 11;
+    const badgeW = 44 / z;
+    const badgeH = 18 / z;
+    const badgeR = 9 / z;
+    const labelFontSize = 11 / z;
 
     ctx.fillStyle = highlight ? '#b3d900' : '#ffffff';
     ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
-    ctx.lineWidth = 1.2 / state.canvas.zoom;
+    ctx.lineWidth = 1.2 / z;
     ctx.beginPath();
     roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
     ctx.fill();
@@ -1290,19 +1291,19 @@ function renderConnection(conn) {
 
     // Delete button when hovered
     if (isHovered) {
-      const delR = 7;
-      const delX = mid.x + badgeW / 2 + 8;
+      const delR = 7 / z;
+      const delX = mid.x + badgeW / 2 + 8 / z;
       const delY = mid.y;
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#e04040';
-      ctx.lineWidth = 1.2 / state.canvas.zoom;
+      ctx.lineWidth = 1.2 / z;
       ctx.beginPath();
       ctx.arc(delX, delY, delR, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.strokeStyle = '#e04040';
-      ctx.lineWidth = 1.2 / state.canvas.zoom;
-      const xPad = 2.2;
+      ctx.lineWidth = 1.2 / z;
+      const xPad = 2.2 / z;
       ctx.beginPath();
       ctx.moveTo(delX - xPad, delY - xPad);
       ctx.lineTo(delX + xPad, delY + xPad);
@@ -1339,17 +1340,18 @@ function renderConnection(conn) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Midpoint badge — world-space sizing (scales with zoom like cards)
+    // Midpoint badge — inverse-scale for zoom invariance
+    const z3 = state.canvas.zoom;
     const mid = bezierPoint(0.5, p0, p1, p2, p3);
-    const badgeW = 38;
-    const badgeH = 18;
-    const badgeR = 9;
-    const labelFontSize = 11;
+    const badgeW = 38 / z3;
+    const badgeH = 18 / z3;
+    const badgeR = 9 / z3;
+    const labelFontSize = 11 / z3;
 
     const midColor = toColors ? toColors.border : 'rgb(101,84,203)';
     ctx.fillStyle = highlight ? lightenColor(midColor) : '#ffffff';
     ctx.strokeStyle = highlight ? lightenColor(midColor) : midColor;
-    ctx.lineWidth = 1.2 / state.canvas.zoom;
+    ctx.lineWidth = 1.2 / z3;
     ctx.beginPath();
     roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
     ctx.fill();
@@ -1368,19 +1370,19 @@ function renderConnection(conn) {
 
     // Delete button when hovered
     if (isHovered) {
-      const delR = 7;
-      const delX = mid.x + badgeW / 2 + 8;
+      const delR = 7 / z3;
+      const delX = mid.x + badgeW / 2 + 8 / z3;
       const delY = mid.y;
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#e04040';
-      ctx.lineWidth = 1.2 / state.canvas.zoom;
+      ctx.lineWidth = 1.2 / z3;
       ctx.beginPath();
       ctx.arc(delX, delY, delR, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.strokeStyle = '#e04040';
-      ctx.lineWidth = 1.2 / state.canvas.zoom;
-      const xPad = 2.2;
+      ctx.lineWidth = 1.2 / z3;
+      const xPad = 2.2 / z3;
       ctx.beginPath();
       ctx.moveTo(delX - xPad, delY - xPad);
       ctx.lineTo(delX + xPad, delY + xPad);
@@ -1465,7 +1467,7 @@ function renderConnection(conn) {
   // Badge text
   const label = TRANSITION_LABELS[conn.transition] || '切';
   ctx.fillStyle = highlight ? '#ffffff' : badgeStroke;
-  ctx.font = `${isHovered ? '550' : '450'} 11px "Inter", system-ui, sans-serif`;
+  ctx.font = `${isHovered ? '550' : '450'} ${11 / state.canvas.zoom}px "Inter", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, mid.x, mid.y);
