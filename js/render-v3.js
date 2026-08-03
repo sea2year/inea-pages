@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v3.js v=32');
+console.log('[inea] render-v3.js v=33');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -902,22 +902,22 @@ function getConnectionBezier(conn) {
 
   // Keyframe / top-side connections: vertical bezier (control points go upward)
   if (conn.fromSide === 'top' || conn.toSide === 'top') {
-    const distY = Math.abs(p3.y - p0.y);
-    const minOff = BEZIER_OFFSET / state.canvas.zoom;
-    let offY = Math.max(minOff, distY * 0.35);
-    // 防止S形：控制点偏移不能超过端点间距的48%
-    if (offY > distY * 0.48) offY = distY * 0.48;
+    // 在屏幕空间中计算，保证缩放时曲线形状完全不变
+    const z = state.canvas.zoom;
+    const screenDistY = Math.abs(p3.y - p0.y) * z;
+    const screenOffY = Math.min(screenDistY * 0.48, Math.max(BEZIER_OFFSET, screenDistY * 0.35));
+    const offY = screenOffY / z;
     const minY = Math.min(p0.y, p3.y);
     const p1 = { x: p0.x, y: minY - offY };
     const p2 = { x: p3.x, y: minY - offY };
     return { p0, p1, p2, p3 };
   }
 
-  const distX = Math.abs(p3.x - p0.x);
-  const minOff = BEZIER_OFFSET / state.canvas.zoom;
-  let offX = Math.max(minOff, distX * 0.35);
-  // 防止S形：控制点偏移不能超过端点间距的48%
-  if (offX > distX * 0.48) offX = distX * 0.48;
+  // 在屏幕空间中计算，保证缩放时曲线形状完全不变
+  const z = state.canvas.zoom;
+  const screenDistX = Math.abs(p3.x - p0.x) * z;
+  const screenOffX = Math.min(screenDistX * 0.48, Math.max(BEZIER_OFFSET, screenDistX * 0.35));
+  const offX = screenOffX / z;
   const p1 = { x: p0.x + offX, y: p0.y };
   const p2 = { x: p3.x - offX, y: p3.y };
   return { p0, p1, p2, p3 };
@@ -1578,20 +1578,20 @@ function renderConnectionPreview() {
   const isTweenPreview = state.interaction._isTweenConnection;
 
   let p1, p2;
+  const z = state.canvas.zoom;
   if (isTopSide) {
-    // Vertical bezier for top connections
-    const distY = Math.abs(p3.y - p0.y);
-    const minOff = BEZIER_OFFSET / state.canvas.zoom;
-    let offY = Math.max(minOff, distY * 0.35);
-    if (offY > distY * 0.48) offY = distY * 0.48;
+    // Vertical bezier: 在屏幕空间中计算，缩放时形状不变
+    const screenDistY = Math.abs(p3.y - p0.y) * z;
+    const screenOffY = Math.min(screenDistY * 0.48, Math.max(BEZIER_OFFSET, screenDistY * 0.35));
+    const offY = screenOffY / z;
     const minY = Math.min(p0.y, p3.y);
     p1 = { x: p0.x, y: minY - offY };
     p2 = { x: p3.x, y: minY - offY };
   } else {
-    const distX = Math.abs(p3.x - p0.x);
-    const minOff = BEZIER_OFFSET / state.canvas.zoom;
-    let offX = Math.max(minOff, distX * 0.35);
-    if (offX > distX * 0.48) offX = distX * 0.48;
+    // 在屏幕空间中计算，缩放时形状不变
+    const screenDistX = Math.abs(p3.x - p0.x) * z;
+    const screenOffX = Math.min(screenDistX * 0.48, Math.max(BEZIER_OFFSET, screenDistX * 0.35));
+    const offX = screenOffX / z;
     const sign = cf.side === 'right' ? 1 : -1;
     p1 = { x: p0.x + offX * sign, y: p0.y };
     p2 = { x: p3.x - offX * sign, y: p3.y };
