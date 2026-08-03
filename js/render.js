@@ -387,7 +387,7 @@ function renderCard(card) {
     // ===== Video/BGM card content =====
 
   // --- Thumbnail strip (crop based on trim range) ---
-  const thumbInsetX = 3;
+  const thumbInsetX = 6;
   const thumbInsetY = 2;
   const thumbAreaH = CARD_THUMB_HEIGHT;
   const thumbX = x + thumbInsetX;
