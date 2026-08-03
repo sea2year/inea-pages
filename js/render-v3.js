@@ -2592,46 +2592,19 @@ function startCardLabelEdit(cardId) {
   const isComp = card.type === 'composition';
   if (!isVideo && !isAudio && !isComp) return;
 
-  const zoom = state.canvas.zoom;
-  const cw = getCardWidth(card);
-  const s = worldToScreen(card.x, card.y);
-
-  let labelScreenY, labelH, fontSize, color;
-
-  if (isVideo) {
-    labelScreenY = s.y;
-    labelH = CARD_LABEL_HEIGHT * zoom;
-    fontSize = 12 * zoom;
-    color = getCardColors(card).label;
-  } else if (isAudio) {
-    const ch = 41;
-    labelScreenY = s.y + (ch - 13) * zoom;
-    labelH = 14 * zoom;
-    fontSize = 10 * zoom;
-    color = getCardColors(card).label;
-  } else {
-    // composition
-    labelScreenY = s.y + CARD_THUMB_HEIGHT * zoom;
-    labelH = CARD_LABEL_HEIGHT * zoom;
-    fontSize = 12 * zoom;
-    color = '#000000';
-  }
+  const ch = isAudio ? 41 : CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT;
 
   const ta = document.createElement('textarea');
   ta.value = card.label || '';
+  ta.id = '__inea-label-editor';
   ta.style.cssText = `
     position: fixed;
-    left: ${s.x + 14 * zoom}px;
-    top: ${labelScreenY}px;
-    width: ${Math.max(60, (cw - 28) * zoom)}px;
-    height: ${labelH}px;
     z-index: 200;
     font-family: "Inter", system-ui, sans-serif;
-    font-size: ${fontSize}px;
     font-weight: 700;
-    color: ${color};
-    background: rgba(40,40,40,0.95);
-    border: 1px solid ${color};
+    color: #000;
+    background: #fff;
+    border: 1px solid #aaa;
     border-radius: 3px;
     padding: 2px 4px;
     outline: none;
@@ -2640,10 +2613,54 @@ function startCardLabelEdit(cardId) {
     overflow: hidden;
     white-space: nowrap;
   `;
-  ta.id = '__inea-label-editor';
   document.body.appendChild(ta);
   ta.focus();
   ta.select();
+
+  // Reposition based on current canvas state; runs every frame during edit
+  const reposition = () => {
+    const zoom = state.canvas.zoom;
+    const s = worldToScreen(card.x, card.y);
+
+    let labelScreenY, labelH, fontSize;
+    if (isVideo) {
+      labelScreenY = s.y;
+      labelH = CARD_LABEL_HEIGHT * zoom;
+      fontSize = 12 * zoom;
+    } else if (isAudio) {
+      labelScreenY = s.y + (ch - 13) * zoom;
+      labelH = 14 * zoom;
+      fontSize = 10 * zoom;
+    } else {
+      labelScreenY = s.y + CARD_THUMB_HEIGHT * zoom;
+      labelH = CARD_LABEL_HEIGHT * zoom;
+      fontSize = 12 * zoom;
+    }
+
+    // Width: fit text content, capped at card width
+    const maxW = Math.max(60, (getCardWidth(card) - 28) * zoom);
+
+    Object.assign(ta.style, {
+      left: (s.x + 14 * zoom) + 'px',
+      top: labelScreenY + 'px',
+      width: Math.min(maxW, Math.max(60, (ta.value.length + 2) * (fontSize * 0.6))) + 'px',
+      height: labelH + 'px',
+      fontSize: fontSize + 'px',
+    });
+  };
+  reposition();
+
+  let _rafId;
+  const _rafLoop = () => {
+    reposition();
+    _rafId = requestAnimationFrame(_rafLoop);
+  };
+  _rafId = requestAnimationFrame(_rafLoop);
+
+  const cleanup = () => {
+    cancelAnimationFrame(_rafId);
+    ta.remove();
+  };
 
   const commit = () => {
     const existingCard = state.cards.find(c => c.id === cardId);
@@ -2651,12 +2668,12 @@ function startCardLabelEdit(cardId) {
       pushUndo();
       existingCard.label = ta.value.trim();
     }
-    ta.remove();
+    cleanup();
     render();
   };
 
   const cancel = () => {
-    ta.remove();
+    cleanup();
     render();
   };
 
