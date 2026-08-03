@@ -437,11 +437,11 @@ function renderCard(card) {
     ctx.fillText('生成缩略图...', x + 12, contentY + thumbAreaH / 2);
   }
 
-  // --- Video card type badge (top-right, Figma: pill on thumbnail) ---
+  // --- Video card type badge (top-right, Figma: above card body, in label area) ---
   if (card.type === 'video' || card.type === 'synthesized-video') {
     const vBadgeW = 31, vBadgeH = 13;
     const vBadgeX = x + cw - vBadgeW - 5;
-    const vBadgeY = bodyY + 3;
+    const vBadgeY = y + 2;
     ctx.fillStyle = colors.badgeFill;
     ctx.strokeStyle = colors.badgeStroke;
     ctx.lineWidth = 1 / state.canvas.zoom;
@@ -459,7 +459,7 @@ function renderCard(card) {
   } else if (card.type === 'image') {
     const iBadgeW = 31, iBadgeH = 13;
     const iBadgeX = x + cw - iBadgeW - 5;
-    const iBadgeY = bodyY + 3;
+    const iBadgeY = y + 2;
     ctx.fillStyle = colors.badgeFill;
     ctx.strokeStyle = colors.badgeStroke;
     ctx.lineWidth = 1 / state.canvas.zoom;
@@ -554,14 +554,6 @@ function renderCard(card) {
 
   // --- Video label (Figma: above card body, outside clip) ---
   if (card.type === 'video' || card.type === 'synthesized-video') {
-    // Debug: thin line at card-body top to verify new code is running
-    ctx.strokeStyle = 'rgba(255,0,0,0.5)';
-    ctx.lineWidth = lw;
-    ctx.beginPath();
-    ctx.moveTo(x, bodyY);
-    ctx.lineTo(x + cw, bodyY);
-    ctx.stroke();
-
     const vLabelY = y;
     ctx.fillStyle = colors.label;
     ctx.font = `700 12px "Inter", system-ui, sans-serif`;
