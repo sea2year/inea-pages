@@ -198,27 +198,20 @@
 <script src="js/ui-panels.js"></script>
 <script src="js/main.js"></script>
 <script>
-// Loading screen — clip-path diagonal slash from left to right + bottom layout
+// Loading screen — skewed fill width animation + bottom layout
 (function() {
   var overlay = document.getElementById('loading-overlay');
   var fill = document.getElementById('loading-fill');
   var loadingText = document.getElementById('loading-text');
   var enterBtn = document.getElementById('loading-enter-btn');
 
-  // Slant angle: right-bottom lags behind right-top, creating diagonal
-  var SLANT = 45; // lag in percentage points
-
   function setFill(progress) {
-    // progress: 0 to 1
-    // rightTop goes 0→135, rightBottom lags by SLANT
-    var rt = Math.min(135, progress * 135);
-    var rb = Math.max(0, rt - SLANT);
-    var poly = 'polygon(0 100%, 0 0, ' + rt + '% 0, ' + rb + '% 100%)';
-    fill.style.clipPath = poly;
+    // progress: 0 to 1, width goes 0% → 160% to cover skewed rect
+    fill.style.width = (progress * 160) + '%';
   }
 
-  // Initial state — barely visible sliver
-  setFill(0.02);
+  // Start at 0
+  fill.style.width = '0%';
 
   var mediaFiles = [
     { path: 'media/无人机操作.mp4', type: 'video', name: '无人机操作.mp4' },
