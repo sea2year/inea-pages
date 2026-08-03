@@ -13,11 +13,11 @@
 
 <!-- Loading overlay -->
 <div id="loading-overlay">
-  <div class="loading-fill" id="loading-fill" style="position:absolute; left:0; top:0; width:100%; height:100%; background:#D4FF00; transform:skewX(-14deg) translateX(-105%); transition:transform 0.6s cubic-bezier(0.4,0,0.2,1); z-index:0;"></div>
+  <div class="loading-fill" id="loading-fill" style="position:absolute; left:-60%; top:0; width:220%; height:100%; background:#D4FF00; transform:skewX(14deg) translateX(-105%); transition:transform 0.6s cubic-bezier(0.4,0,0.2,1); z-index:0;"></div>
   <div class="loading-inner">
     <img class="loading-logo-img" src="assets/logo.png" alt="INEA" />
     <div class="loading-text" id="loading-text">准备素材...</div>
-    <button id="loading-enter-btn">START</button>
+    <button id="loading-enter-btn"><span id="loading-pct">0%</span></button>
   </div>
 </div>
 
@@ -203,11 +203,15 @@
   var overlay = document.getElementById('loading-overlay');
   var fill = document.getElementById('loading-fill');
   var loadingText = document.getElementById('loading-text');
+  var loadingPct = document.getElementById('loading-pct');
   var enterBtn = document.getElementById('loading-enter-btn');
 
   function setFill(progress) {
-    fill.style.transform = 'skewX(-14deg) translateX(' + (-105 + progress * 105) + '%)';
+    fill.style.transform = 'skewX(14deg) translateX(' + (-105 + progress * 105) + '%)';
+    loadingPct.textContent = Math.round(progress * 100) + '%';
   }
+
+  var tips = ['素材加载中', '界面加载中', '网络有点卡顿', '马上就好', '正在渲染画面'];
 
   var mediaFiles = [
     { path: 'media/无人机操作.mp4', type: 'video', name: '无人机操作.mp4' },
@@ -219,6 +223,14 @@
   window.addEventListener('DOMContentLoaded', async function() {
     var done = 0;
     var total = mediaFiles.length;
+
+    // Rotating tips while loading
+    var tipIdx = 0;
+    loadingText.textContent = tips[0];
+    var tipTimer = setInterval(function() {
+      tipIdx = (tipIdx + 1) % tips.length;
+      loadingText.textContent = tips[tipIdx];
+    }, 2000);
 
     var tasks = mediaFiles.map(function(mf) {
       return (async function() {
@@ -238,14 +250,15 @@
           console.error('Load failed:', mf.path, e);
         }
         done++;
-        loadingText.textContent = mf.name + ' (' + done + '/' + total + ')';
         setFill(done / total);
       })();
     });
 
     await Promise.allSettled(tasks);
 
+    clearInterval(tipTimer);
     loadingText.textContent = state.cards.length + ' / ' + total;
+    loadingPct.textContent = 'START';
     enterBtn.classList.add('visible');
 
     enterBtn.addEventListener('click', function() {
