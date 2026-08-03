@@ -11,6 +11,17 @@
 </head>
 <body>
 
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="loading-inner">
+    <div class="loading-logo">INEA</div>
+    <div class="loading-bar-track">
+      <div class="loading-bar-fill" id="loading-bar"></div>
+    </div>
+    <div class="loading-text" id="loading-text">准备加载素材...</div>
+  </div>
+</div>
+
 <div id="app">
   <!-- Toolbar (import/export pill) -->
   <div id="toolbar">
@@ -188,39 +199,53 @@
 <script src="js/ui-panels.js"></script>
 <script src="js/main.js"></script>
 <script>
-// Load real demo media files
-window.addEventListener('DOMContentLoaded', async () => {
-  const statusHint = document.getElementById('status-hint');
+// Load real demo media files with loading screen
+(function() {
+  const loadingOverlay = document.getElementById('loading-overlay');
+  const loadingBar = document.getElementById('loading-bar');
+  const loadingText = document.getElementById('loading-text');
   const mediaFiles = [
-    { path: 'media/无人机操作.mp4', type: 'video' },
-    { path: 'media/无人机飞行.mp4', type: 'video' },
-    { path: 'media/海滩.mp4', type: 'video' },
-    { path: 'media/Minstrel.mp3', type: 'audio' },
+    { path: 'media/无人机操作.mp4', type: 'video', name: '无人机操作.mp4' },
+    { path: 'media/无人机飞行.mp4', type: 'video', name: '无人机飞行.mp4' },
+    { path: 'media/海滩.mp4', type: 'video', name: '海滩.mp4' },
+    { path: 'media/Minstrel.mp3', type: 'audio', name: 'Minstrel.mp3' },
   ];
 
-  if (statusHint) statusHint.textContent = '加载素材中...';
-
-  for (const mf of mediaFiles) {
-    try {
-      const resp = await fetch(mf.path);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const blob = await resp.blob();
-      const filename = mf.path.replace('media/', '');
-      const file = new File([blob], filename, {
-        type: mf.type === 'video' ? 'video/mp4' : 'audio/mpeg'
-      });
-      if (mf.type === 'video') {
-        await importVideoFile(file);
-      } else {
-        await importAudioFile(file);
-      }
-    } catch (e) {
-      console.error('Failed to load media:', mf.path, e);
-    }
+  function setProgress(pct, text) {
+    loadingBar.style.width = pct + '%';
+    if (text) loadingText.textContent = text;
   }
 
-  if (statusHint) statusHint.textContent = '共 ' + state.cards.length + ' 个素材';
-});
+  window.addEventListener('DOMContentLoaded', async () => {
+    const total = mediaFiles.length;
+    for (let i = 0; i < total; i++) {
+      const mf = mediaFiles[i];
+      try {
+        setProgress(Math.round((i / total) * 100), '加载中: ' + mf.name);
+        const resp = await fetch(mf.path);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const file = new File([blob], mf.name, {
+          type: mf.type === 'video' ? 'video/mp4' : 'audio/mpeg'
+        });
+        if (mf.type === 'video') {
+          await importVideoFile(file);
+        } else {
+          await importAudioFile(file);
+        }
+      } catch (e) {
+        console.error('Failed to load media:', mf.path, e);
+      }
+    }
+
+    setProgress(100, '共 ' + state.cards.length + ' 个素材已就绪');
+    // Fade out loading screen
+    setTimeout(function() {
+      loadingOverlay.classList.add('hidden');
+      setTimeout(function() { loadingOverlay.remove(); }, 600);
+    }, 400);
+  });
+})();
 </script>
 <script>
 // ================================================================
