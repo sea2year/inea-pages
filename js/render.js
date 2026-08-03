@@ -56,6 +56,10 @@ function renderCard(card) {
   const showHandles = isSelected;
   const colors = getCardColors(card);
   const contentY = y + CARD_LABEL_HEIGHT; // thumbnail area starts below label (Figma layout)
+  const isVideoLike = card.type === 'video' || card.type === 'synthesized-video';
+  // Figma: card body (background, border, clip) is just the thumbnail; label floats above
+  const bodyY = isVideoLike ? contentY : y;
+  const bodyH = isVideoLike ? CARD_THUMB_HEIGHT : ch;
 
   // --- Image cards: pure image, no frame ---
   if (card.type === 'image') {
@@ -99,32 +103,32 @@ function renderCard(card) {
     ctx.shadowBlur = 12 / state.canvas.zoom;
     // Draw background
     ctx.fillStyle = '#ffffff';
-    roundRect(x, y, cw, ch, r, true, false);
+    roundRect(x, bodyY, cw, bodyH, r, true, false);
     if (drawGradient) {
-      const grad = ctx.createLinearGradient(x, y, x, y + ch);
+      const grad = ctx.createLinearGradient(x, bodyY, x, bodyY + bodyH);
       grad.addColorStop(0, colors.gradientTop);
       grad.addColorStop(1, colors.gradientBot);
       ctx.fillStyle = grad;
-      roundRect(x, y, cw, ch, r, true, false);
+      roundRect(x, bodyY, cw, bodyH, r, true, false);
     }
     // Border — type color, thicker
     ctx.strokeStyle = cardBorderColor;
     ctx.lineWidth = 1.5 / state.canvas.zoom;
-    roundRect(x, y, cw, ch, r, false, true);
+    roundRect(x, bodyY, cw, bodyH, r, false, true);
     ctx.restore();
   } else if (isHovered) {
     ctx.fillStyle = '#ffffff';
-    roundRect(x, y, cw, ch, r, true, false);
+    roundRect(x, bodyY, cw, bodyH, r, true, false);
     if (drawGradient) {
-      const grad = ctx.createLinearGradient(x, y, x, y + ch);
+      const grad = ctx.createLinearGradient(x, bodyY, x, bodyY + bodyH);
       grad.addColorStop(0, colors.gradientTop);
       grad.addColorStop(1, colors.gradientBot);
       ctx.fillStyle = grad;
-      roundRect(x, y, cw, ch, r, true, false);
+      roundRect(x, bodyY, cw, bodyH, r, true, false);
     }
     ctx.strokeStyle = cardBorderColor;
     ctx.lineWidth = lw;
-    roundRect(x, y, cw, ch, r, false, true);
+    roundRect(x, bodyY, cw, bodyH, r, false, true);
 
     // Subtle shadow on hover
     ctx.save();
@@ -132,27 +136,27 @@ function renderCard(card) {
     ctx.shadowBlur = 8 / state.canvas.zoom;
     ctx.shadowOffsetY = 2 / state.canvas.zoom;
     ctx.fillStyle = '#ffffff';
-    roundRect(x, y, cw, ch, r, true, false);
+    roundRect(x, bodyY, cw, bodyH, r, true, false);
     ctx.restore();
   } else {
     ctx.fillStyle = '#ffffff';
-    roundRect(x, y, cw, ch, r, true, false);
+    roundRect(x, bodyY, cw, bodyH, r, true, false);
     if (drawGradient) {
-      const grad = ctx.createLinearGradient(x, y, x, y + ch);
+      const grad = ctx.createLinearGradient(x, bodyY, x, bodyY + bodyH);
       grad.addColorStop(0, colors.gradientTop);
       grad.addColorStop(1, colors.gradientBot);
       ctx.fillStyle = grad;
-      roundRect(x, y, cw, ch, r, true, false);
+      roundRect(x, bodyY, cw, bodyH, r, true, false);
     }
     ctx.strokeStyle = cardBorderColor;
     ctx.lineWidth = lw;
-    roundRect(x, y, cw, ch, r, false, true);
+    roundRect(x, bodyY, cw, bodyH, r, false, true);
   }
 
-  // --- Clip to card for content ---
+  // --- Clip to card body for content (Figma: label floats above, outside clip) ---
   ctx.save();
   ctx.beginPath();
-  roundRectPath(x, y, cw, ch, r);
+  roundRectPath(x, bodyY, cw, bodyH, r);
   ctx.clip();
 
   if (card.type === 'audio') {
@@ -433,11 +437,11 @@ function renderCard(card) {
     ctx.fillText('生成缩略图...', x + 12, contentY + thumbAreaH / 2);
   }
 
-  // --- Video card type badge (top-right, Figma: purple pill) ---
+  // --- Video card type badge (top-right, Figma: pill on thumbnail) ---
   if (card.type === 'video' || card.type === 'synthesized-video') {
     const vBadgeW = 31, vBadgeH = 13;
     const vBadgeX = x + cw - vBadgeW - 5;
-    const vBadgeY = y + 3;
+    const vBadgeY = bodyY + 3;
     ctx.fillStyle = colors.badgeFill;
     ctx.strokeStyle = colors.badgeStroke;
     ctx.lineWidth = 1 / state.canvas.zoom;
@@ -455,7 +459,7 @@ function renderCard(card) {
   } else if (card.type === 'image') {
     const iBadgeW = 31, iBadgeH = 13;
     const iBadgeX = x + cw - iBadgeW - 5;
-    const iBadgeY = y + 3;
+    const iBadgeY = bodyY + 3;
     ctx.fillStyle = colors.badgeFill;
     ctx.strokeStyle = colors.badgeStroke;
     ctx.lineWidth = 1 / state.canvas.zoom;
@@ -537,119 +541,46 @@ function renderCard(card) {
     }
   }
 
-  // --- Label bar ---
-  // Figma layout: video/synthesized cards have label at top; others at bottom
-  const isFigmaCard = card.type === 'video' || card.type === 'synthesized-video';
-  const labelY = isFigmaCard ? y : wfY + wfH;
-
-  // Separator line (NOT for video or composition cards — Figma has no separator)
-  if (card.type !== 'video' && card.type !== 'composition' && card.type !== 'synthesized-video' && card.type !== 'image') {
-    if (card.type === 'audio') {
-      ctx.strokeStyle = 'rgba(243, 93, 93, 0.3)';    // pink
-    } else {
-      ctx.strokeStyle = '#f1f1f1';
-    }
-    ctx.lineWidth = lw;
-    ctx.beginPath();
-    ctx.moveTo(x + 4, labelY);
-    ctx.lineTo(x + cw - 4, labelY);
-    ctx.stroke();
-  }
-
-  // Label text color & font per card type
-  if (card.type === 'video' || card.type === 'synthesized-video') {
-    ctx.fillStyle = colors.label;
-    ctx.font = `700 12px "Inter", system-ui, sans-serif`;
-  } else if (card.type === 'image') {
-    ctx.fillStyle = colors.label;
-    ctx.font = `700 12px "Inter", system-ui, sans-serif`;
-  } else if (card.type === 'audio') {
-    // BGM: red/pink name with white glow
-    ctx.save();
-    ctx.shadowColor = 'rgba(255, 255, 255, 1)';
-    ctx.shadowBlur = 6.7;
-    ctx.fillStyle = colors.label;
-    ctx.font = `700 10px "Inter", system-ui, sans-serif`;
-    ctx.textBaseline = 'middle';
-    const _bgmLabelX = x + 6;
-    const _bgmLabelY = labelY + CARD_LABEL_HEIGHT / 2;
-    let _bgmLabel = card.label;
-    const _bgmMaxW = cw - 12 - (cw > 140 ? 50 : 0);
-    while (ctx.measureText(_bgmLabel).width > _bgmMaxW && _bgmLabel.length > 3) {
-      _bgmLabel = _bgmLabel.slice(0, -4) + '...';
-    }
-    ctx.fillText(_bgmLabel, _bgmLabelX, _bgmLabelY);
-    ctx.restore();
-    // Duration for audio
-    if (cw > 140 && card.duration > 0) {
-      const dur = card.trimOut - card.trimIn;
-      const durStr = formatTime(dur) + ' / ' + formatTime(card.duration);
-      ctx.fillStyle = colors.duration;
-      ctx.font = `400 8px "Inter", system-ui, sans-serif`;
-      ctx.textAlign = 'right';
-      ctx.fillText(durStr, x + cw - 6, labelY + CARD_LABEL_HEIGHT / 2);
-      ctx.textAlign = 'start';
-      ctx.textBaseline = 'alphabetic';
-    }
-  } else if (card.type !== 'composition') {
-    // Skip composition — label already rendered in content block
-    ctx.fillStyle = '#1a1a1a';
-    ctx.font = `${isSelected ? '550' : '450'} 11px "Inter", system-ui, sans-serif`;
-  }
-
-  if (card.type !== 'audio' && card.type !== 'composition') {
-    ctx.textBaseline = 'middle';
-    const isVideo = card.type === 'video' || card.type === 'synthesized-video';
-    const isImage = card.type === 'image';
-
-    // Figma name offset: x+14 for video, x+6 for others
-    const labelTextX = x + ((isVideo || isImage) ? 14 : 6);
-    const labelTextY = labelY + CARD_LABEL_HEIGHT / 2;
-    const maxLabelW = cw - 12 - (cw > 140 ? ((isVideo || isImage) ? 50 : 50) : 0);
-
-    let label = card.label;
-    while (ctx.measureText(label).width > maxLabelW && label.length > 3) {
-      label = label.slice(0, -4) + '...';
-    }
-    ctx.fillText(label, labelTextX, labelTextY);
-
-    // Duration badge
-    if (cw > 140 && card.duration > 0) {
-      const dur = card.trimOut - card.trimIn;
-      if (isVideo) {
-        // Figma: "00:10" format, Inter Regular 8px, at x+75, left-aligned
-        ctx.fillStyle = colors.duration;
-        ctx.font = `400 8px "Inter", system-ui, sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.fillText(formatTime(dur), x + 75, labelTextY);
-        ctx.textAlign = 'start';
-      } else if (isImage) {
-        ctx.fillStyle = colors.duration;
-        ctx.font = `400 8px "Inter", system-ui, sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.fillText(formatTime(dur), x + 75, labelTextY);
-        ctx.textAlign = 'start';
-      } else {
-        const durStr = formatTime(dur) + ' / ' + formatTime(card.duration);
-        ctx.fillStyle = '#999';
-        ctx.font = `400 10px "JetBrains Mono", monospace`;
-        ctx.textAlign = 'right';
-        ctx.fillText(durStr, x + cw - 6, labelTextY);
-        ctx.textAlign = 'start';
-      }
-    }
-  }
-
   // --- Left/Right handles (Figma: inside clip, on top of content) ---
   if (card.type === 'video' || card.type === 'audio' || card.type === 'synthesized-video' || card.type === 'image') {
     const handleW = 11;
     ctx.fillStyle = colors.border;
-    ctx.fillRect(x, y, handleW, ch);
-    ctx.fillRect(x + cw - handleW, y, handleW, ch);
+    ctx.fillRect(x, bodyY, handleW, bodyH);
+    ctx.fillRect(x + cw - handleW, bodyY, handleW, bodyH);
   }
 
   ctx.restore();
   } // end video card content
+
+  // --- Video label (Figma: above card body, outside clip) ---
+  if (card.type === 'video' || card.type === 'synthesized-video') {
+    const vLabelY = y;
+    ctx.fillStyle = colors.label;
+    ctx.font = `700 12px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'middle';
+
+    const vLabelTextX = x + 14;
+    const vLabelTextY = vLabelY + CARD_LABEL_HEIGHT / 2;
+    const vMaxLabelW = cw - 12 - (cw > 140 ? 50 : 0);
+
+    let vLabel = card.label;
+    while (ctx.measureText(vLabel).width > vMaxLabelW && vLabel.length > 3) {
+      vLabel = vLabel.slice(0, -4) + '...';
+    }
+    ctx.fillText(vLabel, vLabelTextX, vLabelTextY);
+
+    // Duration
+    if (cw > 140 && card.duration > 0) {
+      const dur = card.trimOut - card.trimIn;
+      ctx.fillStyle = colors.duration;
+      ctx.font = `400 8px "Inter", system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillText(formatTime(dur), x + 75, vLabelTextY);
+      ctx.textAlign = 'start';
+    }
+
+    ctx.textBaseline = 'alphabetic';
+  }
 
   // --- Trim handles (only for video/audio, outside clip) ---
   if (showHandles && (card.type === 'video' || card.type === 'audio' || card.type === 'bgm' || card.type === 'composition' || card.type === 'synthesized-video' || card.type === 'image')) {
@@ -661,21 +592,21 @@ function renderCard(card) {
     // Left trim handle
     ctx.fillStyle = handleColor;
     ctx.beginPath();
-    ctx.moveTo(x, y + r);
-    ctx.lineTo(x + handleW, y + r - 3 / state.canvas.zoom);
-    ctx.lineTo(x + handleW, y + r + 3 / state.canvas.zoom);
+    ctx.moveTo(x, bodyY + r);
+    ctx.lineTo(x + handleW, bodyY + r - 3 / state.canvas.zoom);
+    ctx.lineTo(x + handleW, bodyY + r + 3 / state.canvas.zoom);
     ctx.closePath();
     ctx.fill();
-    ctx.fillRect(x, y + r, handleW, ch - r * 2);
+    ctx.fillRect(x, bodyY + r, handleW, bodyH - r * 2);
 
     // Right trim handle
     ctx.beginPath();
-    ctx.moveTo(x + cw, y + r);
-    ctx.lineTo(x + cw - handleW, y + r - 3 / state.canvas.zoom);
-    ctx.lineTo(x + cw - handleW, y + r + 3 / state.canvas.zoom);
+    ctx.moveTo(x + cw, bodyY + r);
+    ctx.lineTo(x + cw - handleW, bodyY + r - 3 / state.canvas.zoom);
+    ctx.lineTo(x + cw - handleW, bodyY + r + 3 / state.canvas.zoom);
     ctx.closePath();
     ctx.fill();
-    ctx.fillRect(x + cw - handleW, y + r, handleW, ch - r * 2);
+    ctx.fillRect(x + cw - handleW, bodyY + r, handleW, bodyH - r * 2);
   }
 
   // Anchor points (left + right) — for video/synthesized-video cards
