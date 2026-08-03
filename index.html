@@ -14,10 +14,6 @@
   0%, 100% { opacity: 0.7; filter: drop-shadow(0 0 6px rgba(212,255,0,0.25)); }
   50% { opacity: 1; filter: drop-shadow(0 0 22px rgba(212,255,0,0.55)); }
 }
-@keyframes fill-sweep {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -100% 0; }
-}
 #loading-overlay .loading-logo-img {
   animation: logo-breathe 3s ease-in-out infinite;
 }
@@ -25,27 +21,13 @@
   background: #D4FF00;
   transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
-/* Hard white stripe sweep — matches tutorial start button */
-.fill-shimmer {
-  position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(105deg,
-    transparent 45%, #FFFFFF 45%,
-    #FFFFFF 55%, transparent 55%
-  );
-  background-size: 200% 100%;
-  background-position: 200% 0;
-  background-repeat: no-repeat;
-  animation: fill-sweep 2s linear infinite;
-}
 </style>
 </head>
 <body>
 
 <!-- Loading overlay -->
 <div id="loading-overlay">
-  <div class="loading-fill" id="loading-fill" style="position:absolute; left:-60%; top:0; width:220%; height:100%; transform:skewX(14deg) translateX(-105%); z-index:0;">
-    <div class="fill-shimmer"></div>
-  </div>
+  <div class="loading-fill" id="loading-fill" style="position:absolute; left:-60%; top:0; width:220%; height:100%; transform:skewX(14deg) translateX(-105%); z-index:0;"></div>
   <div class="loading-inner">
     <img class="loading-logo-img" src="assets/logo.png" alt="INEA" />
     <div class="loading-text" id="loading-text">准备素材...</div>
