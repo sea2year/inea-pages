@@ -94,13 +94,20 @@ function renderCard(card) {
   // Card border color per type (from dynamic color system)
   const cardBorderColor = colors.border;
 
+  // Perf: skip expensive effects when zoomed far out (they're invisible anyway)
+  const zoom = state.canvas.zoom;
+  const skipEffects = zoom < 0.2;
+  const shadowBlur = skipEffects ? 0 : Math.min(12 / zoom, 24);
+
   // --- Card background ---
   // Figma gradient fill: per-type tint from color system
-  const drawGradient = card.type === 'video' || card.type === 'audio' || card.type === 'composition' || card.type === 'synthesized-video';
+  const drawGradient = !skipEffects && (card.type === 'video' || card.type === 'audio' || card.type === 'composition' || card.type === 'synthesized-video');
   if (isSelected) {
     ctx.save();
-    ctx.shadowColor = colors.shadow;
-    ctx.shadowBlur = 12 / state.canvas.zoom;
+    if (!skipEffects) {
+      ctx.shadowColor = colors.shadow;
+      ctx.shadowBlur = shadowBlur;
+    }
     // Draw background
     ctx.fillStyle = '#ffffff';
     roundRect(x, bodyY, cw, bodyH, r, true, false);
@@ -131,13 +138,15 @@ function renderCard(card) {
     roundRect(x, bodyY, cw, bodyH, r, false, true);
 
     // Subtle shadow on hover
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.08)';
-    ctx.shadowBlur = 8 / state.canvas.zoom;
-    ctx.shadowOffsetY = 2 / state.canvas.zoom;
-    ctx.fillStyle = '#ffffff';
-    roundRect(x, bodyY, cw, bodyH, r, true, false);
-    ctx.restore();
+    if (!skipEffects) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.08)';
+      ctx.shadowBlur = Math.min(8 / zoom, 16);
+      ctx.shadowOffsetY = 2 / zoom;
+      ctx.fillStyle = '#ffffff';
+      roundRect(x, bodyY, cw, bodyH, r, true, false);
+      ctx.restore();
+    }
   } else {
     ctx.fillStyle = '#ffffff';
     roundRect(x, bodyY, cw, bodyH, r, true, false);
