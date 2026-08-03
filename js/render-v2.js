@@ -387,12 +387,13 @@ function renderCard(card) {
     // ===== Video/BGM card content =====
 
   // --- Thumbnail strip (crop based on trim range) ---
-  const thumbInset = 3;
+  const thumbInsetX = 3;
+  const thumbInsetY = 2;
   const thumbAreaH = CARD_THUMB_HEIGHT;
-  const thumbX = x + thumbInset;
-  const thumbY = contentY + thumbInset;
-  const thumbW = cw - thumbInset * 2;
-  const thumbH = thumbAreaH - thumbInset * 2;
+  const thumbX = x + thumbInsetX;
+  const thumbY = contentY + thumbInsetY;
+  const thumbW = cw - thumbInsetX * 2;
+  const thumbH = thumbAreaH - thumbInsetY * 2;
 
   // Recreate frameImage from dataURL if lost (e.g., after undo/redo)
   if (card.isFreezeFrame && card.frameImageDataURL && (!card.frameImage || !card.frameImage.src)) {
