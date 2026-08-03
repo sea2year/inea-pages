@@ -2647,6 +2647,8 @@ function startCardLabelEdit(cardId) {
       width: Math.min(maxW, textW) + 'px',
       height: labelH + 'px',
       fontSize: fontSize + 'px',
+      padding: `${Math.max(1, 2 * zoom)}px ${Math.max(2, 4 * zoom)}px`,
+      borderRadius: `${3 * zoom}px`,
     });
   };
   reposition();
