@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=25');
+console.log('[inea] render-v4.js v=26');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -541,7 +541,7 @@ function renderCard(card) {
     ctx.textBaseline = 'bottom';
 
     const vLabelTextX = x + 14;
-    const vLabelTextY = vLabelY + CARD_LABEL_HEIGHT;
+    const vLabelTextY = y + labelH;
     const vMaxLabelW = cw - 12 - (cw > 140 ? 50 : 0);
 
     let vLabel = card.label;
