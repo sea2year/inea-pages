@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v3.js v=31');
+console.log('[inea] render-v3.js v=32');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -902,16 +902,22 @@ function getConnectionBezier(conn) {
 
   // Keyframe / top-side connections: vertical bezier (control points go upward)
   if (conn.fromSide === 'top' || conn.toSide === 'top') {
+    const distY = Math.abs(p3.y - p0.y);
     const minOff = BEZIER_OFFSET / state.canvas.zoom;
-    const offY = Math.max(minOff, Math.abs(p3.y - p0.y) * 0.35);
+    let offY = Math.max(minOff, distY * 0.35);
+    // 防止S形：控制点偏移不能超过端点间距的48%
+    if (offY > distY * 0.48) offY = distY * 0.48;
     const minY = Math.min(p0.y, p3.y);
     const p1 = { x: p0.x, y: minY - offY };
     const p2 = { x: p3.x, y: minY - offY };
     return { p0, p1, p2, p3 };
   }
 
+  const distX = Math.abs(p3.x - p0.x);
   const minOff = BEZIER_OFFSET / state.canvas.zoom;
-  const offX = Math.max(minOff, Math.abs(p3.x - p0.x) * 0.35);
+  let offX = Math.max(minOff, distX * 0.35);
+  // 防止S形：控制点偏移不能超过端点间距的48%
+  if (offX > distX * 0.48) offX = distX * 0.48;
   const p1 = { x: p0.x + offX, y: p0.y };
   const p2 = { x: p3.x - offX, y: p3.y };
   return { p0, p1, p2, p3 };
@@ -1574,14 +1580,18 @@ function renderConnectionPreview() {
   let p1, p2;
   if (isTopSide) {
     // Vertical bezier for top connections
+    const distY = Math.abs(p3.y - p0.y);
     const minOff = BEZIER_OFFSET / state.canvas.zoom;
-    const offY = Math.max(minOff, Math.abs(p3.y - p0.y) * 0.35);
+    let offY = Math.max(minOff, distY * 0.35);
+    if (offY > distY * 0.48) offY = distY * 0.48;
     const minY = Math.min(p0.y, p3.y);
     p1 = { x: p0.x, y: minY - offY };
     p2 = { x: p3.x, y: minY - offY };
   } else {
+    const distX = Math.abs(p3.x - p0.x);
     const minOff = BEZIER_OFFSET / state.canvas.zoom;
-    const offX = Math.max(minOff, Math.abs(p3.x - p0.x) * 0.35);
+    let offX = Math.max(minOff, distX * 0.35);
+    if (offX > distX * 0.48) offX = distX * 0.48;
     const sign = cf.side === 'right' ? 1 : -1;
     p1 = { x: p0.x + offX * sign, y: p0.y };
     p2 = { x: p3.x - offX * sign, y: p3.y };
