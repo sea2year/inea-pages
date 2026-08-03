@@ -14,28 +14,9 @@
 <!-- Loading overlay -->
 <div id="loading-overlay">
   <div class="loading-inner">
-    <!-- SVG ring + logo -->
-    <div class="loading-logo-wrap">
-      <svg class="loading-ring-svg" viewBox="0 0 220 220">
-        <!-- Background track ring -->
-        <circle cx="110" cy="110" r="94" fill="none" stroke="#eee" stroke-width="1" />
-        <!-- Progress arc — 4 segments, one per file (total circumference = 2π×94 ≈ 590.6) -->
-        <circle id="loading-arc" cx="110" cy="110" r="94" fill="none"
-          stroke="#D4FF00" stroke-width="1.8" stroke-linecap="round"
-          stroke-dasharray="0 999" transform="rotate(-90 110 110)" />
-        <!-- Dot markers at 4 cardinal positions -->
-        <circle cx="110" cy="16" r="2.5" fill="#e0e0e0" class="ring-dot" id="rd0" />
-        <circle cx="204" cy="110" r="2.5" fill="#e0e0e0" class="ring-dot" id="rd1" />
-        <circle cx="110" cy="204" r="2.5" fill="#e0e0e0" class="ring-dot" id="rd2" />
-        <circle cx="16" cy="110" r="2.5" fill="#e0e0e0" class="ring-dot" id="rd3" />
-      </svg>
-      <img class="loading-logo-img" src="assets/logo.png" alt="INEA" />
-    </div>
-    <div class="loading-line-track">
-      <div class="loading-line-fill" id="loading-line"></div>
-    </div>
-    <div class="loading-text" id="loading-text">正在准备素材...</div>
-    <button id="loading-enter-btn">进入画板</button>
+    <img class="loading-logo-img" src="assets/logo.png" alt="INEA" />
+    <div class="loading-text" id="loading-text">准备素材...</div>
+    <button id="loading-enter-btn">START</button>
   </div>
 </div>
 
@@ -216,31 +197,19 @@
 <script src="js/ui-panels.js"></script>
 <script src="js/main.js"></script>
 <script>
-// Loading screen — geometric ring arc + line + enter button
+// Loading screen — diagonal green slash fill + bottom layout
 (function() {
-  var loadingOverlay = document.getElementById('loading-overlay');
+  var overlay = document.getElementById('loading-overlay');
   var loadingText = document.getElementById('loading-text');
-  var loadingLine = document.getElementById('loading-line');
-  var loadingArc = document.getElementById('loading-arc');
   var enterBtn = document.getElementById('loading-enter-btn');
-  var ACCENT = '#D4FF00';
+  var GREEN = '#D4FF00';
+  var GRAY = '#f2f2f2';
 
-  // Ring circumference = 2π × 94 ≈ 590.62
-  var FULL = 590.62;
-  var quarter = FULL / 4;
-
-  var dotIds = ['rd0', 'rd1', 'rd2', 'rd3'];
-
-  function setProgress(fileIndex) {
-    var pct = (fileIndex / 4) * 100;
-    var dashLen = fileIndex * quarter;
-    loadingArc.setAttribute('stroke-dasharray', dashLen + ' ' + (FULL - dashLen));
-    loadingLine.style.width = pct + '%';
-    // Light up dot markers
-    for (var d = 0; d < 4; d++) {
-      var el = document.getElementById(dotIds[d]);
-      if (el) el.setAttribute('fill', d < fileIndex ? ACCENT : '#e0e0e0');
-    }
+  function setFill(pct) {
+    // Diagonal gradient: gray stops at pct, green takes over
+    var g = pct < 2 ? GRAY :
+      'linear-gradient(135deg, ' + GRAY + ' 0%, ' + GRAY + ' ' + pct + '%, ' + GREEN + ' ' + (pct + 1) + '%, ' + GREEN + ' 100%)';
+    overlay.style.background = g;
   }
 
   var mediaFiles = [
@@ -254,7 +223,7 @@
     for (var i = 0; i < mediaFiles.length; i++) {
       var mf = mediaFiles[i];
       try {
-        loadingText.textContent = '加载中 — ' + mf.name;
+        loadingText.textContent = mf.name;
         var resp = await fetch(mf.path);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         var blob = await resp.blob();
@@ -269,15 +238,16 @@
       } catch (e) {
         console.error('Load failed:', mf.path, e);
       }
-      setProgress(i + 1);
+      // Fill: 0 files = 2% (barely visible), 4 files = 100%
+      setFill(Math.round(((i + 1) / 4) * 100));
     }
 
-    loadingText.textContent = state.cards.length + ' 个素材已就绪';
+    loadingText.textContent = state.cards.length + ' / ' + mediaFiles.length;
     enterBtn.classList.add('visible');
 
     enterBtn.addEventListener('click', function() {
-      loadingOverlay.classList.add('hidden');
-      setTimeout(function() { loadingOverlay.remove(); }, 600);
+      overlay.classList.add('hidden');
+      setTimeout(function() { overlay.remove(); }, 600);
     });
   });
 })();

@@ -1061,83 +1061,58 @@ canvas {
 }
 
 /* ================================================================
-   Loading Screen — Geometric Ring + Line Progress
+   Loading Screen — Diagonal slash fill + bottom-anchored layout
    ================================================================ */
 #loading-overlay {
   position: fixed; inset: 0; z-index: 100000;
-  background: #fff;
-  display: flex; align-items: center; justify-content: center;
-  transition: opacity 0.5s ease;
+  background: #f2f2f2;
+  transition: background 0.6s ease, opacity 0.5s ease;
   opacity: 1;
 }
 #loading-overlay.hidden { opacity: 0; pointer-events: none; }
 
 .loading-inner {
-  display: flex; flex-direction: column; align-items: center; gap: 22px;
-}
-
-/* ---- Ring + Logo container ---- */
-.loading-logo-wrap {
-  position: relative;
-  width: 250px; height: 250px;
-  display: flex; align-items: center; justify-content: center;
-}
-
-.loading-ring-svg {
   position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
-}
-.loading-ring-svg circle {
-  transition: stroke-dasharray 0.6s ease;
 }
 
-.ring-dot {
-  transition: fill 0.4s ease;
-}
-
+/* ---- Logo: bottom-left, large ---- */
 .loading-logo-img {
-  position: relative; z-index: 1;
-  width: 140px; height: auto;
+  position: absolute;
+  bottom: 48px; left: 48px;
+  width: 240px; height: auto;
+  opacity: 0.9;
 }
 
-/* ---- Progress line ---- */
-.loading-line-track {
-  width: 200px; height: 1.5px;
-  background: #eee;
-  border-radius: 1px;
-  overflow: hidden;
-}
-.loading-line-fill {
-  height: 100%; width: 0%;
-  background: var(--color-accent);
-  transition: width 0.5s ease;
-}
-
-/* ---- Text ---- */
+/* ---- Progress text: bottom-right ---- */
 .loading-text {
+  position: absolute;
+  bottom: 60px; right: 56px;
   font-family: var(--font-mono); font-size: 11px;
-  color: #b0b0b0;
+  color: #999;
   letter-spacing: 0.06em;
 }
 
-/* ---- Enter button ---- */
+/* ---- START button: centered on right edge ---- */
 #loading-enter-btn {
-  font-family: var(--font-mono); font-size: 13px; font-weight: 500;
-  letter-spacing: 0.08em;
-  color: #333; background: transparent;
-  border: 1px solid #d4d4d4; border-radius: 8px;
-  padding: 10px 40px;
+  position: absolute;
+  right: 48px; top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-mono); font-size: 15px; font-weight: 500;
+  letter-spacing: 0.12em;
+  color: #555; background: transparent;
+  border: 1px solid #ccc; border-radius: 50%;
+  width: 64px; height: 64px;
+  padding: 0;
   cursor: pointer;
   opacity: 0;
-  transform: translateY(8px);
   transition: all 0.5s ease 0.3s;
   pointer-events: none;
 }
 #loading-enter-btn.visible {
-  opacity: 1; transform: translateY(0); pointer-events: auto;
+  opacity: 1; pointer-events: auto;
 }
 #loading-enter-btn:hover {
   background: var(--color-accent);
   border-color: var(--color-accent);
+  color: #000;
 }
