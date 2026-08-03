@@ -184,9 +184,18 @@ async function generateThumbnails(file) {
 // ================================================================
 // Import: Extract dominant color from thumbnail strip
 // ================================================================
-function extractDominantColor(stripCanvas) {
-  const stripCtx = stripCanvas.getContext('2d');
-  const imageData = stripCtx.getImageData(0, 0, stripCanvas.width, stripCanvas.height);
+function extractDominantColor(source) {
+  // Accept both Canvas and Image (after undo restore, thumbStrip may be an Image)
+  let canvas = source;
+  if (!source.getContext) {
+    canvas = document.createElement('canvas');
+    canvas.width = source.width || 200;
+    canvas.height = source.height || 100;
+    const tmpCtx = canvas.getContext('2d');
+    tmpCtx.drawImage(source, 0, 0);
+  }
+  const stripCtx = canvas.getContext('2d');
+  const imageData = stripCtx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
   const buckets = {};
   let totalR = 0, totalG = 0, totalB = 0, totalCount = 0;

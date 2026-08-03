@@ -239,13 +239,15 @@ function renderCard(card) {
     while (ctx.measureText(_label).width > _maxLabelW && _label.length > 3) {
       _label = _label.slice(0, -4) + '...';
     }
-    ctx.fillText(_label, x + 12, labelTextY);
+    const _labelX = x + 12;
+    ctx.fillText(_label, _labelX, labelTextY);
 
     if (card.duration > 0) {
       const dur = card.trimOut - card.trimIn;
+      const _labelW = ctx.measureText(_label).width;
       ctx.fillStyle = colors.duration;
       ctx.font = `400 8px "Inter", system-ui, sans-serif`;
-      ctx.fillText(formatTime(dur), x + 73, labelTextY);
+      ctx.fillText(formatTime(dur), _labelX + _labelW + 8, labelTextY);
     }
     ctx.textBaseline = 'alphabetic';
 
@@ -350,20 +352,21 @@ function renderCard(card) {
       ctx.fillText('空编辑盒', x + 12, y + CARD_THUMB_HEIGHT / 2);
     }
 
-    // Duration + Label (bottom-left, black)
+    // Duration + Label (bottom-left, label first, duration after)
     const cLabelY2 = y + CARD_THUMB_HEIGHT;
-    const dur = (card.trimOut || card.totalDuration) - (card.trimIn || card.trimStart || 0);
-    const durText = formatTime(dur);
-    ctx.fillStyle = '#000000';
-    ctx.font = `400 8px "Inter", system-ui, sans-serif`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(durText, x + 75, cLabelY2 + CARD_LABEL_HEIGHT / 2);
-    ctx.textAlign = 'start';
-
+    const cLabelX = x + 14;
     ctx.fillStyle = '#000000';
     ctx.font = `700 12px "Inter", system-ui, sans-serif`;
-    ctx.fillText(card.label || '合成', x + 14, cLabelY2 + CARD_LABEL_HEIGHT / 2);
+    ctx.textBaseline = 'middle';
+    const cLabelName = card.label || '合成';
+    ctx.fillText(cLabelName, cLabelX, cLabelY2 + CARD_LABEL_HEIGHT / 2);
+
+    const dur = (card.trimOut || card.totalDuration) - (card.trimIn || card.trimStart || 0);
+    const durText = formatTime(dur);
+    const cLabelW = ctx.measureText(cLabelName).width;
+    ctx.fillStyle = '#000000';
+    ctx.font = `400 8px "Inter", system-ui, sans-serif`;
+    ctx.fillText(durText, cLabelX + cLabelW + 8, cLabelY2 + CARD_LABEL_HEIGHT / 2);
     ctx.textBaseline = 'alphabetic';
 
     // Left/Right handles — same as video card: 11px wide, full card height, green
@@ -545,13 +548,14 @@ function renderCard(card) {
     }
     ctx.fillText(vLabel, vLabelTextX, vLabelTextY);
 
-    // Duration
+    // Duration (positioned after label text to avoid overlap)
     if (cw > 140 && card.duration > 0) {
       const dur = card.trimOut - card.trimIn;
+      const vLabelW = ctx.measureText(vLabel).width;
       ctx.fillStyle = colors.duration;
       ctx.font = `400 8px "Inter", system-ui, sans-serif`;
       ctx.textAlign = 'left';
-      ctx.fillText(formatTime(dur), x + 75, vLabelTextY);
+      ctx.fillText(formatTime(dur), vLabelTextX + vLabelW + 8, vLabelTextY);
       ctx.textAlign = 'start';
     }
 

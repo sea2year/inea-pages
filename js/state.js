@@ -126,9 +126,46 @@ let _undoStack = [];
 let _redoStack = [];
 let _undoSuppress = false;  // set true when restoring state to avoid re-pushing
 
+// Serialize Canvas/ImageBitmap to data URL for undo snapshots
+function _canvasToDataUrl(source) {
+  if (!source) return null;
+  try {
+    if (source.toDataURL) return source.toDataURL();
+    // For ImageBitmap or Image, draw to a temp canvas first
+    const w = source.width || 200;
+    const h = source.height || 100;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(source, 0, 0);
+    return c.toDataURL();
+  } catch (e) { return null; }
+}
+
+function _captureCardCanvasData(cards) {
+  return cards.map(card => {
+    const data = {};
+    if (card.thumbStrip) data.thumbStrip = _canvasToDataUrl(card.thumbStrip);
+    return data;
+  });
+}
+
+function _restoreCardCanvasData(cards, canvasData) {
+  if (!canvasData) return;
+  for (let i = 0; i < cards.length; i++) {
+    const cd = canvasData[i];
+    if (!cd) continue;
+    if (cd.thumbStrip) {
+      const img = new Image();
+      img.src = cd.thumbStrip;
+      cards[i].thumbStrip = img;
+    }
+  }
+}
+
 function pushUndo() {
   if (_undoSuppress) return;
   _redoStack = [];
+  const canvasData = _captureCardCanvasData(state.cards);
   const snapshot = {
     cards: JSON.parse(JSON.stringify(state.cards)),
     connections: JSON.parse(JSON.stringify(state.connections)),
@@ -137,6 +174,7 @@ function pushUndo() {
     editBoxes: JSON.parse(JSON.stringify(state.editBoxes)),
     compositionCards: JSON.parse(JSON.stringify(state.compositionCards)),
     markerCards: JSON.parse(JSON.stringify(state.markerCards)),
+    _canvasData: canvasData,
   };
   _undoStack.push(snapshot);
   if (_undoStack.length > MAX_UNDO) _undoStack.shift();
@@ -144,6 +182,7 @@ function pushUndo() {
 
 function undo() {
   if (_undoStack.length === 0) return;
+  const currentCanvasData = _captureCardCanvasData(state.cards);
   const current = {
     cards: JSON.parse(JSON.stringify(state.cards)),
     connections: JSON.parse(JSON.stringify(state.connections)),
@@ -152,6 +191,7 @@ function undo() {
     editBoxes: JSON.parse(JSON.stringify(state.editBoxes)),
     compositionCards: JSON.parse(JSON.stringify(state.compositionCards)),
     markerCards: JSON.parse(JSON.stringify(state.markerCards)),
+    _canvasData: currentCanvasData,
   };
   _redoStack.push(current);
   const prev = _undoStack.pop();
@@ -163,6 +203,7 @@ function undo() {
   state.editBoxes = prev.editBoxes || [];
   state.compositionCards = prev.compositionCards || [];
   state.markerCards = prev.markerCards || [];
+  _restoreCardCanvasData(state.cards, prev._canvasData);
   state.selection.cardIds = [];
   state.selection.groupIds = [];
   state.selection.connectionId = null;
@@ -185,6 +226,7 @@ function undo() {
 
 function redo() {
   if (_redoStack.length === 0) return;
+  const currentCanvasData = _captureCardCanvasData(state.cards);
   const current = {
     cards: JSON.parse(JSON.stringify(state.cards)),
     connections: JSON.parse(JSON.stringify(state.connections)),
@@ -193,6 +235,7 @@ function redo() {
     editBoxes: JSON.parse(JSON.stringify(state.editBoxes)),
     compositionCards: JSON.parse(JSON.stringify(state.compositionCards)),
     markerCards: JSON.parse(JSON.stringify(state.markerCards)),
+    _canvasData: currentCanvasData,
   };
   _undoStack.push(current);
   const next = _redoStack.pop();
@@ -204,6 +247,7 @@ function redo() {
   state.editBoxes = next.editBoxes || [];
   state.compositionCards = next.compositionCards || [];
   state.markerCards = next.markerCards || [];
+  _restoreCardCanvasData(state.cards, next._canvasData);
   state.selection.cardIds = [];
   state.selection.groupIds = [];
   state.selection.connectionId = null;
