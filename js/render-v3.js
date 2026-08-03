@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v3.js v=28');
+console.log('[inea] render-v3.js v=29');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -224,7 +224,7 @@ function renderCard(card) {
 
     // Separator + label at card bottom (Figma: name x:12, duration x:73, near bottom)
     const sepY = y + ch - 13;
-    const labelTextY = y + ch - 6;
+    const labelTextY = y + ch;
     ctx.strokeStyle = colors.border;
     ctx.lineWidth = 0.5 / state.canvas.zoom;
     ctx.beginPath();
@@ -232,7 +232,7 @@ function renderCard(card) {
     ctx.lineTo(x + cw - 13, sepY);
     ctx.stroke();
 
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'bottom';
     ctx.fillStyle = colors.label;
     ctx.font = `700 ${10 / zoom}px "Inter", system-ui, sans-serif`;
     let _label = card.label;
@@ -358,16 +358,16 @@ function renderCard(card) {
     const cLabelX = x + 14;
     ctx.fillStyle = '#000000';
     ctx.font = `700 ${12 / zoom}px "Inter", system-ui, sans-serif`;
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'bottom';
     const cLabelName = card.label || '合成';
-    ctx.fillText(cLabelName, cLabelX, cLabelY2 + CARD_LABEL_HEIGHT / 2);
+    ctx.fillText(cLabelName, cLabelX, cLabelY2 + CARD_LABEL_HEIGHT);
 
     const dur = (card.trimOut || card.totalDuration) - (card.trimIn || card.trimStart || 0);
     const durText = formatTime(dur);
     const cLabelW = ctx.measureText(cLabelName).width;
     ctx.fillStyle = '#000000';
     ctx.font = `400 8px "Inter", system-ui, sans-serif`;
-    ctx.fillText(durText, cLabelX + cLabelW + 8, cLabelY2 + CARD_LABEL_HEIGHT / 2);
+    ctx.fillText(durText, cLabelX + cLabelW + 8, cLabelY2 + CARD_LABEL_HEIGHT);
     ctx.textBaseline = 'alphabetic';
 
     // Left/Right handles — same as video card: 11px wide, full card height, green
@@ -537,10 +537,10 @@ function renderCard(card) {
     const vLabelY = y;
     ctx.fillStyle = colors.label;
     ctx.font = `700 ${12 / zoom}px "Inter", system-ui, sans-serif`;
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'bottom';
 
     const vLabelTextX = x + 14;
-    const vLabelTextY = vLabelY + CARD_LABEL_HEIGHT / 2;
+    const vLabelTextY = vLabelY + CARD_LABEL_HEIGHT;
     const vMaxLabelW = cw - 12 - (cw > 140 ? 50 : 0);
 
     let vLabel = card.label;
