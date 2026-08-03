@@ -2594,27 +2594,30 @@ function startCardLabelEdit(cardId) {
 
   const ch = isAudio ? 41 : CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT;
 
-  const ta = document.createElement('textarea');
-  ta.value = card.label || '';
-  ta.id = '__inea-label-editor';
-  ta.style.position = 'fixed';
-  ta.style.zIndex = '200';
-  ta.style.fontFamily = '"Inter", system-ui, sans-serif';
-  ta.style.fontWeight = '700';
-  ta.style.color = '#000';
-  ta.style.background = '#fff';
-  ta.style.border = '1px solid #aaa';
-  ta.style.outline = 'none';
-  ta.style.resize = 'none';
-  ta.style.lineHeight = '1.2';
-  ta.style.overflow = 'hidden';
-  ta.style.whiteSpace = 'nowrap';
-  ta.style.boxSizing = 'border-box';
-  document.body.appendChild(ta);
-  ta.focus();
-  ta.select();
+  // Remove any existing editor first
+  const prev = document.getElementById('__inea-label-editor');
+  if (prev) prev.remove();
 
-  // Reposition based on current canvas state; runs every frame during edit
+  const el = document.createElement('div');
+  el.id = '__inea-label-editor';
+  el.contentEditable = 'true';
+  el.textContent = card.label || '';
+  el.style.cssText = ''
+    + 'position:fixed;z-index:200;'
+    + 'font-family:"Inter",system-ui,sans-serif;font-weight:700;'
+    + 'color:#000;background:#fff;'
+    + 'border:1px solid #aaa;outline:none;'
+    + 'overflow:hidden;white-space:nowrap;box-sizing:border-box;'
+    + 'display:flex;align-items:center;';
+  document.body.appendChild(el);
+  el.focus();
+  // Select all text
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
   const reposition = () => {
     const zoom = state.canvas.zoom;
     const s = worldToScreen(card.x, card.y);
@@ -2634,18 +2637,17 @@ function startCardLabelEdit(cardId) {
       fontSize = 12 * zoom;
     }
 
-    // Width: tightly fit text content, capped at card width
     const maxW = Math.max(30, (getCardWidth(card) - 28) * zoom);
-    const textW = Math.max(40, (ta.value.length || 1) * fontSize * 0.6 + 20);
+    const textW = Math.max(40, ((el.textContent || '').length || 1) * fontSize * 0.6 + 20);
 
-    ta.style.left = (s.x + 14 * zoom) + 'px';
-    ta.style.top = labelScreenY + 'px';
-    ta.style.width = Math.min(maxW, textW) + 'px';
-    ta.style.height = labelH + 'px';
-    ta.style.padding = `${Math.max(1, 2 * zoom)}px ${Math.max(2, 4 * zoom)}px`;
-    ta.style.borderRadius = `${3 * zoom}px`;
-    ta.style.setProperty('font-size', fontSize + 'px', 'important');
-    ta.style.setProperty('line-height', '1.2', 'important');
+    el.style.left = (s.x + 14 * zoom) + 'px';
+    el.style.top = labelScreenY + 'px';
+    el.style.width = Math.min(maxW, textW) + 'px';
+    el.style.height = labelH + 'px';
+    el.style.fontSize = fontSize + 'px';
+    el.style.lineHeight = '1.2';
+    el.style.padding = `${Math.max(1, 2 * zoom)}px ${Math.max(2, 4 * zoom)}px`;
+    el.style.borderRadius = `${3 * zoom}px`;
   };
   reposition();
 
@@ -2658,14 +2660,14 @@ function startCardLabelEdit(cardId) {
 
   const cleanup = () => {
     cancelAnimationFrame(_rafId);
-    ta.remove();
+    el.remove();
   };
 
   const commit = () => {
     const existingCard = state.cards.find(c => c.id === cardId);
-    if (existingCard && ta.value.trim()) {
+    if (existingCard && el.textContent.trim()) {
       pushUndo();
-      existingCard.label = ta.value.trim();
+      existingCard.label = el.textContent.trim();
     }
     cleanup();
     render();
@@ -2676,14 +2678,13 @@ function startCardLabelEdit(cardId) {
     render();
   };
 
-  ta.addEventListener('blur', commit);
-  ta.addEventListener('keydown', (ev) => {
+  el.addEventListener('blur', commit);
+  el.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
     if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
     ev.stopPropagation();
   });
-  // Redirect wheel events to canvas so zoom/pan works while editing label
-  ta.addEventListener('wheel', (ev) => {
+  el.addEventListener('wheel', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     canvasWrap.dispatchEvent(new WheelEvent('wheel', {
