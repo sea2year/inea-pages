@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v3.js v=27');
+console.log('[inea] render-v3.js v=28');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -234,7 +234,7 @@ function renderCard(card) {
 
     ctx.textBaseline = 'middle';
     ctx.fillStyle = colors.label;
-    ctx.font = `700 10px "Inter", system-ui, sans-serif`;
+    ctx.font = `700 ${10 / zoom}px "Inter", system-ui, sans-serif`;
     let _label = card.label;
     const _maxLabelW = cw - 90;
     while (ctx.measureText(_label).width > _maxLabelW && _label.length > 3) {
@@ -357,7 +357,7 @@ function renderCard(card) {
     const cLabelY2 = y + CARD_THUMB_HEIGHT;
     const cLabelX = x + 14;
     ctx.fillStyle = '#000000';
-    ctx.font = `700 12px "Inter", system-ui, sans-serif`;
+    ctx.font = `700 ${12 / zoom}px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
     const cLabelName = card.label || '合成';
     ctx.fillText(cLabelName, cLabelX, cLabelY2 + CARD_LABEL_HEIGHT / 2);
@@ -536,7 +536,7 @@ function renderCard(card) {
   if (card.type === 'video' || card.type === 'synthesized-video') {
     const vLabelY = y;
     ctx.fillStyle = colors.label;
-    ctx.font = `700 12px "Inter", system-ui, sans-serif`;
+    ctx.font = `700 ${12 / zoom}px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
 
     const vLabelTextX = x + 14;
