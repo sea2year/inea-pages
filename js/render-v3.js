@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v3.js v=30');
+console.log('[inea] render-v3.js v=31');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -902,14 +902,16 @@ function getConnectionBezier(conn) {
 
   // Keyframe / top-side connections: vertical bezier (control points go upward)
   if (conn.fromSide === 'top' || conn.toSide === 'top') {
-    const offY = Math.max(BEZIER_OFFSET, Math.abs(p3.y - p0.y) * 0.35);
+    const minOff = BEZIER_OFFSET / state.canvas.zoom;
+    const offY = Math.max(minOff, Math.abs(p3.y - p0.y) * 0.35);
     const minY = Math.min(p0.y, p3.y);
     const p1 = { x: p0.x, y: minY - offY };
     const p2 = { x: p3.x, y: minY - offY };
     return { p0, p1, p2, p3 };
   }
 
-  const offX = Math.max(BEZIER_OFFSET, Math.abs(p3.x - p0.x) * 0.35);
+  const minOff = BEZIER_OFFSET / state.canvas.zoom;
+  const offX = Math.max(minOff, Math.abs(p3.x - p0.x) * 0.35);
   const p1 = { x: p0.x + offX, y: p0.y };
   const p2 = { x: p3.x - offX, y: p3.y };
   return { p0, p1, p2, p3 };
@@ -1215,6 +1217,19 @@ function renderEditBoxTimelines() {
 // ================================================================
 // Rendering: Connections (bezier curves + badges)
 // ================================================================
+function lightenColor(color, amount = 0.3) {
+  const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (!match) return color;
+  const r = parseInt(match[1]);
+  const g = parseInt(match[2]);
+  const b = parseInt(match[3]);
+  const a = match[4] !== undefined ? parseFloat(match[4]) : 1;
+  const lr = Math.round(r + (255 - r) * amount);
+  const lg = Math.round(g + (255 - g) * amount);
+  const lb = Math.round(b + (255 - b) * amount);
+  return a === 1 ? `rgb(${lr},${lg},${lb})` : `rgba(${lr},${lg},${lb},${a})`;
+}
+
 function renderConnection(conn) {
   const isHovered = state.hoveredConnectionId === conn.id;
   const isSelected = state.selection.connectionId === conn.id || state.selection.connectionIds.includes(conn.id);
@@ -1230,6 +1245,9 @@ function renderConnection(conn) {
   const bz = getConnectionBezier(conn);
   if (!bz) return;
   const { p0, p1, p2, p3 } = bz;
+
+  const fromCard = state.cards.find(c => c.id === conn.fromCardId);
+  const toCard = state.cards.find(c => c.id === conn.toCardId);
 
   // Keyframe connection: green dashed (Figma: #D4FF00), vertical bezier
   if (isKeyframe) {
@@ -1298,13 +1316,23 @@ function renderConnection(conn) {
     return;
   }
 
-  // Tween connection: purple dashed (Figma: rgb(101,84,203)), no arrow
+  // Tween connection: dashed, gradient from left card to right card, no arrow
   if (isTween) {
+    const fromColors = fromCard ? getCardColors(fromCard) : null;
+    const toColors = toCard ? getCardColors(toCard) : null;
+    const gradFrom = fromColors ? fromColors.border : 'rgb(101,84,203)';
+    const gradTo = toColors ? toColors.border : 'rgb(101,84,203)';
+
     const lw = highlight ? (2.5 / state.canvas.zoom) : (1.5 / state.canvas.zoom);
-    ctx.strokeStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
     ctx.lineWidth = lw;
     ctx.lineCap = 'round';
     ctx.setLineDash([8 / state.canvas.zoom, 5 / state.canvas.zoom]);
+
+    const tweenGrad = ctx.createLinearGradient(p0.x, p0.y, p3.x, p3.y);
+    tweenGrad.addColorStop(0, highlight ? lightenColor(gradFrom) : gradFrom);
+    tweenGrad.addColorStop(1, highlight ? lightenColor(gradTo) : gradTo);
+    ctx.strokeStyle = tweenGrad;
+
     ctx.beginPath();
     ctx.moveTo(p0.x, p0.y);
     ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
@@ -1318,15 +1346,16 @@ function renderConnection(conn) {
     const badgeR = 9;
     const labelFontSize = 11;
 
-    ctx.fillStyle = highlight ? 'rgb(130,110,220)' : '#ffffff';
-    ctx.strokeStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
+    const midColor = toColors ? toColors.border : 'rgb(101,84,203)';
+    ctx.fillStyle = highlight ? lightenColor(midColor) : '#ffffff';
+    ctx.strokeStyle = highlight ? lightenColor(midColor) : midColor;
     ctx.lineWidth = 1.2 / state.canvas.zoom;
     ctx.beginPath();
     roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = highlight ? '#ffffff' : 'rgb(101,84,203)';
+    ctx.fillStyle = highlight ? '#ffffff' : midColor;
     ctx.font = `${isHovered ? '550' : '450'} ${labelFontSize}px "Inter", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1365,6 +1394,12 @@ function renderConnection(conn) {
     return;
   }
 
+  // Gradient from left card color to right card color
+  const fromColors = fromCard ? getCardColors(fromCard) : null;
+  const toColors = toCard ? getCardColors(toCard) : null;
+  const gradFrom = fromColors ? fromColors.border : 'rgb(101,84,203)';
+  const gradTo = toColors ? toColors.border : 'rgb(101,84,203)';
+
   const lw = highlight ? (2.5 / state.canvas.zoom) : (1.5 / state.canvas.zoom);
 
   // Arrowhead at p3 (target) — compute base first (bezier ends at base, not tip)
@@ -1387,8 +1422,10 @@ function renderConnection(conn) {
   }
 
   // Bezier curve (ends at arrow base, not tip)
-  // Transition connection: purple (Figma: rgb(101,84,203))
-  ctx.strokeStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
+  const lineGrad = ctx.createLinearGradient(p0.x, p0.y, baseX, baseY);
+  lineGrad.addColorStop(0, highlight ? lightenColor(gradFrom) : gradFrom);
+  lineGrad.addColorStop(1, highlight ? lightenColor(gradTo) : gradTo);
+  ctx.strokeStyle = lineGrad;
   ctx.lineWidth = lw;
   ctx.lineCap = 'round';
   ctx.setLineDash([]);
@@ -1399,7 +1436,7 @@ function renderConnection(conn) {
 
   // Arrowhead triangle (from tip back to base)
   if (alen > 0.01) {
-    ctx.fillStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
+    ctx.fillStyle = highlight ? lightenColor(gradTo) : gradTo;
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
     ctx.lineTo(baseX + perpX, baseY + perpY);
@@ -1419,18 +1456,20 @@ function renderConnection(conn) {
   const badgeH = 18 / state.canvas.zoom;
   const badgeR = 2 / state.canvas.zoom;
 
-  // Badge background (Figma: light purple fill, purple stroke)
-  ctx.fillStyle = highlight ? 'rgb(130,110,220)' : 'rgb(202, 193, 254)';
-  ctx.strokeStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
+  // Badge background — use right card color
+  const badgeColor = toColors ? toColors.badgeFill : 'rgb(202, 193, 254)';
+  const badgeStroke = toColors ? toColors.badgeStroke : 'rgb(101,84,203)';
+  ctx.fillStyle = highlight ? lightenColor(badgeStroke) : badgeColor;
+  ctx.strokeStyle = highlight ? lightenColor(badgeStroke) : badgeStroke;
   ctx.lineWidth = 1.2 / state.canvas.zoom;
   ctx.beginPath();
   roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
   ctx.fill();
   ctx.stroke();
 
-  // Badge text (Figma: purple)
+  // Badge text
   const label = TRANSITION_LABELS[conn.transition] || '切';
-  ctx.fillStyle = highlight ? '#ffffff' : 'rgb(101,84,203)';
+  ctx.fillStyle = highlight ? '#ffffff' : badgeStroke;
   ctx.font = `${isHovered ? '550' : '450'} 11px "Inter", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1489,11 +1528,13 @@ function renderConnectionPreview() {
   const cf = state.interaction.connectingFrom;
   const isTween = state.interaction._isTweenConnection;
   let p0;
+  let sourceCard = null;
 
   // Get source position — from card or marker card
   if (cf.cardId) {
     const card = state.cards.find(c => c.id === cf.cardId);
     if (!card) return;
+    sourceCard = card;
     // For top anchors, pass a connection-like object so getAnchorPos uses the correct fromPosition
     let connForAnchor = undefined;
     if (cf.side === 'top') {
@@ -1533,12 +1574,14 @@ function renderConnectionPreview() {
   let p1, p2;
   if (isTopSide) {
     // Vertical bezier for top connections
-    const offY = Math.max(BEZIER_OFFSET, Math.abs(p3.y - p0.y) * 0.35);
+    const minOff = BEZIER_OFFSET / state.canvas.zoom;
+    const offY = Math.max(minOff, Math.abs(p3.y - p0.y) * 0.35);
     const minY = Math.min(p0.y, p3.y);
     p1 = { x: p0.x, y: minY - offY };
     p2 = { x: p3.x, y: minY - offY };
   } else {
-    const offX = Math.max(BEZIER_OFFSET, Math.abs(p3.x - p0.x) * 0.35);
+    const minOff = BEZIER_OFFSET / state.canvas.zoom;
+    const offX = Math.max(minOff, Math.abs(p3.x - p0.x) * 0.35);
     const sign = cf.side === 'right' ? 1 : -1;
     p1 = { x: p0.x + offX * sign, y: p0.y };
     p2 = { x: p3.x - offX * sign, y: p3.y };
@@ -1564,8 +1607,17 @@ function renderConnectionPreview() {
     perp2Y = anx2 * arrowW2;
   }
 
-  // Keyframe (top) connections use green; others use purple
-  const previewColor = isTopSide ? 'rgba(212,255,0,0.45)' : 'rgba(130,110,220,0.45)';
+  // Keyframe (top) connections use green; others use source card color
+  let previewColor;
+  if (isTopSide) {
+    previewColor = 'rgba(212,255,0,0.45)';
+  } else if (sourceCard) {
+    const srcColors = getCardColors(sourceCard);
+    const rgb = srcColors.border.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    previewColor = rgb ? `rgba(${rgb[1]},${rgb[2]},${rgb[3]},0.45)` : 'rgba(130,110,220,0.45)';
+  } else {
+    previewColor = 'rgba(130,110,220,0.45)';
+  }
   ctx.strokeStyle = previewColor;
   ctx.lineWidth = 2 / state.canvas.zoom;
   ctx.lineCap = 'round';
@@ -1578,7 +1630,15 @@ function renderConnectionPreview() {
 
   // Arrowhead at cursor (skip for keyframe/top connections)
   if (!isTopSide && alen2 > 0.01) {
-    ctx.fillStyle = 'rgba(130,110,220,0.5)';
+    let arrowColor;
+    if (sourceCard) {
+      const srcColors = getCardColors(sourceCard);
+      const rgb = srcColors.border.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      arrowColor = rgb ? `rgba(${rgb[1]},${rgb[2]},${rgb[3]},0.5)` : 'rgba(130,110,220,0.5)';
+    } else {
+      arrowColor = 'rgba(130,110,220,0.5)';
+    }
+    ctx.fillStyle = arrowColor;
     ctx.beginPath();
     ctx.moveTo(tip2X, tip2Y);
     ctx.lineTo(base2X + perp2X, base2Y + perp2Y);
