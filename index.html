@@ -13,7 +13,7 @@
 
 <!-- Loading overlay -->
 <div id="loading-overlay">
-  <div class="loading-fill" id="loading-fill"></div>
+  <div class="loading-fill" id="loading-fill" style="position:absolute; left:0; top:0; width:100%; height:100%; background:#D4FF00; transform:skewX(-14deg); z-index:0;"></div>
   <div class="loading-inner">
     <img class="loading-logo-img" src="assets/logo.png" alt="INEA" />
     <div class="loading-text" id="loading-text">准备素材...</div>
@@ -206,12 +206,10 @@
   var enterBtn = document.getElementById('loading-enter-btn');
 
   function setFill(progress) {
-    // progress: 0→1, translateX: -105% → 0%
-    fill.style.transform = 'skewX(-14deg) translateX(' + (-105 + progress * 105) + '%)';
+    // DEBUG: do nothing for now
   }
 
-  // DEBUG: Start visible to verify CSS works
-  fill.style.transform = 'skewX(-14deg) translateX(0)';
+  // DEBUG: inline style handles visibility
 
   var mediaFiles = [
     { path: 'media/无人机操作.mp4', type: 'video', name: '无人机操作.mp4' },
