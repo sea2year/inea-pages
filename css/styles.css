@@ -1072,13 +1072,13 @@ canvas {
 }
 #loading-overlay.hidden { opacity: 0; pointer-events: none; }
 
-/* Diagonal green fill — skewed rect expands width left to right */
+/* Diagonal green fill — skewed rect scales from left to right */
 .loading-fill {
-  position: absolute; left: -30%; top: -10%; bottom: -10%; z-index: 0;
-  width: 0%;
+  position: absolute; left: -10%; top: -5%; right: -10%; bottom: -5%; z-index: 0;
   background: #D4FF00;
-  transform: skewX(-14deg);
-  transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: skewX(-14deg) scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .loading-inner {
