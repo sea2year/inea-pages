@@ -1,6 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
+console.log('[inea] render-v3.js v=25');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2647,6 +2648,7 @@ function startCardLabelEdit(cardId) {
     el.style.width = Math.min(maxW, textW) + 'px';
     el.style.padding = padY + 'px ' + padX + 'px';
     el.style.borderRadius = br + 'px';
+    console.debug('[label-edit] zoom:', zoom.toFixed(2), 'fontSize:', fontSize.toFixed(1), 'height:', h.toFixed(1));
   };
   reposition();
 
