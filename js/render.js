@@ -514,6 +514,7 @@ function renderCard(card) {
   } // end video card content
 
   // --- Video label (Figma: above card body, outside clip) ---
+  console.log('RENDERCARD label section - type:', card.type, 'id:', card.id, 'label:', card.label);
   if (card.type === 'video' || card.type === 'synthesized-video') {
     const vLabelY = y;
     ctx.fillStyle = colors.label;
