@@ -162,18 +162,24 @@ function _restoreCardCanvasData(cards, canvasData) {
   }
 }
 
+// JSON.stringify replacer: convert TypedArrays to regular arrays
+function _jsonReplacer(key, value) {
+  if (ArrayBuffer.isView(value)) return Array.from(value);
+  return value;
+}
+
 function pushUndo() {
   if (_undoSuppress) return;
   _redoStack = [];
   const canvasData = _captureCardCanvasData(state.cards);
   const snapshot = {
-    cards: JSON.parse(JSON.stringify(state.cards)),
-    connections: JSON.parse(JSON.stringify(state.connections)),
-    groups: JSON.parse(JSON.stringify(state.groups)),
-    shapes: JSON.parse(JSON.stringify(state.shapes)),
-    editBoxes: JSON.parse(JSON.stringify(state.editBoxes)),
-    compositionCards: JSON.parse(JSON.stringify(state.compositionCards)),
-    markerCards: JSON.parse(JSON.stringify(state.markerCards)),
+    cards: JSON.parse(JSON.stringify(state.cards, _jsonReplacer)),
+    connections: JSON.parse(JSON.stringify(state.connections, _jsonReplacer)),
+    groups: JSON.parse(JSON.stringify(state.groups, _jsonReplacer)),
+    shapes: JSON.parse(JSON.stringify(state.shapes, _jsonReplacer)),
+    editBoxes: JSON.parse(JSON.stringify(state.editBoxes, _jsonReplacer)),
+    compositionCards: JSON.parse(JSON.stringify(state.compositionCards, _jsonReplacer)),
+    markerCards: JSON.parse(JSON.stringify(state.markerCards, _jsonReplacer)),
     _canvasData: canvasData,
   };
   _undoStack.push(snapshot);
@@ -184,13 +190,13 @@ function undo() {
   if (_undoStack.length === 0) return;
   const currentCanvasData = _captureCardCanvasData(state.cards);
   const current = {
-    cards: JSON.parse(JSON.stringify(state.cards)),
-    connections: JSON.parse(JSON.stringify(state.connections)),
-    groups: JSON.parse(JSON.stringify(state.groups)),
-    shapes: JSON.parse(JSON.stringify(state.shapes)),
-    editBoxes: JSON.parse(JSON.stringify(state.editBoxes)),
-    compositionCards: JSON.parse(JSON.stringify(state.compositionCards)),
-    markerCards: JSON.parse(JSON.stringify(state.markerCards)),
+    cards: JSON.parse(JSON.stringify(state.cards, _jsonReplacer)),
+    connections: JSON.parse(JSON.stringify(state.connections, _jsonReplacer)),
+    groups: JSON.parse(JSON.stringify(state.groups, _jsonReplacer)),
+    shapes: JSON.parse(JSON.stringify(state.shapes, _jsonReplacer)),
+    editBoxes: JSON.parse(JSON.stringify(state.editBoxes, _jsonReplacer)),
+    compositionCards: JSON.parse(JSON.stringify(state.compositionCards, _jsonReplacer)),
+    markerCards: JSON.parse(JSON.stringify(state.markerCards, _jsonReplacer)),
     _canvasData: currentCanvasData,
   };
   _redoStack.push(current);
@@ -228,13 +234,13 @@ function redo() {
   if (_redoStack.length === 0) return;
   const currentCanvasData = _captureCardCanvasData(state.cards);
   const current = {
-    cards: JSON.parse(JSON.stringify(state.cards)),
-    connections: JSON.parse(JSON.stringify(state.connections)),
-    groups: JSON.parse(JSON.stringify(state.groups)),
-    shapes: JSON.parse(JSON.stringify(state.shapes)),
-    editBoxes: JSON.parse(JSON.stringify(state.editBoxes)),
-    compositionCards: JSON.parse(JSON.stringify(state.compositionCards)),
-    markerCards: JSON.parse(JSON.stringify(state.markerCards)),
+    cards: JSON.parse(JSON.stringify(state.cards, _jsonReplacer)),
+    connections: JSON.parse(JSON.stringify(state.connections, _jsonReplacer)),
+    groups: JSON.parse(JSON.stringify(state.groups, _jsonReplacer)),
+    shapes: JSON.parse(JSON.stringify(state.shapes, _jsonReplacer)),
+    editBoxes: JSON.parse(JSON.stringify(state.editBoxes, _jsonReplacer)),
+    compositionCards: JSON.parse(JSON.stringify(state.compositionCards, _jsonReplacer)),
+    markerCards: JSON.parse(JSON.stringify(state.markerCards, _jsonReplacer)),
     _canvasData: currentCanvasData,
   };
   _undoStack.push(current);

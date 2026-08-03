@@ -611,12 +611,12 @@ function renderCard(card) {
 
 
   // Anchor points (left + right) — only when card is selected or in connecting mode
+  const ha = state.hoveredAnchor;
   if (card.type === 'video' || card.type === 'synthesized-video') {
   const isConnecting = state.interaction.mode === 'connecting';
   const isSelected = state.selection.cardIds.includes(card.id);
   if (isSelected || isConnecting) {
   const anchorR = ANCHOR_RADIUS / state.canvas.zoom;
-  const ha = state.hoveredAnchor;
   const isConnSource = isConnecting &&
   state.interaction.connectingFrom &&
   state.interaction.connectingFrom.cardId === card.id;
