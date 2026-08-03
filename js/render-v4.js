@@ -1464,7 +1464,7 @@ function renderConnection(conn) {
 
   // Badge size proportional to card screen height (15%, lower clamp 4px)
   const cardScreenH = 116 * state.canvas.zoom;
-  const badgeH = Math.max(4, cardScreenH * 0.225);
+  const badgeH = Math.max(8, cardScreenH * 0.225);
   const s = badgeH / 12; // scale factor from baseline (H=12)
   const badgeW = Math.round(18 * s);
   const badgeR = Math.max(1, Math.round(2 * s));
@@ -1496,7 +1496,7 @@ function renderConnection(conn) {
   conn._badgeBounds = { x: sx - badgeW / 2, y: sy - badgeH / 2, w: badgeW, h: badgeH, screen: true };
 
   // Delete button (visible when hovered, hidden when badge too small)
-  if (isHovered && badgeH >= 7) {
+  if (isHovered && badgeH >= 11) {
     const delR = Math.max(3, Math.round(5 * s));
     const delOff = Math.round(5 * s);
     const delX = sx + badgeW / 2 + delOff;
