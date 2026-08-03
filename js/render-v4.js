@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=12');
+console.log('[inea] render-v4.js v=13');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1262,57 +1262,60 @@ function renderConnection(conn) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Midpoint badge — inverse-scale for zoom invariance
+    // Midpoint badge — drawn in screen-space for true zoom invariance
     const z = state.canvas.zoom;
     const mid = bezierPoint(0.5, p0, p1, p2, p3);
-    const badgeW = 44 / z;
-    const badgeH = 18 / z;
-    const badgeR = 9 / z;
-    const labelFontSize = Math.max(6, Math.min(24, 12 / z));
+    const ox = state.canvas.offsetX, oy = state.canvas.offsetY;
+    const sx = mid.x * z + ox, sy = mid.y * z + oy;
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const badgeW = 44, badgeH = 18, badgeR = 9;
     ctx.fillStyle = highlight ? '#b3d900' : '#ffffff';
     ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
-    ctx.lineWidth = 1.2 / z;
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
+    roundRectPath(sx - badgeW / 2, sy - badgeH / 2, badgeW, badgeH, badgeR);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = highlight ? '#ffffff' : '#808000';
-    ctx.font = `${isHovered ? '550' : '450'} ${labelFontSize}px "Inter", system-ui, sans-serif`;
+    ctx.font = `${isHovered ? '550' : '450'} 12px "Inter", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('关键帧', mid.x, mid.y);
+    ctx.fillText('关键帧', sx, sy);
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
 
-    // Store badge bounds
-    conn._badgeBounds = { x: mid.x - badgeW / 2, y: mid.y - badgeH / 2, w: badgeW, h: badgeH };
+    // Store badge bounds in screen-space
+    conn._badgeBounds = { x: sx - badgeW / 2, y: sy - badgeH / 2, w: badgeW, h: badgeH, screen: true };
 
     // Delete button when hovered
     if (isHovered) {
-      const delR = 7 / z;
-      const delX = mid.x + badgeW / 2 + 8 / z;
-      const delY = mid.y;
+      const delR = 7, delX = sx + badgeW / 2 + 8, delY = sy;
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#e04040';
-      ctx.lineWidth = 1.2 / z;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.arc(delX, delY, delR, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.strokeStyle = '#e04040';
-      ctx.lineWidth = 1.2 / z;
-      const xPad = 2.2 / z;
+      ctx.lineWidth = 1.2;
+      const xPad = 2.2;
       ctx.beginPath();
       ctx.moveTo(delX - xPad, delY - xPad);
       ctx.lineTo(delX + xPad, delY + xPad);
       ctx.moveTo(delX + xPad, delY - xPad);
       ctx.lineTo(delX - xPad, delY + xPad);
       ctx.stroke();
-      conn._delBounds = { x: delX - delR, y: delY - delR, w: delR * 2, h: delR * 2 };
+      conn._delBounds = { x: delX - delR, y: delY - delR, w: delR * 2, h: delR * 2, screen: true };
     } else {
       conn._delBounds = null;
     }
+
+    ctx.restore();
     return;
   }
 
@@ -1339,58 +1342,61 @@ function renderConnection(conn) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Midpoint badge — inverse-scale for zoom invariance
+    // Midpoint badge — drawn in screen-space for true zoom invariance
     const z3 = state.canvas.zoom;
     const mid = bezierPoint(0.5, p0, p1, p2, p3);
-    const badgeW = 38 / z3;
-    const badgeH = 18 / z3;
-    const badgeR = 9 / z3;
-    const labelFontSize = Math.max(6, Math.min(24, 12 / z3));
+    const ox = state.canvas.offsetX, oy = state.canvas.offsetY;
+    const sx = mid.x * z3 + ox, sy = mid.y * z3 + oy;
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const badgeW = 38, badgeH = 18, badgeR = 9;
     const midColor = toColors ? toColors.border : 'rgb(101,84,203)';
     ctx.fillStyle = highlight ? lightenColor(midColor) : '#ffffff';
     ctx.strokeStyle = highlight ? lightenColor(midColor) : midColor;
-    ctx.lineWidth = 1.2 / z3;
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
+    roundRectPath(sx - badgeW / 2, sy - badgeH / 2, badgeW, badgeH, badgeR);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = highlight ? '#ffffff' : midColor;
-    ctx.font = `${isHovered ? '550' : '450'} ${labelFontSize}px "Inter", system-ui, sans-serif`;
+    ctx.font = `${isHovered ? '550' : '450'} 12px "Inter", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('补间', mid.x, mid.y);
+    ctx.fillText('补间', sx, sy);
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
 
-    // Store badge bounds
-    conn._badgeBounds = { x: mid.x - badgeW / 2, y: mid.y - badgeH / 2, w: badgeW, h: badgeH };
+    // Store badge bounds in screen-space
+    conn._badgeBounds = { x: sx - badgeW / 2, y: sy - badgeH / 2, w: badgeW, h: badgeH, screen: true };
 
     // Delete button when hovered
     if (isHovered) {
-      const delR = 7 / z3;
-      const delX = mid.x + badgeW / 2 + 8 / z3;
-      const delY = mid.y;
+      const delR = 7, delX = sx + badgeW / 2 + 8, delY = sy;
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#e04040';
-      ctx.lineWidth = 1.2 / z3;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.arc(delX, delY, delR, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.strokeStyle = '#e04040';
-      ctx.lineWidth = 1.2 / z3;
-      const xPad = 2.2 / z3;
+      ctx.lineWidth = 1.2;
+      const xPad = 2.2;
       ctx.beginPath();
       ctx.moveTo(delX - xPad, delY - xPad);
       ctx.lineTo(delX + xPad, delY + xPad);
       ctx.moveTo(delX + xPad, delY - xPad);
       ctx.lineTo(delX - xPad, delY + xPad);
       ctx.stroke();
-      conn._delBounds = { x: delX - delR, y: delY - delR, w: delR * 2, h: delR * 2 };
+      conn._delBounds = { x: delX - delR, y: delY - delR, w: delR * 2, h: delR * 2, screen: true };
     } else {
       conn._delBounds = null;
     }
+
+    ctx.restore();
     return;
   }
 
@@ -1445,51 +1451,50 @@ function renderConnection(conn) {
     conn._hitPath = { p0, p1, p2, p3 };
   }
 
-  // Midpoint for badge
+  // Midpoint for badge — drawn in screen-space for true zoom invariance
   const mid = bezierPoint(0.5, p0, p1, p2, p3);
-  const badgeW = 28 / state.canvas.zoom;
-  const badgeH = 18 / state.canvas.zoom;
-  const badgeR = 2 / state.canvas.zoom;
+  const ox = state.canvas.offsetX, oy = state.canvas.offsetY;
+  const sx = mid.x * state.canvas.zoom + ox, sy = mid.y * state.canvas.zoom + oy;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  const badgeW = 28, badgeH = 18, badgeR = 2;
 
   // Badge background — use right card color
   const badgeColor = toColors ? toColors.badgeFill : 'rgb(202, 193, 254)';
   const badgeStroke = toColors ? toColors.badgeStroke : 'rgb(101,84,203)';
   ctx.fillStyle = highlight ? lightenColor(badgeStroke) : badgeColor;
   ctx.strokeStyle = highlight ? lightenColor(badgeStroke) : badgeStroke;
-  ctx.lineWidth = 1.2 / state.canvas.zoom;
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
+  roundRectPath(sx - badgeW / 2, sy - badgeH / 2, badgeW, badgeH, badgeR);
   ctx.fill();
   ctx.stroke();
 
   // Badge text
   const label = TRANSITION_LABELS[conn.transition] || '切';
   ctx.fillStyle = highlight ? '#ffffff' : badgeStroke;
-  ctx.font = `${isHovered ? '550' : '450'} ${Math.max(6, Math.min(24, 12 / state.canvas.zoom))}px "Inter", system-ui, sans-serif`;
+  ctx.font = `${isHovered ? '550' : '450'} 12px "Inter", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, mid.x, mid.y);
+  ctx.fillText(label, sx, sy);
   ctx.textAlign = 'start';
   ctx.textBaseline = 'alphabetic';
 
-  // Store badge bounds for hit testing
-  conn._badgeBounds = {
-    x: mid.x - badgeW / 2,
-    y: mid.y - badgeH / 2,
-    w: badgeW,
-    h: badgeH
-  };
+  // Store badge bounds for hit testing (screen-space)
+  conn._badgeBounds = { x: sx - badgeW / 2, y: sy - badgeH / 2, w: badgeW, h: badgeH, screen: true };
 
   // Delete button (visible when hovered)
   if (isHovered) {
-    const delR = 7 / state.canvas.zoom;
-    const delX = mid.x + badgeW / 2 + 8 / state.canvas.zoom;
-    const delY = mid.y;
+    const delR = 7;
+    const delX = sx + badgeW / 2 + 8;
+    const delY = sy;
 
     // Outer circle
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#e04040';
-    ctx.lineWidth = 1.2 / state.canvas.zoom;
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.arc(delX, delY, delR, 0, Math.PI * 2);
     ctx.fill();
@@ -1497,8 +1502,8 @@ function renderConnection(conn) {
 
     // X mark
     ctx.strokeStyle = '#e04040';
-    ctx.lineWidth = 1.2 / state.canvas.zoom;
-    const xPad = 2.2 / state.canvas.zoom;
+    ctx.lineWidth = 1.2;
+    const xPad = 2.2;
     ctx.beginPath();
     ctx.moveTo(delX - xPad, delY - xPad);
     ctx.lineTo(delX + xPad, delY + xPad);
@@ -1506,15 +1511,12 @@ function renderConnection(conn) {
     ctx.lineTo(delX - xPad, delY + xPad);
     ctx.stroke();
 
-    conn._delBounds = {
-      x: delX - delR,
-      y: delY - delR,
-      w: delR * 2,
-      h: delR * 2
-    };
+    conn._delBounds = { x: delX - delR, y: delY - delR, w: delR * 2, h: delR * 2, screen: true };
   } else {
     conn._delBounds = null;
   }
+
+  ctx.restore();
 }
 
 function renderConnectionPreview() {
@@ -1976,21 +1978,37 @@ function hitTest(sx, sy) {
 
   // Check connections (delete button first, then badge)
   const connHitWorld = CONN_HIT_R / state.canvas.zoom;
+  const connHitScreen = CONN_HIT_R; // screen-space hit margin
   for (let i = state.connections.length - 1; i >= 0; i--) {
     const conn = state.connections[i];
     if (conn._delBounds) {
       const db = conn._delBounds;
-      const ddx = wx - (db.x + db.w / 2);
-      const ddy = wy - (db.y + db.h / 2);
-      if (Math.sqrt(ddx * ddx + ddy * ddy) <= connHitWorld + db.w / 2) {
-        return { type: 'connection-delete', connectionId: conn.id };
+      if (db.screen) {
+        const ddx = sx - (db.x + db.w / 2);
+        const ddy = sy - (db.y + db.h / 2);
+        if (Math.sqrt(ddx * ddx + ddy * ddy) <= connHitScreen + db.w / 2) {
+          return { type: 'connection-delete', connectionId: conn.id };
+        }
+      } else {
+        const ddx = wx - (db.x + db.w / 2);
+        const ddy = wy - (db.y + db.h / 2);
+        if (Math.sqrt(ddx * ddx + ddy * ddy) <= connHitWorld + db.w / 2) {
+          return { type: 'connection-delete', connectionId: conn.id };
+        }
       }
     }
     if (conn._badgeBounds) {
       const bb = conn._badgeBounds;
-      if (wx >= bb.x - connHitWorld && wx <= bb.x + bb.w + connHitWorld &&
-          wy >= bb.y - connHitWorld && wy <= bb.y + bb.h + connHitWorld) {
-        return { type: 'connection-badge', connectionId: conn.id };
+      if (bb.screen) {
+        if (sx >= bb.x - connHitScreen && sx <= bb.x + bb.w + connHitScreen &&
+            sy >= bb.y - connHitScreen && sy <= bb.y + bb.h + connHitScreen) {
+          return { type: 'connection-badge', connectionId: conn.id };
+        }
+      } else {
+        if (wx >= bb.x - connHitWorld && wx <= bb.x + bb.w + connHitWorld &&
+            wy >= bb.y - connHitWorld && wy <= bb.y + bb.h + connHitWorld) {
+          return { type: 'connection-badge', connectionId: conn.id };
+        }
       }
     }
   }
