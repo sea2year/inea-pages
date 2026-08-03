@@ -610,11 +610,14 @@ function renderCard(card) {
   }
 
 
-  // Anchor points (left + right) — for video/synthesized-video cards
+  // Anchor points (left + right) — only when card is selected or in connecting mode
   if (card.type === 'video' || card.type === 'synthesized-video') {
+  const isConnecting = state.interaction.mode === 'connecting';
+  const isSelected = state.selection.cardIds.includes(card.id);
+  if (isSelected || isConnecting) {
   const anchorR = ANCHOR_RADIUS / state.canvas.zoom;
   const ha = state.hoveredAnchor;
-  const isConnSource = state.interaction.mode === 'connecting' &&
+  const isConnSource = isConnecting &&
   state.interaction.connectingFrom &&
   state.interaction.connectingFrom.cardId === card.id;
 
@@ -658,6 +661,7 @@ function renderCard(card) {
   ctx.textAlign = 'start';
   ctx.textBaseline = 'alphabetic';
   }
+  } // end isSelected || isConnecting
   }
 
   // Top anchor — diamond shape that follows the playhead (group mode only).
@@ -1729,7 +1733,8 @@ function hitTest(sx, sy) {
             }
           }
         }
-        // Left/right anchor hit test
+        // Left/right anchor hit test (only when selected or connecting)
+        if (state.selection.cardIds.includes(card.id) || state.interaction.mode === 'connecting') {
         for (const side of ['left', 'right']) {
           const anchor = getAnchorPos(card, side);
           const dx = wx - anchor.x;
@@ -1737,6 +1742,7 @@ function hitTest(sx, sy) {
           if (Math.sqrt(dx * dx + dy * dy) <= anchorHitWorld) {
             return { type: 'anchor', cardId: card.id, side };
           }
+        }
         }
         return { type: 'card-body', cardId: card.id };
       }
@@ -1799,7 +1805,8 @@ function hitTest(sx, sy) {
             }
           }
         }
-        // Left/right anchors
+        // Left/right anchors (only when selected or connecting)
+        if (state.selection.cardIds.includes(card.id) || state.interaction.mode === 'connecting') {
         for (const side of ['left', 'right']) {
           const anchor = getAnchorPos(card, side);
           const dx = wx - anchor.x;
@@ -1807,6 +1814,7 @@ function hitTest(sx, sy) {
           if (Math.sqrt(dx * dx + dy * dy) <= anchorHitWorld) {
             return { type: 'anchor', cardId: card.id, side };
           }
+        }
         }
       }
 
@@ -1863,7 +1871,8 @@ function hitTest(sx, sy) {
         return { type: 'anchor', cardId: card.id, side: 'top', _kfConnId: null };
       }
     }
-    // Left/right anchors
+    // Left/right anchors (only when selected or connecting)
+    if (state.selection.cardIds.includes(card.id) || state.interaction.mode === 'connecting') {
     for (const side of ['left', 'right']) {
       const anchor = getAnchorPos(card, side);
       const dx = wx - anchor.x;
@@ -1871,6 +1880,7 @@ function hitTest(sx, sy) {
       if (Math.sqrt(dx * dx + dy * dy) <= anchorHitWorld) {
         return { type: 'anchor', cardId: card.id, side };
       }
+    }
     }
     }
   }
