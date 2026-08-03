@@ -610,16 +610,20 @@ function renderCard(card) {
   }
 
 
-  // Anchor points (left + right) — only when card is selected or in connecting mode
-  const ha = state.hoveredAnchor;
+  // Anchor points — only on video/synthesized-video cards.
+  // Visibility: hidden by default. Show when card is selected OR in connecting mode.
   if (card.type === 'video' || card.type === 'synthesized-video') {
+  const ha = state.hoveredAnchor;
   const isConnecting = state.interaction.mode === 'connecting';
   const isSelected = state.selection.cardIds.includes(card.id);
-  if (isSelected || isConnecting) {
+  const shouldShowAnchors = isSelected || isConnecting;
   const anchorR = ANCHOR_RADIUS / state.canvas.zoom;
   const isConnSource = isConnecting &&
   state.interaction.connectingFrom &&
   state.interaction.connectingFrom.cardId === card.id;
+
+  // Left + right anchors (circles) — only when shouldShowAnchors
+  if (shouldShowAnchors) {
 
   for (const side of ['left', 'right']) {
   const isHoveredAnchor = ha && ha.cardId === card.id && ha.side === side;
@@ -661,8 +665,8 @@ function renderCard(card) {
   ctx.textAlign = 'start';
   ctx.textBaseline = 'alphabetic';
   }
-  } // end isSelected || isConnecting
-  }
+  } // end for (left/right)
+  } // end shouldShowAnchors
 
   // Top anchor — diamond shape that follows the playhead (group mode only).
   const keyframeConnsFrom = state.connections.filter(c => c.type === 'keyframe' && c.fromCardId === card.id);
