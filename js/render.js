@@ -1,7 +1,6 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('RENDER.JS LOADED');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -515,7 +514,6 @@ function renderCard(card) {
   } // end video card content
 
   // --- Video label (Figma: above card body, outside clip) ---
-  console.log('RENDERCARD label section - type:', card.type, 'id:', card.id, 'label:', card.label);
   if (card.type === 'video' || card.type === 'synthesized-video') {
     const vLabelY = y;
     ctx.fillStyle = colors.label;
@@ -545,7 +543,7 @@ function renderCard(card) {
     ctx.textBaseline = 'alphabetic';
 
     // Video type badge (top-right, same y as label)
-    const vBadgeW = 31, vBadgeH = 13;
+    const vBadgeW = 40, vBadgeH = 13;
     const vBadgeX = x + cw - vBadgeW - 5;
     const vBadgeY = vLabelY + 2;
     ctx.fillStyle = colors.badgeFill;
@@ -559,15 +557,9 @@ function renderCard(card) {
     ctx.font = '400 6px "Inter", system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('V', vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2);
+    ctx.fillText('Video', vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2);
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
-
-    // DEBUG: big red dot at badge position
-    ctx.fillStyle = 'red';
-    ctx.beginPath();
-    ctx.arc(vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2, 6, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   // --- Trim handles (only for video/audio, outside clip) ---
