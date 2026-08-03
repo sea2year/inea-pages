@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=26');
+console.log('[inea] render-v4.js v=27');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2671,35 +2671,24 @@ function startCardLabelEdit(cardId) {
   const isComp = card.type === 'composition';
   if (!isVideo && !isAudio && !isComp) return;
 
-  const ch = isAudio ? 41 : CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT;
-
   // Remove any existing editor first
   const prev = document.getElementById('__inea-label-editor');
   if (prev) prev.remove();
-
-  let baseFontSize = isAudio ? 10 : 12;
-  let baseHeight = isAudio ? 14 : CARD_LABEL_HEIGHT;
-  if (isVideo) {
-    baseFontSize = 10;
-    baseHeight = Math.round(Math.max(CARD_LABEL_HEIGHT, 14 / state.canvas.zoom) * state.canvas.zoom);
-  }
 
   const el = document.createElement('div');
   el.id = '__inea-label-editor';
   el.contentEditable = 'true';
   el.textContent = card.label || '';
-  const textW = Math.max(40, ((el.textContent || '').length || 1) * baseFontSize * 0.6 + 20);
   el.style.cssText = ''
     + 'position:fixed;z-index:200;'
     + 'font-family:"Inter",system-ui,sans-serif;font-weight:700;'
     + 'color:#000;background:#fff;'
     + 'border:1px solid #aaa;outline:none;'
     + 'overflow:hidden;white-space:nowrap;box-sizing:border-box;'
-    + 'line-height:' + baseHeight + 'px;'
-    + 'font-size:' + baseFontSize + 'px;'
-    + 'height:' + baseHeight + 'px;'
-    + 'width:' + textW + 'px;'
-    + 'padding:2px 4px;border-radius:3px;';
+    + 'font-size:10px;line-height:1.2;'
+    + 'padding:0 4px;border-radius:3px;'
+    + 'display:flex;align-items:flex-end;'
+    + 'min-width:20px;width:fit-content;';
   document.body.appendChild(el);
   el.focus();
   const range = document.createRange();
@@ -2709,23 +2698,25 @@ function startCardLabelEdit(cardId) {
   sel.addRange(range);
 
   const reposition = () => {
+    const zoom = state.canvas.zoom;
     const s = worldToScreen(card.x, card.y);
-    let labelScreenY;
+    let labelScreenH, labelScreenY;
+
     if (isVideo) {
-      const _h = Math.round(Math.max(CARD_LABEL_HEIGHT, 14 / state.canvas.zoom) * state.canvas.zoom);
-      el.style.height = _h + 'px';
-      el.style.display = 'flex';
-      el.style.alignItems = 'flex-end';
-      el.style.fontSize = '10px';
-      el.style.padding = '0 4px 1px 4px';
+      labelScreenH = Math.round(Math.max(CARD_LABEL_HEIGHT * zoom, 14));
       labelScreenY = s.y;
     } else if (isAudio) {
-      labelScreenY = s.y + (ch - 13) * state.canvas.zoom;
+      labelScreenH = 14;
+      labelScreenY = s.y + (41 - 13) * zoom;
     } else {
-      labelScreenY = s.y + CARD_THUMB_HEIGHT * state.canvas.zoom;
+      labelScreenH = Math.round(CARD_LABEL_HEIGHT * zoom);
+      labelScreenY = s.y + CARD_THUMB_HEIGHT * zoom;
     }
-    el.style.left = (s.x + 14 * state.canvas.zoom) + 'px';
+
+    el.style.height = labelScreenH + 'px';
     el.style.top = labelScreenY + 'px';
+    el.style.left = (s.x + 12 * zoom) + 'px';
+    el.style.maxWidth = Math.max(40, getCardWidth(card) * zoom - 24 * zoom - 8) + 'px';
   };
   reposition();
 
