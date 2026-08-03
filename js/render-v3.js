@@ -2684,6 +2684,16 @@ function startCardLabelEdit(cardId) {
     if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
     ev.stopPropagation();
   });
+  // Redirect wheel events to canvas so zoom/pan works while editing label
+  ta.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    canvasWrap.dispatchEvent(new WheelEvent('wheel', {
+      deltaX: ev.deltaX, deltaY: ev.deltaY, deltaMode: ev.deltaMode,
+      clientX: ev.clientX, clientY: ev.clientY,
+      ctrlKey: ev.ctrlKey, metaKey: ev.metaKey, shiftKey: ev.shiftKey,
+    }));
+  }, { passive: false });
 }
 
 // ================================================================
