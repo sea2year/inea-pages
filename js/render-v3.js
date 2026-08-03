@@ -2641,15 +2641,13 @@ function startCardLabelEdit(cardId) {
     const maxW = Math.max(30, (getCardWidth(card) - 28) * zoom);
     const textW = Math.max(40, (ta.value.length || 1) * fontSize * 0.6 + 20);
 
-    Object.assign(ta.style, {
-      left: (s.x + 14 * zoom) + 'px',
-      top: labelScreenY + 'px',
-      width: Math.min(maxW, textW) + 'px',
-      height: labelH + 'px',
-      fontSize: fontSize + 'px',
-      padding: `${Math.max(1, 2 * zoom)}px ${Math.max(2, 4 * zoom)}px`,
-      borderRadius: `${3 * zoom}px`,
-    });
+    ta.style.left = (s.x + 14 * zoom) + 'px';
+    ta.style.top = labelScreenY + 'px';
+    ta.style.width = Math.min(maxW, textW) + 'px';
+    ta.style.height = labelH + 'px';
+    ta.style.fontSize = fontSize + 'px';
+    ta.style.padding = `${Math.max(1, 2 * zoom)}px ${Math.max(2, 4 * zoom)}px`;
+    ta.style.borderRadius = `${3 * zoom}px`;
   };
   reposition();
 
