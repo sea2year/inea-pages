@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=3');
+console.log('[inea] render-v4.js v=4');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -831,7 +831,7 @@ function formatTime(sec) {
 
 function getAnchorPos(card, side, opts) {
   const cw = getCardWidth(card);
-  const offset = 10 / state.canvas.zoom; // 10 world px outside card edge
+  const offset = 3 / state.canvas.zoom; // 3px screen-space gap from card edge
   if (side === 'top') {
     // Accept { fromPosition: N } or a plain number N
     let pos = 0;
@@ -1422,8 +1422,8 @@ function renderConnection(conn) {
   if (alen > 0.01) {
     const anx = ax / alen;
     const any = ay / alen;
-    const arrowLen = 12 / state.canvas.zoom;
-    const arrowW = 5 / state.canvas.zoom;
+    const arrowLen = 7 / state.canvas.zoom;
+    const arrowW = 3.5 / state.canvas.zoom;
     // 箭头底部对齐锚点，尖端指向卡片方向
     const baseX = p3.x;
     const baseY = p3.y;
@@ -1609,8 +1609,8 @@ function renderConnectionPreview() {
   if (!isTopSide && alen2 > 0.01) {
     const anx2 = ax2 / alen2;
     const any2 = ay2 / alen2;
-    const arrowLen2 = 10 / state.canvas.zoom;
-    const arrowW2 = 4 / state.canvas.zoom;
+    const arrowLen2 = 6 / state.canvas.zoom;
+    const arrowW2 = 3 / state.canvas.zoom;
     const base2X = p3.x;
     const base2Y = p3.y;
     const tip2X = base2X + anx2 * arrowLen2;
