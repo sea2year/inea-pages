@@ -2598,17 +2598,25 @@ function startCardLabelEdit(cardId) {
   const prev = document.getElementById('__inea-label-editor');
   if (prev) prev.remove();
 
+  const baseFontSize = isAudio ? 10 : 12;
+  const baseHeight = isAudio ? 14 : CARD_LABEL_HEIGHT;
+
   const el = document.createElement('div');
   el.id = '__inea-label-editor';
   el.contentEditable = 'true';
   el.textContent = card.label || '';
+  const textW = Math.max(40, ((el.textContent || '').length || 1) * baseFontSize * 0.6 + 20);
   el.style.cssText = ''
     + 'position:fixed;z-index:200;'
     + 'font-family:"Inter",system-ui,sans-serif;font-weight:700;'
     + 'color:#000;background:#fff;'
     + 'border:1px solid #aaa;outline:none;'
     + 'overflow:hidden;white-space:nowrap;box-sizing:border-box;'
-    + 'display:flex;align-items:center;';
+    + 'display:flex;align-items:center;'
+    + 'font-size:' + baseFontSize + 'px;'
+    + 'height:' + baseHeight + 'px;'
+    + 'width:' + textW + 'px;'
+    + 'padding:2px 4px;border-radius:3px;';
   document.body.appendChild(el);
   el.focus();
   // Select all text
@@ -2619,35 +2627,17 @@ function startCardLabelEdit(cardId) {
   sel.addRange(range);
 
   const reposition = () => {
-    const zoom = state.canvas.zoom;
     const s = worldToScreen(card.x, card.y);
-
-    let labelScreenY, labelH, fontSize;
+    let labelScreenY;
     if (isVideo) {
       labelScreenY = s.y;
-      labelH = CARD_LABEL_HEIGHT * zoom;
-      fontSize = 12 * zoom;
     } else if (isAudio) {
-      labelScreenY = s.y + (ch - 13) * zoom;
-      labelH = 14 * zoom;
-      fontSize = 10 * zoom;
+      labelScreenY = s.y + (ch - 13) * state.canvas.zoom;
     } else {
-      labelScreenY = s.y + CARD_THUMB_HEIGHT * zoom;
-      labelH = CARD_LABEL_HEIGHT * zoom;
-      fontSize = 12 * zoom;
+      labelScreenY = s.y + CARD_THUMB_HEIGHT * state.canvas.zoom;
     }
-
-    const maxW = Math.max(30, (getCardWidth(card) - 28) * zoom);
-    const textW = Math.max(40, ((el.textContent || '').length || 1) * fontSize * 0.6 + 20);
-
-    el.style.left = (s.x + 14 * zoom) + 'px';
+    el.style.left = (s.x + 14 * state.canvas.zoom) + 'px';
     el.style.top = labelScreenY + 'px';
-    el.style.width = Math.min(maxW, textW) + 'px';
-    el.style.height = labelH + 'px';
-    el.style.fontSize = fontSize + 'px';
-    el.style.lineHeight = '1.2';
-    el.style.padding = `${Math.max(1, 2 * zoom)}px ${Math.max(2, 4 * zoom)}px`;
-    el.style.borderRadius = `${3 * zoom}px`;
   };
   reposition();
 
