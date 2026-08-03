@@ -557,9 +557,15 @@ function renderCard(card) {
     ctx.font = '400 6px "Inter", system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Video', vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2);
+    ctx.fillText('V', vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2);
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
+
+    // DEBUG: big red dot at badge position
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2, 6, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // --- Trim handles (only for video/audio, outside clip) ---
