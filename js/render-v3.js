@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v3.js v=25');
+console.log('[inea] render-v3.js v=26');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2611,8 +2611,7 @@ function startCardLabelEdit(cardId) {
     + 'font-family:"Inter",system-ui,sans-serif;font-weight:700;'
     + 'color:#000;background:#fff;'
     + 'border:1px solid #aaa;outline:none;'
-    + 'overflow:hidden;white-space:nowrap;box-sizing:border-box;'
-    + 'display:flex;align-items:center;';
+    + 'overflow:hidden;white-space:nowrap;box-sizing:border-box;';
   document.body.appendChild(el);
   el.focus();
   const range = document.createRange();
@@ -2645,6 +2644,7 @@ function startCardLabelEdit(cardId) {
     el.style.top = labelScreenY + 'px';
     el.style.fontSize = fontSize + 'px';
     el.style.height = h + 'px';
+    el.style.lineHeight = h + 'px';
     el.style.width = Math.min(maxW, textW) + 'px';
     el.style.padding = padY + 'px ' + padX + 'px';
     el.style.borderRadius = br + 'px';
