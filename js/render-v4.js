@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=18');
+console.log('[inea] render-v4.js v=19');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1464,7 +1464,7 @@ function renderConnection(conn) {
 
   // Badge size proportional to card screen height (15%, lower clamp 4px)
   const cardScreenH = 116 * state.canvas.zoom;
-  const badgeH = Math.max(4, cardScreenH * 0.15);
+  const badgeH = Math.max(4, cardScreenH * 0.225);
   const s = badgeH / 12; // scale factor from baseline (H=12)
   const badgeW = Math.round(18 * s);
   const badgeR = Math.max(1, Math.round(2 * s));
