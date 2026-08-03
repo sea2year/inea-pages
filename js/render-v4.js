@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=2');
+console.log('[inea] render-v4.js v=3');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1424,10 +1424,11 @@ function renderConnection(conn) {
     const any = ay / alen;
     const arrowLen = 12 / state.canvas.zoom;
     const arrowW = 5 / state.canvas.zoom;
-    const tipX = p3.x;
-    const tipY = p3.y;
-    const baseX = tipX - anx * arrowLen;
-    const baseY = tipY - any * arrowLen;
+    // 箭头底部对齐锚点，尖端指向卡片方向
+    const baseX = p3.x;
+    const baseY = p3.y;
+    const tipX = baseX + anx * arrowLen;
+    const tipY = baseY + any * arrowLen;
     const perpX = -any * arrowW;
     const perpY = anx * arrowW;
     ctx.fillStyle = highlight ? lightenColor(gradTo) : gradTo;
@@ -1610,10 +1611,10 @@ function renderConnectionPreview() {
     const any2 = ay2 / alen2;
     const arrowLen2 = 10 / state.canvas.zoom;
     const arrowW2 = 4 / state.canvas.zoom;
-    const tip2X = p3.x;
-    const tip2Y = p3.y;
-    const base2X = tip2X - anx2 * arrowLen2;
-    const base2Y = tip2Y - any2 * arrowLen2;
+    const base2X = p3.x;
+    const base2Y = p3.y;
+    const tip2X = base2X + anx2 * arrowLen2;
+    const tip2Y = base2Y + any2 * arrowLen2;
     const perp2X = -any2 * arrowW2;
     const perp2Y = anx2 * arrowW2;
     let arrowColor;
