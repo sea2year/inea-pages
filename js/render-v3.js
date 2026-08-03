@@ -2637,13 +2637,14 @@ function startCardLabelEdit(cardId) {
       fontSize = 12 * zoom;
     }
 
-    // Width: fit text content, capped at card width
-    const maxW = Math.max(60, (getCardWidth(card) - 28) * zoom);
+    // Width: tightly fit text content, capped at card width
+    const maxW = Math.max(30, (getCardWidth(card) - 28) * zoom);
+    const textW = Math.max(20, (ta.value.length || 1) * fontSize * 0.5 + 10);
 
     Object.assign(ta.style, {
       left: (s.x + 14 * zoom) + 'px',
       top: labelScreenY + 'px',
-      width: Math.min(maxW, Math.max(60, (ta.value.length + 2) * (fontSize * 0.6))) + 'px',
+      width: Math.min(maxW, textW) + 'px',
       height: labelH + 'px',
       fontSize: fontSize + 'px',
     });
