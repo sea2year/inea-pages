@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=21');
+console.log('[inea] render-v4.js v=22');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2708,7 +2708,7 @@ function startCardLabelEdit(cardId) {
     const s = worldToScreen(card.x, card.y);
     let labelScreenY;
     if (isVideo) {
-      labelScreenY = s.y;
+      labelScreenY = s.y + (CARD_HEIGHT - CARD_LABEL_HEIGHT) * state.canvas.zoom;
     } else if (isAudio) {
       labelScreenY = s.y + (ch - 13) * state.canvas.zoom;
     } else {
