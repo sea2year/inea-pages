@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=5');
+console.log('[inea] render-v4.js v=6');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1268,7 +1268,7 @@ function renderConnection(conn) {
     const badgeW = 44 / z;
     const badgeH = 18 / z;
     const badgeR = 9 / z;
-    const labelFontSize = 11 / z;
+    const labelFontSize = 11 / Math.pow(z, 0.3);
 
     ctx.fillStyle = highlight ? '#b3d900' : '#ffffff';
     ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
@@ -1346,7 +1346,7 @@ function renderConnection(conn) {
     const badgeW = 38 / z3;
     const badgeH = 18 / z3;
     const badgeR = 9 / z3;
-    const labelFontSize = 11 / z3;
+    const labelFontSize = 11 / Math.pow(z3, 0.3);
 
     const midColor = toColors ? toColors.border : 'rgb(101,84,203)';
     ctx.fillStyle = highlight ? lightenColor(midColor) : '#ffffff';
@@ -1467,7 +1467,7 @@ function renderConnection(conn) {
   // Badge text
   const label = TRANSITION_LABELS[conn.transition] || '切';
   ctx.fillStyle = highlight ? '#ffffff' : badgeStroke;
-  ctx.font = `${isHovered ? '550' : '450'} ${11 / state.canvas.zoom}px "Inter", system-ui, sans-serif`;
+  ctx.font = `${isHovered ? '550' : '450'} ${11 / Math.pow(state.canvas.zoom, 0.3)}px "Inter", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, mid.x, mid.y);
