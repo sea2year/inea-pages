@@ -1378,7 +1378,10 @@ window.addEventListener('mousemove', (e) => {
     const dy = e.clientY - state.interaction.dragStart.y;
     state.canvas.offsetX = state.interaction.dragOffset.x + dx;
     state.canvas.offsetY = state.interaction.dragOffset.y + dy;
-    render();
+    // During playback, skip redundant render — playbackTick's rAF will handle it
+    if (!state.playback.isPlaying && state.playback.pausedAt === 0) {
+      render();
+    }
     return;
   }
 

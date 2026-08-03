@@ -1,4 +1,78 @@
 // ================================================================
+// Performance profiler (remove after debugging)
+// ================================================================
+var _perf = {
+  samples: [],
+  gridTime: 0,
+  cardTotal: 0,
+  cardCount: 0,
+  cardDrawImage: 0,
+  cardGradient: 0,
+  cardClipPath: 0,
+  cardLabelBadge: 0,
+  frameCount: 0,
+  reset() {
+    this.gridTime = 0; this.cardTotal = 0; this.cardCount = 0;
+    this.cardDrawImage = 0; this.cardGradient = 0; this.cardClipPath = 0;
+    this.cardLabelBadge = 0; this.frameCount = 0;
+  },
+  snapshot(renderMs) {
+    this.samples.push({
+      total: renderMs,
+      grid: this.gridTime,
+      cards: this.cardTotal,
+      cardN: this.cardCount,
+      drawImage: this.cardDrawImage,
+      gradient: this.cardGradient,
+      clipPath: this.cardClipPath,
+      labelBadge: this.cardLabelBadge
+    });
+    if (this.samples.length > 120) this.samples.shift();
+  }
+};
+
+function _showPerfOverlay() {
+  var el = document.getElementById('_perfOverlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '_perfOverlay';
+    el.style.cssText = 'position:fixed;top:120px;right:12px;z-index:99999;background:rgba(0,0,0,0.82);color:#0f0;font:11px/1.5 monospace;padding:10px 14px;border-radius:6px;pointer-events:none;white-space:pre;max-height:70vh;overflow:hidden';
+    document.body.appendChild(el);
+  }
+  var recent = _perf.samples.slice(-60);
+  if (!recent.length) { el.textContent = 'Profiling...'; return; }
+  var avg = function(k) {
+    var sum = 0; for (var i = 0; i < recent.length; i++) sum += recent[i][k]; return sum / recent.length;
+  };
+  var max = function(k) {
+    var m = 0; for (var i = 0; i < recent.length; i++) if (recent[i][k] > m) m = recent[i][k]; return m;
+  };
+  var zoom = state.canvas.zoom;
+  var fps = 1000 / avg('total');
+  el.textContent =
+    'ZOOM: ' + zoom.toFixed(1) + 'x  |  FPS: ' + fps.toFixed(0) + '\n' +
+    '─'.repeat(36) + '\n' +
+    'render() total:   ' + pad(avg('total').toFixed(2), 6) + 'ms  (max ' + max('total').toFixed(2) + ')\n' +
+    '  grid:           ' + pad(avg('grid').toFixed(2), 6) + 'ms\n' +
+    '  cards (' + avg('cardN').toFixed(0) + '):     ' + pad(avg('cards').toFixed(2), 6) + 'ms\n' +
+    '    └ drawImage:  ' + pad(avg('drawImage').toFixed(2), 6) + 'ms\n' +
+    '    └ gradient:   ' + pad(avg('gradient').toFixed(2), 6) + 'ms\n' +
+    '    └ clipPath:   ' + pad(avg('clipPath').toFixed(2), 6) + 'ms\n' +
+    '    └ label/badge:' + pad(avg('labelBadge').toFixed(2), 6) + 'ms';
+}
+function pad(s, n) { while (s.length < n) s = ' ' + s; return s; }
+
+function _perfRenderCard(card) {
+  renderCard(card);
+}
+
+// Render the overlay every 60 frames
+(function _perfLoop() {
+  if (_perf.samples.length > 0) _showPerfOverlay();
+  requestAnimationFrame(_perfLoop);
+})();
+
+// ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
 function renderGrid() {
@@ -43,6 +117,7 @@ function renderGrid() {
 // Rendering: Cards (called within world-space transform)
 // ================================================================
 function renderCard(card) {
+  var _ctStart = performance.now();
   const cw = getCardWidth(card);
   const ch = card.type === 'image' ? (card.height || CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT) :
              (card.type === 'video' || card.type === 'composition' || card.type === 'synthesized-video') ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
@@ -63,6 +138,7 @@ function renderCard(card) {
 
   // --- Image cards: pure image, no frame ---
   if (card.type === 'image') {
+    _perf.cardCount++;
     if (card.thumbStrip) {
       try {
         // Draw image with rounded corners
@@ -70,7 +146,9 @@ function renderCard(card) {
         ctx.beginPath();
         roundRectPath(x, y, cw, ch, 4);
         ctx.clip();
+        var _imgT0 = performance.now();
         ctx.drawImage(card.thumbStrip, x, y, cw, ch);
+        _perf.cardDrawImage += performance.now() - _imgT0;
         ctx.restore();
       } catch (e) {
         ctx.fillStyle = '#e0e0e0';
@@ -163,6 +241,9 @@ function renderCard(card) {
   }
 
   // --- Clip to card body for content (Figma: label floats above, outside clip) ---
+  var _ctPostBg = performance.now();
+  _perf.cardGradient += _ctPostBg - _ctStart;
+  _perf.cardCount++;
   ctx.save();
   ctx.beginPath();
   roundRectPath(x, bodyY, cw, bodyH, r);
@@ -526,6 +607,8 @@ function renderCard(card) {
   }
 
   ctx.restore();
+  var _ctPostDraw = performance.now();
+  _perf.cardDrawImage += _ctPostDraw - _ctPostBg;
   } // end video card content
 
   // --- Video label (Figma: above card body, outside clip) ---
@@ -805,6 +888,8 @@ function renderCard(card) {
   }
   }
   } // end video guard
+  var _ctEnd = performance.now();
+  _perf.cardLabelBadge += _ctEnd - (typeof _ctPostDraw !== 'undefined' ? _ctPostDraw : _ctPostBg);
 }
 
 function formatTime(sec) {
@@ -2313,6 +2398,8 @@ function renderEditBox(eb) {
 // Main render
 // ================================================================
 function render() {
+  var _t0 = performance.now();
+  _perf.reset();
   const dpr = window.devicePixelRatio || 1;
 
   syncFabricSizeAndTransform();
@@ -2328,7 +2415,8 @@ function render() {
   // 1. Grid — screen space (DPR only, no world transform)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   renderGrid();
-
+  _perf.gridTime = performance.now() - _t0;
+  var _tCardsStart = performance.now();
   // 2. Cards — world space, single pass in array order
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.translate(state.canvas.offsetX, state.canvas.offsetY);
@@ -2370,8 +2458,9 @@ function render() {
   ctx.save();
   if (editingEbId) ctx.globalAlpha = 0.25;
   for (const card of state.cards) {
-    if (!collapsedCardIds.has(card.id)) renderCard(card);
+    if (!collapsedCardIds.has(card.id)) { _perfRenderCard(card); }
   }
+  _perf.cardTotal = performance.now() - _tCardsStart;
   ctx.restore();
 
   // 2.5 Marker cards — orange dashed vertical lines at keyframe positions
@@ -2425,6 +2514,7 @@ function render() {
   renderLayerList();
   updateInspector();
   renderTransformOverlay();
+  _perf.snapshot(performance.now() - _t0);
 }
 
 function updateStatusBar() {
