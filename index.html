@@ -217,28 +217,35 @@
   ];
 
   window.addEventListener('DOMContentLoaded', async function() {
-    for (var i = 0; i < mediaFiles.length; i++) {
-      var mf = mediaFiles[i];
-      try {
-        loadingText.textContent = mf.name;
-        var resp = await fetch(mf.path);
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        var blob = await resp.blob();
-        var file = new File([blob], mf.name, {
-          type: mf.type === 'video' ? 'video/mp4' : 'audio/mpeg'
-        });
-        if (mf.type === 'video') {
-          await importVideoFile(file);
-        } else {
-          await importAudioFile(file);
-        }
-      } catch (e) {
-        console.error('Load failed:', mf.path, e);
-      }
-      setFill((i + 1) / 4);
-    }
+    var done = 0;
+    var total = mediaFiles.length;
 
-    loadingText.textContent = state.cards.length + ' / ' + mediaFiles.length;
+    var tasks = mediaFiles.map(function(mf) {
+      return (async function() {
+        try {
+          var resp = await fetch(mf.path);
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          var blob = await resp.blob();
+          var file = new File([blob], mf.name, {
+            type: mf.type === 'video' ? 'video/mp4' : 'audio/mpeg'
+          });
+          if (mf.type === 'video') {
+            await importVideoFile(file);
+          } else {
+            await importAudioFile(file);
+          }
+        } catch (e) {
+          console.error('Load failed:', mf.path, e);
+        }
+        done++;
+        loadingText.textContent = mf.name + ' (' + done + '/' + total + ')';
+        setFill(done / total);
+      })();
+    });
+
+    await Promise.allSettled(tasks);
+
+    loadingText.textContent = state.cards.length + ' / ' + total;
     enterBtn.classList.add('visible');
 
     enterBtn.addEventListener('click', function() {
