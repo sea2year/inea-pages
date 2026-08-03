@@ -1272,7 +1272,7 @@ function renderConnection(conn) {
     const dpr2 = window.devicePixelRatio || 1;
     ctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
 
-    const badgeW = 44, badgeH = 18, badgeR = 9;
+    const badgeW = 32, badgeH = 14, badgeR = 7;
     ctx.fillStyle = highlight ? '#b3d900' : '#ffffff';
     ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
     ctx.lineWidth = 1.2;
@@ -1294,7 +1294,7 @@ function renderConnection(conn) {
 
     // Delete button when hovered
     if (isHovered) {
-      const delR = 7, delX = sx + badgeW / 2 + 8, delY = sy;
+      const delR = 6, delX = sx + badgeW / 2 + 6, delY = sy;
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#e04040';
       ctx.lineWidth = 1.2;
@@ -1304,7 +1304,7 @@ function renderConnection(conn) {
       ctx.stroke();
       ctx.strokeStyle = '#e04040';
       ctx.lineWidth = 1.2;
-      const xPad = 2.2;
+      const xPad = 1.8;
       ctx.beginPath();
       ctx.moveTo(delX - xPad, delY - xPad);
       ctx.lineTo(delX + xPad, delY + xPad);
@@ -1353,7 +1353,7 @@ function renderConnection(conn) {
     const dpr2 = window.devicePixelRatio || 1;
     ctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
 
-    const badgeW = 38, badgeH = 18, badgeR = 9;
+    const badgeW = 28, badgeH = 14, badgeR = 7;
     const midColor = toColors ? toColors.border : 'rgb(101,84,203)';
     ctx.fillStyle = highlight ? lightenColor(midColor) : '#ffffff';
     ctx.strokeStyle = highlight ? lightenColor(midColor) : midColor;
@@ -1376,7 +1376,7 @@ function renderConnection(conn) {
 
     // Delete button when hovered
     if (isHovered) {
-      const delR = 7, delX = sx + badgeW / 2 + 8, delY = sy;
+      const delR = 6, delX = sx + badgeW / 2 + 6, delY = sy;
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#e04040';
       ctx.lineWidth = 1.2;
@@ -1386,7 +1386,7 @@ function renderConnection(conn) {
       ctx.stroke();
       ctx.strokeStyle = '#e04040';
       ctx.lineWidth = 1.2;
-      const xPad = 2.2;
+      const xPad = 1.8;
       ctx.beginPath();
       ctx.moveTo(delX - xPad, delY - xPad);
       ctx.lineTo(delX + xPad, delY + xPad);
@@ -1462,7 +1462,7 @@ function renderConnection(conn) {
   const dpr2 = window.devicePixelRatio || 1;
   ctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
 
-  const badgeW = 28, badgeH = 18, badgeR = 2;
+  const badgeW = 22, badgeH = 14, badgeR = 2;
 
   // Badge background — use right card color
   const badgeColor = toColors ? toColors.badgeFill : 'rgb(202, 193, 254)';
@@ -1490,8 +1490,8 @@ function renderConnection(conn) {
 
   // Delete button (visible when hovered)
   if (isHovered) {
-    const delR = 7;
-    const delX = sx + badgeW / 2 + 8;
+    const delR = 6;
+    const delX = sx + badgeW / 2 + 6;
     const delY = sy;
 
     // Outer circle
@@ -1506,7 +1506,7 @@ function renderConnection(conn) {
     // X mark
     ctx.strokeStyle = '#e04040';
     ctx.lineWidth = 1.2;
-    const xPad = 2.2;
+    const xPad = 1.8;
     ctx.beginPath();
     ctx.moveTo(delX - xPad, delY - xPad);
     ctx.lineTo(delX + xPad, delY + xPad);
