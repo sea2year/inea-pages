@@ -227,23 +227,30 @@ function extractDominantColor(stripCanvas) {
     }
   }
 
+  let rr, gg, bb;
+
   if (bestBucket && totalCount > 0) {
-    return {
-      r: Math.round(bestBucket.r / bestBucket.count),
-      g: Math.round(bestBucket.g / bestBucket.count),
-      b: Math.round(bestBucket.b / bestBucket.count)
-    };
+    rr = Math.round(bestBucket.r / bestBucket.count);
+    gg = Math.round(bestBucket.g / bestBucket.count);
+    bb = Math.round(bestBucket.b / bestBucket.count);
+  } else if (totalCount > 0) {
+    rr = Math.round(totalR / totalCount);
+    gg = Math.round(totalG / totalCount);
+    bb = Math.round(totalB / totalCount);
+  } else {
+    return { r: 128, g: 128, b: 128 };
   }
 
-  if (totalCount > 0) {
-    return {
-      r: Math.round(totalR / totalCount),
-      g: Math.round(totalG / totalCount),
-      b: Math.round(totalB / totalCount)
-    };
+  // Clamp brightness ceiling: prevent accent colors from blending into white bg
+  const lum = 0.299 * rr + 0.587 * gg + 0.114 * bb;
+  if (lum > 140) {
+    const scale = 140 / lum;
+    rr = Math.round(rr * scale);
+    gg = Math.round(gg * scale);
+    bb = Math.round(bb * scale);
   }
 
-  return { r: 128, g: 128, b: 128 };
+  return { r: rr, g: gg, b: bb };
 }
 
 // ================================================================
