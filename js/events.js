@@ -20,9 +20,7 @@ canvasWrap.addEventListener('wheel', (e) => {
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
 
-  // When edit box is active, Fabric handles all interaction — don't zoom/pan
-  if (state.interaction.activeEditBoxId) return;
-
+  // Allow zoom/pan via scroll wheel even in edit mode
   const isZoom = e.metaKey || e.ctrlKey;
 
   if (isZoom) {
@@ -86,10 +84,11 @@ canvasWrap.addEventListener('mousedown', (e) => {
         evented: true,
         hasControls: true,
         hasBorders: true,
-        editingBorderColor: '#D4FF00',
-        cursorColor: '#D4FF00',
+        centeredRotation: true,
+        editingBorderColor: '#88C405',
+        cursorColor: '#88C405',
         cursorWidth: 1.5,
-        selectionColor: 'rgba(212,255,0,0.25)'
+        selectionColor: 'rgba(136,196,5,0.25)'
       });
       fabricCanvas.add(textObj);
 
@@ -155,17 +154,13 @@ canvasWrap.addEventListener('mousedown', (e) => {
             id, shapeType: 'line',
             x1: d.startX, y1: d.startY,
             x2: d.currentX, y2: d.currentY,
-            stroke: '#D4FF00', strokeWidth: 2, opacity: 1
+            stroke: '#88C405', strokeWidth: 2, opacity: 1
           };
           pushUndo();
           if (lineEBId) {
-            // Convert world coords to edit-box-local
+            // Lines stored in world coords
             const eb = findEditBoxById(lineEBId);
             if (eb) {
-              const p1 = _eboxWorldToLocal(eb, shapeEntry.x1, shapeEntry.y1);
-              const p2 = _eboxWorldToLocal(eb, shapeEntry.x2, shapeEntry.y2);
-              shapeEntry.x1 = p1.x; shapeEntry.y1 = p1.y;
-              shapeEntry.x2 = p2.x; shapeEntry.y2 = p2.y;
               eb.shapes = eb.shapes || [];
               eb.shapes.push(shapeEntry);
             }
@@ -204,7 +199,7 @@ canvasWrap.addEventListener('mousedown', (e) => {
       if (!pathDraw) {
         // First point — create fabric Path
         const path = new fabric.Path(`M ${world.x} ${world.y}`, {
-          stroke: '#D4FF00', strokeWidth: 2 / state.canvas.zoom,
+          stroke: '#88C405', strokeWidth: 2 / state.canvas.zoom,
           strokeUniform: true, fill: '',
           selectable: false, evented: false
         });
@@ -306,10 +301,12 @@ canvasWrap.addEventListener('mousedown', (e) => {
   const overFabric = _isOverFabricShape(e.clientX, e.clientY);
   const hit = hitTest(sx, sy);
 
-  // Edit box active: click on Fabric shape or within the active edit box → forward to Fabric
+  // Edit box active: click within the active edit box → forward ALL events to Fabric
+  // until mouseup. Don't rely on _isOverFabricShape (it has center-coord issues).
   if (state.interaction.activeEditBoxId) {
     const inActiveEditBox = hit.editBoxId === state.interaction.activeEditBoxId;
     if (overFabric || inActiveEditBox) {
+      state.interaction._fabricForwarding = true;
       _forwardToFabric('mousedown', e);
       return;
     }
@@ -371,6 +368,12 @@ canvasWrap.addEventListener('mousedown', (e) => {
         const eb = state.editBoxes.find(e => e.id === ebid);
         if (eb) state.interaction.editBoxStartPos.set(ebid, { x: eb.x, y: eb.y });
       }
+      // Snapshot shape coords for real-time update during drag
+      state.interaction._eboxShapeSnap = {};
+      for (const ebid of state.selection.editBoxIds) {
+        const eb = state.editBoxes.find(e => e.id === ebid);
+        if (eb) state.interaction._eboxShapeSnap[ebid] = JSON.parse(JSON.stringify(eb.shapes || []));
+      }
       render();
       return;
     }
@@ -392,6 +395,12 @@ canvasWrap.addEventListener('mousedown', (e) => {
       for (const ebid of state.selection.editBoxIds) {
         const eb = state.editBoxes.find(e => e.id === ebid);
         if (eb) state.interaction.editBoxStartPos.set(ebid, { x: eb.x, y: eb.y });
+      }
+      // Snapshot shape coords for real-time update during drag
+      state.interaction._eboxShapeSnap = {};
+      for (const ebid of state.selection.editBoxIds) {
+        const eb = state.editBoxes.find(e => e.id === ebid);
+        if (eb) state.interaction._eboxShapeSnap[ebid] = JSON.parse(JSON.stringify(eb.shapes || []));
       }
       render();
       return;
@@ -468,6 +477,21 @@ canvasWrap.addEventListener('mousedown', (e) => {
           }
         });
       }
+      // Snapshot shape data for updating eb.shapes after drag
+      state.interaction._eboxShapeDataSnap = JSON.parse(JSON.stringify(eb.shapes || []));
+      // Find all edit boxes connected via eb-keyframe connections (for group move)
+      state.interaction._eboxGroupDrag = null;
+      const connectedEbIds = findConnectedEditBoxes(hit.editBoxId);
+      if (connectedEbIds.length > 1) {
+        const groupPositions = {};
+        for (const cid of connectedEbIds) {
+          const ceb = findEditBoxById(cid);
+          if (ceb) {
+            groupPositions[cid] = { x: ceb.x, y: ceb.y, shapesSnap: JSON.parse(JSON.stringify(ceb.shapes || [])) };
+          }
+        }
+        state.interaction._eboxGroupDrag = { ids: connectedEbIds, starts: groupPositions };
+      }
     };
 
     // Title click: always start immediate drag
@@ -503,6 +527,11 @@ canvasWrap.addEventListener('mousedown', (e) => {
         // Double-click → enter edit mode
         state.interaction._eboxLastClickTime = 0;
         state.interaction._eboxLastClickId = null;
+        // Save and exit any previously active edit box before entering
+        if (state.interaction.activeEditBoxId) {
+          const prevEB = findEditBoxById(state.interaction.activeEditBoxId);
+          if (prevEB) _exitEditBoxOnFabric(prevEB);
+        }
         state.interaction.activeEditBoxId = hit.editBoxId;
         _enterEditBoxOnFabric(eb);
         setDrawingTool('select');
@@ -558,6 +587,20 @@ canvasWrap.addEventListener('mousedown', (e) => {
     state.selection.cardIds = [];
     state.selection.connectionIds = [];
     state.selection.connectionId = null;
+    render();
+    return;
+  }
+
+  // Timeline progress dot scrub — drag to scrub through eb-chain playback
+  if (hit.type === 'timeline-progress') {
+    const pb = state.playback;
+    if (!pb || pb.isPlaying || pb.playbackMode !== 'eb-chain') return;
+    const tl = state._ebTimelines && state._ebTimelines[hit.timelineKey];
+    if (!tl) return;
+    state.interaction.mode = 'timeline-progress-drag';
+    state.interaction.dragStart = { x: e.clientX, y: e.clientY };
+    state.interaction._progressDragTl = tl;
+    state.interaction._progressDragStartProgress = pb._ebChainProgress || 0;
     render();
     return;
   }
@@ -622,14 +665,36 @@ canvasWrap.addEventListener('mousedown', (e) => {
     render();
   } else if (hit.type === 'editbox-anchor') {
     if (state.interaction._autoPaused) { render(); return; }
-    // Click on existing eb-keyframe diamond → select the connection
+    // If the anchor has an existing keyframe connection, start drag-pending
+    // (drag = horizontal move; click = select connection)
     if (hit._kfConnId) {
-      state.selection.connectionId = hit._kfConnId;
-      state.selection.connectionIds = [hit._kfConnId];
+      const eb = findEditBoxById(hit.editBoxId);
+      if (!eb) return;
+      pushUndo();
+      // Reuse the same drag setup as editbox-body drag, but force solo (no group movement)
+      state.interaction.mode = 'editbox-drag-pending';
+      state.interaction.dragStart = { x: e.clientX, y: e.clientY };
+      state.interaction.dragStartWorld = screenToWorld(sx, sy);
+      state.interaction._eboxDragStartX = eb.x;
+      state.interaction._eboxDragStartY = eb.y;
+      state.interaction.dragEditBoxId = hit.editBoxId;
+      state.interaction._eboxShapeStartPos = [];
+      if (fabricCanvas) {
+        fabricCanvas.getObjects().forEach(obj => {
+          if (obj._isEditBoxShape && obj._editBoxId === eb.id) {
+            state.interaction._eboxShapeStartPos.push({ obj, left: obj.left, top: obj.top });
+          }
+        });
+      }
+      state.interaction._eboxShapeDataSnap = JSON.parse(JSON.stringify(eb.shapes || []));
+      state.interaction._eboxGroupDrag = null; // Force solo drag — no group movement
+      state.interaction._anchorKfConnId = hit._kfConnId;
+      state.selection.editBoxId = hit.editBoxId;
       state.selection.cardIds = [];
       state.selection.groupIds = [];
       state.selection.editBoxIds = [];
-      state.selection.editBoxId = null;
+      state.selection.connectionId = null;
+      state.selection.connectionIds = [];
       render();
       return;
     }
@@ -850,11 +915,32 @@ canvasWrap.addEventListener('mousedown', (e) => {
     // Apply initial volume from click position (vertical slider)
     const world = screenToWorld(sx, sy);
     const _isAudio = card.type === 'audio';
-    const _volTrackY = _isAudio ? card.y + 3 / state.canvas.zoom : card.y + CARD_THUMB_HEIGHT + 8;
-    const _volTrackH = _isAudio ? CARD_WAVEFORM_HEIGHT - 6 / state.canvas.zoom : CARD_WAVEFORM_HEIGHT - 16;
+    const _wfY = _isAudio ? card.y : card.y + CARD_THUMB_HEIGHT;
+    const _wfH = CARD_WAVEFORM_HEIGHT;
+    const _volTrackY = _wfY + 8;
+    const _volTrackH = _wfH - 16;
     const frac = 1 - (world.y - _volTrackY) / _volTrackH;
     card.volume = Math.round(Math.max(0, Math.min(1, frac)) * 100) / 100;
     render();
+  } else if (hit.type === 'card-label') {
+    state.selection.connectionId = null;
+    state.selection.groupIds = [];
+    state.selection.shapeId = null;
+    if (fabricCanvas) { fabricCanvas.discardActiveObject(); fabricCanvas.requestRenderAll(); }
+    state.selection.cardIds = [hit.cardId];
+    // Double-click detection for label editing
+    const labelNow = Date.now();
+    const labelPrev = state.interaction._lastLabelClick || 0;
+    const labelPrevId = state.interaction._lastLabelClickId;
+    state.interaction._lastLabelClick = labelNow;
+    state.interaction._lastLabelClickId = hit.cardId;
+    if (labelNow - labelPrev < 400 && labelPrevId === hit.cardId) {
+      render();
+      setTimeout(() => startCardLabelEdit(hit.cardId), 60);
+      return;
+    }
+    render();
+    return;
   } else if (hit.type === 'card-body') {
     state.selection.connectionId = null;
     state.selection.groupIds = [];
@@ -881,6 +967,13 @@ canvasWrap.addEventListener('mousedown', (e) => {
         seekPlayheadToCard(state.selection.cardIds[0]);
         _recompositePreviewForTransform();
         renderTransformOverlay();
+      } else {
+        // Standalone video card (not in any group)
+        const selCard = state.cards.find(c => c.id === state.selection.cardIds[0]);
+        if (selCard && selCard.type === 'video' && !selCard.groupId) {
+          _recompositePreviewForTransform();
+          renderTransformOverlay();
+        }
       }
     }
     // Look up the card once for double-click + drag logic
@@ -899,9 +992,7 @@ canvasWrap.addEventListener('mousedown', (e) => {
     }
     // If auto-paused, just select without dragging
     if (state.interaction._autoPaused) {
-      console.log('[DEBUG] card-body: _autoPaused → render() upcoming, sel=' + JSON.stringify(state.selection.cardIds));
       render();
-      console.log('[DEBUG] card-body: render() done');
       return;
     }
     // Start drag
@@ -1087,9 +1178,9 @@ window.addEventListener('mousemove', (e) => {
   // Skip reentrant calls triggered by our own Fabric event forwarding
   if (typeof _isForwarding !== 'undefined' && _isForwarding) return;
 
-  // If Fabric is mid-transform or mid rubber-band selection, forward event to Fabric
-  // but also continue processing 2D rubber-band below (card selection)
-  if (_isFabricBusy()) {
+  // If Fabric is mid-transform, mid rubber-band selection, or we're in
+  // edit-box forwarding mode → forward event to Fabric.
+  if (_isFabricBusy() || state.interaction._fabricForwarding) {
     _forwardToFabric('mousemove', e);
     // Fall through to 2D rubber-band update if active
   }
@@ -1205,20 +1296,71 @@ window.addEventListener('mousemove', (e) => {
     }
   }
 
-  // Dragging edit box — move the box + its Fabric shapes
+  // Dragging edit box — move the box + its connected boxes + shapes
   if (state.interaction.mode === 'dragging-editbox') {
     const worldNow = screenToWorld(sx, sy);
-    const dx = worldNow.x - state.interaction.dragStartWorld.x;
-    const dy = worldNow.y - state.interaction.dragStartWorld.y;
-    const eb = findEditBoxById(state.interaction.dragEditBoxId);
-    if (eb) {
-      eb.x = state.interaction._eboxDragStartX + dx;
-      eb.y = state.interaction._eboxDragStartY + dy;
-      // Move Fabric shapes from their start positions
+    let dx = worldNow.x - state.interaction.dragStartWorld.x;
+    let dy = worldNow.y - state.interaction.dragStartWorld.y;
+    // Anchor drag: horizontal only, lock Y
+    if (state.interaction._anchorKfConnId) dy = 0;
+    const group = state.interaction._eboxGroupDrag;
+    if (group) {
+      // Move all connected edit boxes together
+      for (const [cid, start] of Object.entries(group.starts)) {
+        const ceb = findEditBoxById(cid);
+        if (ceb) {
+          ceb.x = start.x + dx;
+          ceb.y = start.y + dy;
+          // Update shapes from snapshot
+          ceb.shapes = start.shapesSnap.map(s => {
+            const c = { ...s };
+            if (c.shapeType === 'line') {
+              if (c.x1 != null) c.x1 += dx;
+              if (c.x2 != null) c.x2 += dx;
+              if (c.y1 != null) c.y1 += dy;
+              if (c.y2 != null) c.y2 += dy;
+            } else {
+              if (c.left != null) c.left += dx;
+              if (c.top != null) c.top += dy;
+            }
+            return c;
+          });
+        }
+      }
+      // Also move Fabric shapes for the actively edited box
       const shapeStarts = state.interaction._eboxShapeStartPos || [];
       for (const s of shapeStarts) {
         s.obj.set({ left: s.left + dx, top: s.top + dy });
         s.obj.setCoords();
+      }
+    } else {
+      const eb = findEditBoxById(state.interaction.dragEditBoxId);
+      if (eb) {
+        eb.x = state.interaction._eboxDragStartX + dx;
+        eb.y = state.interaction._eboxDragStartY + dy;
+        // Move Fabric shapes from their start positions
+        const shapeStarts = state.interaction._eboxShapeStartPos || [];
+        for (const s of shapeStarts) {
+          s.obj.set({ left: s.left + dx, top: s.top + dy });
+          s.obj.setCoords();
+        }
+        // Real-time update eb.shapes from snapshot + delta
+        const snap = state.interaction._eboxShapeDataSnap;
+        if (snap) {
+          eb.shapes = snap.map(s => {
+            const c = { ...s };
+            if (c.shapeType === 'line') {
+              if (c.x1 != null) c.x1 += dx;
+              if (c.x2 != null) c.x2 += dx;
+              if (c.y1 != null) c.y1 += dy;
+              if (c.y2 != null) c.y2 += dy;
+            } else {
+              if (c.left != null) c.left += dx;
+              if (c.top != null) c.top += dy;
+            }
+            return c;
+          });
+        }
       }
     }
     render();
@@ -1237,6 +1379,27 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
+  // Timeline progress scrub
+  if (state.interaction.mode === 'timeline-progress-drag') {
+    const tl = state.interaction._progressDragTl;
+    const pb = state.playback;
+    if (!tl || !pb || !pb._ebChain) return;
+    const worldNow = screenToWorld(sx, sy);
+    const progress = Math.max(0, Math.min(1, (worldNow.x - tl.x) / Math.max(1, tl.w)));
+    pb._ebChainProgress = progress;
+    pb.pausedAt = progress * pb.totalDuration;
+    // Recompute interpolated shapes at new progress
+    const chainData = pb._ebChain;
+    const card = { editBoxChain: chainData.chain, totalDuration: pb.totalDuration };
+    const frame = computeSynthFrame(card, progress);
+    if (frame) {
+      chainData._currentInterp = frame.shapes;
+      chainData._currentViewport = frame.viewport;
+    }
+    render();
+    return;
+  }
+
   // If a drawing tool is active, no hover updates on main canvas
   if (state.drawingTool !== 'select') return;
 
@@ -1245,7 +1408,10 @@ window.addEventListener('mousemove', (e) => {
     const dy = e.clientY - state.interaction.dragStart.y;
     state.canvas.offsetX = state.interaction.dragOffset.x + dx;
     state.canvas.offsetY = state.interaction.dragOffset.y + dy;
-    render();
+    // During playback, skip redundant render — playbackTick's rAF will handle it
+    if (!state.playback.isPlaying && state.playback.pausedAt === 0) {
+      render();
+    }
     return;
   }
 
@@ -1364,6 +1530,28 @@ window.addEventListener('mousemove', (e) => {
       for (const [ebid, startPos] of state.interaction.editBoxStartPos) {
         const eb = state.editBoxes.find(e => e.id === ebid);
         if (eb) { eb.x = startPos.x + effectiveDx; eb.y = startPos.y + effectiveDy; }
+      }
+      // Real-time update eb.shapes[] from snapshot + delta
+      const snap = state.interaction._eboxShapeSnap;
+      if (snap) {
+        for (const [ebid, startPos] of state.interaction.editBoxStartPos) {
+          const eb = state.editBoxes.find(e => e.id === ebid);
+          const orig = snap[ebid];
+          if (!eb || !orig) continue;
+          const ddx = eb.x - startPos.x;
+          const ddy = eb.y - startPos.y;
+          eb.shapes = orig.map(s => {
+            const c = { ...s };
+            if (c.shapeType === 'line') {
+              if (c.x1 != null) c.x1 += ddx; if (c.x2 != null) c.x2 += ddx;
+              if (c.y1 != null) c.y1 += ddy; if (c.y2 != null) c.y2 += ddy;
+            } else {
+              if (c.left != null) c.left += ddx;
+              if (c.top != null) c.top += ddy;
+            }
+            return c;
+          });
+        }
       }
     }
     // Move collapsed groups alongside cards during unified drag
@@ -1503,8 +1691,10 @@ window.addEventListener('mousemove', (e) => {
     if (!card) return;
     const world = screenToWorld(sx, sy);
     const isAudio = card.type === 'audio';
-    const volTrackY = isAudio ? card.y + 3 / state.canvas.zoom : card.y + CARD_THUMB_HEIGHT + 8;
-    const volTrackH = isAudio ? CARD_WAVEFORM_HEIGHT - 6 / state.canvas.zoom : CARD_WAVEFORM_HEIGHT - 16;
+    const wfY = isAudio ? card.y : card.y + CARD_THUMB_HEIGHT;
+    const wfH = CARD_WAVEFORM_HEIGHT;
+    const volTrackY = wfY + 8;
+    const volTrackH = wfH - 16;
     // Vertical: top = 100%, bottom = 0%
     const frac = 1 - (world.y - volTrackY) / volTrackH;
     card.volume = Math.round(Math.max(0, Math.min(1, frac)) * 100) / 100;
@@ -1695,6 +1885,8 @@ window.addEventListener('mousemove', (e) => {
     _setCanvasCursor('grab');
   } else if (hit.type === 'group-body') {
     _setCanvasCursor('default');
+  } else if (hit.type === 'card-label') {
+    _setCanvasCursor('text');
   } else if (hit.type === 'card-body') {
     _setCanvasCursor('pointer');
   } else if (hit.type === 'playhead') {
@@ -1728,10 +1920,10 @@ window.addEventListener('mouseup', (e) => {
   // Line drawing mode — wait for second click, don't reset on mouseup
   if (state.interaction.mode === 'drawing-line') return;
 
-  // If Fabric is mid-transform, forward mouseup to Fabric
-  // but also continue processing 2D rubber-band end below
-  if (_isFabricBusy()) {
+  // If Fabric is mid-transform or in edit-box forwarding mode → forward mouseup
+  if (_isFabricBusy() || state.interaction._fabricForwarding) {
     _forwardToFabric('mouseup', e);
+    state.interaction._fabricForwarding = false;
     // Fall through to 2D rubber-band end
   }
 
@@ -1746,10 +1938,44 @@ window.addEventListener('mouseup', (e) => {
 
   // End edit box dragging (or clear pending drag)
   if (state.interaction.mode === 'dragging-editbox' || state.interaction.mode === 'editbox-drag-pending' || state.interaction.mode === 'timeline-dot-drag') {
+    // Anchor click (no significant drag) → select the connection
+    if (state.interaction.mode === 'editbox-drag-pending' && state.interaction._anchorKfConnId) {
+      state.selection.connectionId = state.interaction._anchorKfConnId;
+      state.selection.connectionIds = [state.interaction._anchorKfConnId];
+      state.selection.cardIds = [];
+      state.selection.groupIds = [];
+      state.selection.editBoxIds = [];
+      state.selection.editBoxId = null;
+    }
     state.interaction.mode = 'idle';
     state.interaction._eboxShapeStartPos = null;
+    state.interaction._eboxShapeDataSnap = null;
+    state.interaction._eboxGroupDrag = null;
     state.interaction._dotDragEbId = null;
     state.interaction._dotDragStartX = null;
+    state.interaction._anchorKfConnId = null;
+    // Update eb-keyframe connection durations after edit box drag
+    const draggedEb = findEditBoxById(state.interaction.dragEditBoxId);
+    if (draggedEb) {
+      for (const c of state.connections) {
+        if (c.type !== 'eb-keyframe') continue;
+        if (c.fromEditBoxId !== draggedEb.id && c.toEditBoxId !== draggedEb.id) continue;
+        const fromEb = findEditBoxById(c.fromEditBoxId);
+        const toEb = findEditBoxById(c.toEditBoxId);
+        if (fromEb && toEb) {
+          c.transitionDuration = Math.abs(toEb.x - fromEb.x) / PIXELS_PER_SECOND;
+        }
+      }
+    }
+    render();
+    return;
+  }
+
+  // End timeline progress scrub
+  if (state.interaction.mode === 'timeline-progress-drag') {
+    state.interaction.mode = 'idle';
+    state.interaction._progressDragTl = null;
+    state.interaction._progressDragStartProgress = null;
     render();
     return;
   }
@@ -1782,9 +2008,10 @@ window.addEventListener('mouseup', (e) => {
         evented: true,
         hasControls: true,
         hasBorders: true,
+        centeredRotation: true,
         lockUniScaling: false,
-        fill: 'rgba(212,255,0,0.15)',
-        stroke: '#D4FF00'
+        fill: 'rgba(136,196,5,0.15)',
+        stroke: '#88C405'
       });
       obj.setCoords();
 
@@ -1912,52 +2139,48 @@ window.addEventListener('mouseup', (e) => {
             easing: 'ease-in-out',
             properties: ['opacity', 'transformScale', 'transformX', 'transformY']
           });
+          // Auto-snap target card flush against source card
+          toCard.x = fromCard.x + getCardWidth(fromCard);
           // Auto-select the new connection so the user can configure properties immediately
           state.selection.connectionId = connId;
           state.selection.cardIds = [];
           state.selection.groupIds = [];
           updateInspector();
         } else {
-        const fromCenterX = fromCard.x + getCardWidth(fromCard) / 2;
-        const toCenterX = toCard.x + getCardWidth(toCard) / 2;
-        const toSide = fromCenterX < toCenterX ? 'left' : 'right';
-        const compatible = (fromSide === 'right' && toSide === 'left') ||
-                           (fromSide === 'left' && toSide === 'right');
-        if (compatible) {
-          const connId = 'conn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-          let transDur = 0.5;
-          if (fromCard && toCard) {
-            // Normalize: always left-to-right for gap calculation
-            const fromIsLeft = fromCard.x <= toCard.x;
-            const leftCard = fromIsLeft ? fromCard : toCard;
-            const rightCard = fromIsLeft ? toCard : fromCard;
-            const leftEndX = leftCard.x + getCardWidth(leftCard);
-            let gap = rightCard.x - leftEndX;
-
-            // Clamp card positions to valid gap range
-            if (gap > MAX_TRANSITION_GAP) {
-              leftCard.x = rightCard.x - getCardWidth(leftCard) - MAX_TRANSITION_GAP;
-              gap = MAX_TRANSITION_GAP;
-            } else if (gap < MIN_TRANSITION_GAP) {
-              rightCard.x = leftCard.x + getCardWidth(leftCard) + MIN_TRANSITION_GAP;
-              gap = MIN_TRANSITION_GAP;
-            }
-
-            transDur = Math.max(0.5, Math.min(5, gap / PIXELS_PER_SECOND));
-          }
-          const isTween = state.interaction._isTweenConnection;
-          state.connections.push({
-            id: connId,
-            fromCardId: fromCard.id,
-            fromSide,
-            toCardId: toCard.id,
-            toSide,
-            type: isTween ? 'tween' : 'transition',
-            transition: isTween ? 'cut' : 'dissolve',
-            transitionDuration: isTween ? 0 : Math.round(transDur * 10) / 10,
-            easing: 'linear'
-          });
+        // Always connect left→right, regardless of drag direction
+        let leftCard = fromCard;
+        let rightCard = toCard;
+        if (fromCard.x + getCardWidth(fromCard) / 2 > toCard.x + getCardWidth(toCard) / 2) {
+          leftCard = toCard;
+          rightCard = fromCard;
         }
+        const connId = 'conn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        let transDur = 0.5;
+        const fromEndX = leftCard.x + getCardWidth(leftCard);
+        let gap = rightCard.x - fromEndX;
+
+        // Clamp card positions to valid gap range
+        if (gap > MAX_TRANSITION_GAP) {
+          leftCard.x = rightCard.x - getCardWidth(leftCard) - MAX_TRANSITION_GAP;
+          gap = MAX_TRANSITION_GAP;
+        } else if (gap < MIN_TRANSITION_GAP) {
+          rightCard.x = leftCard.x + getCardWidth(leftCard) + MIN_TRANSITION_GAP;
+          gap = MIN_TRANSITION_GAP;
+        }
+
+        transDur = Math.max(0.5, Math.min(5, gap / PIXELS_PER_SECOND));
+        const isTween = state.interaction._isTweenConnection;
+        state.connections.push({
+          id: connId,
+          fromCardId: leftCard.id,
+          fromSide: 'right',
+          toCardId: rightCard.id,
+          toSide: 'left',
+          type: isTween ? 'tween' : 'transition',
+          transition: isTween ? 'cut' : 'dissolve',
+          transitionDuration: isTween ? 0 : Math.round(transDur * 10) / 10,
+          easing: 'linear'
+        });
         }
       }
     }
@@ -2140,7 +2363,7 @@ window.addEventListener('mouseup', (e) => {
       }
     }
   }
-  // If cards were dropped outside all groups, remove them from fixed-mode groups if dragged outside the frame
+  // If cards were dropped outside all groups, remove from fixed-mode groups if dragged outside the frame
   if ((state.interaction.mode === 'dragging-card' || state.interaction.mode === 'dragging-group')
       && !state.interaction.dropTargetGroupId) {
     for (const [cid] of state.interaction.cardStartPos) {
@@ -2200,6 +2423,7 @@ window.addEventListener('mouseup', (e) => {
     state.interaction.dropTargetGroupId = null;
     state.interaction._fabricStartPos = null;
     state.interaction.editBoxStartPos = null;
+    state.interaction._eboxShapeSnap = null;
     state.interaction._groupStartPosForUnified = null;
     state.interaction.dragMarkerCardId = null;
     state.interaction._markerDragStartX = 0;
@@ -2242,7 +2466,7 @@ function showContextMenu(clientX, clientY, hit) {
       } else {
         html += `<div class="cm-item" data-action="rename">重命名</div>`;
       }
-      if (card.type === 'video' || card.type === 'audio' || card.type === 'bgm') {
+      if (card.type === 'video' || card.type === 'audio' || card.type === 'bgm' || card.type === 'synthesized-video') {
         html += `<div class="cm-sep"></div>`;
         const pb = state.playback;
         let pausedOnThisCard = false;
@@ -2254,21 +2478,22 @@ function showContextMenu(clientX, clientY, hit) {
         }
         html += `<div class="cm-item${pausedOnThisCard ? '' : ' disabled'}" data-action="cut-at-playhead">裁剪到此处</div>`;
         html += `<div class="cm-item" data-action="reset-trim">重置裁剪</div>`;
-        html += `<div class="cm-item" data-action="replace-content">替换素材...</div>`;
+        if (card.type !== 'synthesized-video') {
+          html += `<div class="cm-item" data-action="replace-content">替换素材...</div>`;
+        }
+        html += `<div class="cm-item" data-action="locate-eb-chain">定位编辑盒链</div>`;
       }
       if (card.type === 'composition') {
         html += `<div class="cm-sep"></div>`;
         html += `<div class="cm-item" data-action="locate-editbox">定位编辑盒</div>`;
       }
-      if (card.type === 'synthesized-video') {
+      if (card.type === 'image') {
         html += `<div class="cm-sep"></div>`;
-        html += `<div class="cm-item" data-action="locate-eb-chain">定位编辑盒链</div>`;
+        html += `<div class="cm-item" data-action="convert-to-still-video">转为静止视频卡片</div>`;
       }
       html += `<div class="cm-sep"></div>`;
       if (card.type === 'composition') {
         html += `<div class="cm-item danger" data-action="delete-comp-card">删除</div>`;
-      } else if (card.type === 'synthesized-video') {
-        html += `<div class="cm-item danger" data-action="delete-card">删除</div>`;
       } else {
         html += `<div class="cm-item danger" data-action="delete-card">删除</div>`;
       }
@@ -2310,6 +2535,7 @@ function showContextMenu(clientX, clientY, hit) {
     html += `<div class="cm-sep"></div>`;
     html += `<div class="cm-item" data-action="import-video">导入视频</div>`;
     html += `<div class="cm-item" data-action="import-audio">导入音频</div>`;
+    html += `<div class="cm-item" data-action="import-image">导入图片</div>`;
     html += `<div class="cm-sep"></div>`;
     html += `<div class="cm-item" data-action="auto-arrange">排列全部</div>`;
   }
@@ -2367,6 +2593,28 @@ function cloneCardData(card) {
       isFreezeFrame: card.isFreezeFrame || false,
       frameImage: card.frameImage || null,
       frameImageDataURL: card.frameImageDataURL || '',
+    });
+  }
+  if (card.type === 'image') {
+    Object.assign(base, {
+      file: card.file,
+      fileURL: card.fileURL,
+      trimIn: card.trimIn,
+      trimOut: card.trimOut,
+      volume: card.volume || 1,
+      thumbStrip: card.thumbStrip,
+      waveform: card.waveform,
+      duration: card.duration,
+      createdAt: card.createdAt,
+      fadeIn: card.fadeIn || 0,
+      fadeOut: card.fadeOut || 0,
+      markers: (card.markers || []).map(m => ({ ...m })),
+      isFreezeFrame: card.isFreezeFrame || false,
+      frameImage: card.frameImage || null,
+      frameImageDataURL: card.frameImageDataURL || '',
+      _imageDataURL: card._imageDataURL || null,
+      _imgWidth: card._imgWidth || 0,
+      _imgHeight: card._imgHeight || 0,
     });
   }
   if (card.type === 'text') {
@@ -2530,7 +2778,25 @@ function handleContextAction(action, hit) {
       break;
     }
     case 'import-audio': {
-      document.getElementById('btn-import-audio').click();
+      document.getElementById('btn-import-video').click();
+      break;
+    }
+    case 'import-image': {
+      const imgInput = document.createElement('input');
+      imgInput.type = 'file';
+      imgInput.accept = 'image/*';
+      imgInput.multiple = true;
+      imgInput.addEventListener('change', () => {
+        if (imgInput.files.length > 0) importFiles(imgInput.files);
+      });
+      imgInput.click();
+      break;
+    }
+    case 'convert-to-still-video': {
+      const imgCard = state.cards.find(c => c.id === hit.cardId);
+      if (!imgCard || imgCard.type !== 'image') break;
+      pushUndo();
+      convertImageToStillVideo(imgCard);
       break;
     }
     case 'create-group': {
@@ -2677,8 +2943,11 @@ function handleContextAction(action, hit) {
       state.selection.shapeId = null;
       state.selection.connectionId = null;
       state.selection.connectionIds = [];
-      // Deselect Fabric objects
-      if (fabricCanvas) { fabricCanvas.discardActiveObject(); fabricCanvas.requestRenderAll(); }
+      // Deselect Fabric objects after creating edit box
+      if (fabricCanvas) {
+        fabricCanvas.discardActiveObject();
+        fabricCanvas.requestRenderAll();
+      }
       // Zoom view to fit the edit box fullscreen
       const canvasEl = document.getElementById('main-canvas');
       if (canvasEl) {
@@ -2707,6 +2976,7 @@ function handleContextAction(action, hit) {
         x: eb.x + offsetW, y: eb.y + offsetH,
         width: eb.width, height: eb.height,
         shapes: JSON.parse(JSON.stringify(eb.shapes || [])),
+        _shapesWorldCoords: !!eb._shapesWorldCoords,
         camera: { zoom: eb.camera.zoom, offsetX: eb.camera.offsetX, offsetY: eb.camera.offsetY }
       };
       state.editBoxes.push(newEb);
@@ -2749,6 +3019,7 @@ function handleContextAction(action, hit) {
         width: fromEb.width,
         height: fromEb.height,
         shapes: interpShapes,
+        _shapesWorldCoords: !!(fromEb._shapesWorldCoords || toEb._shapesWorldCoords),
         camera: { zoom: fromEb.camera ? fromEb.camera.zoom : 1, offsetX: 0, offsetY: 0 }
       };
       state.editBoxes.push(newEb);
@@ -2798,11 +3069,20 @@ function handleContextAction(action, hit) {
         x: 0,
         y: 0,
         width: totalDuration * PIXELS_PER_SECOND,
+        duration: totalDuration,
         totalDuration: totalDuration,
         trimIn: 0,
         trimOut: totalDuration,
+        thumbStrip: null,
         label: '合成动画',
         layer: state.cards.length,
+        volume: 1.0,
+        fadeIn: 0,
+        fadeOut: 0,
+        transformScale: 1.0,
+        transformX: 0,
+        transformY: 0,
+        markers: [],
         fps: 30
       };
       // Auto-arrange position: place at the bottom after existing cards
@@ -2823,7 +3103,27 @@ function handleContextAction(action, hit) {
       state.selection.connectionId = null;
       state.selection.connectionIds = [];
       state.selection.markerCardIds = [];
+      // Exit edit-box editing mode if active, so subsequent
+      // renders (including video imports) don't draw at 0.25 opacity.
+      try {
+        if (state.interaction.activeEditBoxId) {
+          const activeEb = findEditBoxById(state.interaction.activeEditBoxId);
+          if (activeEb) _exitEditBoxOnFabric(activeEb);
+        }
+      } finally {
+        state.interaction.activeEditBoxId = null;
+        _fcSyncContainerState();
+      }
+      navigateToCards();
       render();
+
+      // Generate thumbnail strip asynchronously (same pattern as video import)
+      generateSynthThumbnails(synthCard).then(strip => {
+        if (strip) {
+          synthCard.thumbStrip = strip;
+          render();
+        }
+      });
       break;
     }
     case 'delete-editbox': {
@@ -3563,15 +3863,35 @@ window.addEventListener('blur', () => {
   _setCanvasCursor('default');
 });
 
+// Float bar — hover indicator
+const floatBar = document.getElementById('float-bar');
+const floatHover = document.getElementById('float-hover');
+floatBar.addEventListener('mouseover', (e) => {
+  const btn = e.target.closest('.float-btn[data-tool]');
+  if (btn && btn.dataset.tool !== state.drawingTool) {
+    const barRect = floatBar.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    floatHover.style.left = (btnRect.left - barRect.left + (btnRect.width - 32) / 2 - 1) + 'px';
+    floatHover.style.top = (btnRect.top - barRect.top + (btnRect.height - 32) / 2 - 1) + 'px';
+    floatHover.style.opacity = '1';
+  } else {
+    floatHover.style.opacity = '0';
+  }
+});
+floatBar.addEventListener('mouseleave', () => {
+  floatHover.style.opacity = '0';
+});
+
 // Float bar drawing tool buttons
-document.getElementById('float-bar').addEventListener('click', (e) => {
+floatBar.addEventListener('click', (e) => {
   const btn = e.target.closest('.float-btn[data-tool]');
   if (!btn) return;
   setDrawingTool(btn.dataset.tool);
 });
 
 // Frame edit buttons (eb-chain per-frame editing)
-document.getElementById('right-panel').addEventListener('click', (e) => {
+// Use document listener because buttons are in #preview-screen, not #right-panel
+document.addEventListener('click', (e) => {
   if (e.target.id === 'eb-frame-edit-btn') {
     e.preventDefault();
     enterEbFrameEdit();
@@ -3614,7 +3934,7 @@ document.addEventListener('drop', (e) => {
 document.getElementById('btn-import-video').addEventListener('click', () => {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = 'video/*';
+  input.accept = 'video/*,audio/*,image/*';
   input.multiple = true;
   input.addEventListener('change', () => {
     if (input.files.length > 0) {
@@ -3622,34 +3942,5 @@ document.getElementById('btn-import-video').addEventListener('click', () => {
     }
   });
   input.click();
-});
-
-document.getElementById('btn-import-audio').addEventListener('click', () => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'audio/*';
-  input.multiple = true;
-  input.addEventListener('change', () => {
-    if (input.files.length > 0) {
-      importFiles(input.files);
-    }
-  });
-  input.click();
-});
-
-// ================================================================
-// Help panel toggle
-// ================================================================
-document.getElementById('btn-help').addEventListener('click', () => {
-  helpPanel.classList.toggle('visible');
-});
-
-// Close help when clicking outside
-document.addEventListener('click', (e) => {
-  if (helpPanel.classList.contains('visible')) {
-    if (!helpPanel.contains(e.target) && e.target !== document.getElementById('btn-help')) {
-      helpPanel.classList.remove('visible');
-    }
-  }
 });
 
