@@ -1186,12 +1186,20 @@ canvasWrap.addEventListener('mousedown', (e) => {
 // Input: Mouse move
 // ================================================================
 window.addEventListener('mousemove', (e) => {
+  // [DIAG] Trace execution
+  if (state && state.interaction && state.interaction.mode === 'drawing-empty-group') {
+    console.log('[DIAG-TOP] handler entered, mode=drawing-empty-group, e.target=', e.target?.tagName || e.target);
+  }
   // Skip reentrant calls triggered by our own Fabric event forwarding
-  if (typeof _isForwarding !== 'undefined' && _isForwarding) return;
+  if (typeof _isForwarding !== 'undefined' && _isForwarding) {
+    if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-BLOCK] blocked by _isForwarding');
+    return;
+  }
 
   // If Fabric is mid-transform, mid rubber-band selection, or we're in
   // edit-box forwarding mode → forward event to Fabric.
   if (_isFabricBusy() || state.interaction._fabricForwarding) {
+    if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-BLOCK] _isFabricBusy or _fabricForwarding, busy=', _isFabricBusy(), 'fwd=', state.interaction._fabricForwarding);
     _forwardToFabric('mousemove', e);
     // Fall through to 2D rubber-band update if active
   }
@@ -1750,7 +1758,9 @@ window.addEventListener('mousemove', (e) => {
 
   if (state.interaction.mode === 'drawing-empty-group') {
     const world = screenToWorld(sx, sy);
+    console.log('[DIAG-EMPTY] reaching empty-group handler, sx=', sx, 'sy=', sy, 'world=', world, 'before=', state.interaction._emptyGroupCurrent);
     state.interaction._emptyGroupCurrent = { x: world.x, y: world.y };
+    console.log('[DIAG-EMPTY] after update=', state.interaction._emptyGroupCurrent);
     render();
     return;
   }

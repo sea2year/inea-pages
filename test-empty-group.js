@@ -1,143 +1,87 @@
 /**
- * Empty Group 自动化测试 v2 — 精确定位事件断点
+ * Empty Group 自动化测试 v3 — DIAG 日志追踪
+ * events.js 中已添加 [DIAG-TOP], [DIAG-BLOCK], [DIAG-EMPTY] 日志
+ * 此测试只做最小触发，关键信息看 DIAG 输出
  */
 function runEmptyGroupTest() {
-  const pass = (msg) => console.log(`%c  ✅ ${msg}`, 'color:green');
-  const fail = (msg) => console.log(`%c  ❌ ${msg}`, 'color:red;font-weight:bold');
   const info = (msg, obj) => console.log(`  🔍 ${msg}`, obj || '');
 
-  console.log('%c═══ Empty Group 测试 v2 ═══', 'font-weight:bold');
+  console.log('%c═══ Empty Group 测试 v3 — 检查 DIAG 日志 ═══', 'font-weight:bold');
 
-  // 前置
-  if (!state || !canvas || !setDrawingTool) { fail('前置条件缺失'); return; }
+  if (!state || !canvasWrap || !setDrawingTool) {
+    console.log('%c  ❌ 前置条件缺失', 'color:red');
+    return;
+  }
 
   const groupsBefore = state.groups.length;
   setDrawingTool('empty-group');
   info(`drawingTool = "${state.drawingTool}"`);
 
   const canvasRect = canvas.getBoundingClientRect();
-  info(`canvas rect: left=${canvasRect.left} top=${canvasRect.top} w=${canvasRect.width} h=${canvasRect.height}`);
-
   const startSX = 200, startSY = 150, endSX = 500, endSY = 400;
   const startCX = canvasRect.left + startSX;
   const startCY = canvasRect.top + startSY;
   const endCX = canvasRect.left + endSX;
   const endCY = canvasRect.top + endSY;
 
-  // ---- Spy: 监控 mousemove 是否被调用 ----
-  let mmHandlerCalled = 0;
-  let mmReachedEmptyGroup = false;
-  const origMM = window.onmousemove; // save
-
-  function mmSpy(e) {
-    mmHandlerCalled++;
-    // 在 empty-group 检查的坐标位置读取
-    const rect = canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    if (state.interaction.mode === 'drawing-empty-group') {
-      mmReachedEmptyGroup = true;
-      info(`mmSpy: mode=drawing-empty-group, sx=${sx} sy=${sy}, clientX=${e.clientX} clientY=${e.clientY}`);
-    }
-  }
-  window.addEventListener('mousemove', mmSpy);
-
-  // ---- mousedown ----
-  info('dispatch mousedown...');
+  // ---- mousedown on canvasWrap (handler 在 canvasWrap) ----
+  console.log('%c--- 派发 mousedown 到 canvasWrap ---', 'color:orange');
   const mdEvent = new MouseEvent('mousedown', {
     clientX: startCX, clientY: startCY,
     button: 0, buttons: 1, bubbles: true, cancelable: true
   });
-  canvas.dispatchEvent(mdEvent);
-  info(`mode after mousedown: "${state.interaction.mode}"`);
-  info(`_emptyGroupStart:`, state.interaction._emptyGroupStart);
+  canvasWrap.dispatchEvent(mdEvent);
+  info(`mode = "${state.interaction.mode}" (期望: drawing-empty-group)`);
+  info(`_emptyGroupStart =`, state.interaction._emptyGroupStart);
 
   if (state.interaction.mode !== 'drawing-empty-group') {
-    fail(`mousedown 未设置 drawing-empty-group 模式`);
-    window.removeEventListener('mousemove', mmSpy);
+    console.log('%c  ❌ 进入 drawing-empty-group 模式失败', 'color:red');
+    setDrawingTool('select');
     return;
   }
-  pass('mousedown 成功进入 drawing-empty-group');
+  console.log('%c  ✅ 进入 drawing-empty-group 模式', 'color:green');
 
-  // ---- 尝试多种 mousemove 派发方式 ----
-  info('--- 测试 mousemove 派发 ---');
+  // ---- 派发 mousemove 到 window ----
+  console.log('%c--- 派发 mousemove 到 window (检查 DIAG 日志) ---', 'color:orange');
+  state.interaction._emptyGroupCurrent = { x: startSX, y: startSY };
 
-  // 方式1: dispatch on window
-  mmHandlerCalled = 0;
-  mmReachedEmptyGroup = false;
-  const mm1 = new MouseEvent('mousemove', {
+  const mmEvent = new MouseEvent('mousemove', {
     clientX: endCX, clientY: endCY,
     button: 0, buttons: 1, bubbles: true, cancelable: true
   });
-  window.dispatchEvent(mm1);
-  info(`方式1 (window.dispatch): handlerCalled=${mmHandlerCalled}, reachedEmptyGroup=${mmReachedEmptyGroup}, _emptyGroupCurrent=`, state.interaction._emptyGroupCurrent);
+  window.dispatchEvent(mmEvent);
 
-  if (mmHandlerCalled === 0) {
-    fail('window.dispatchEvent(mousemove) 未触发任何 handler！');
-  } else if (!mmReachedEmptyGroup) {
-    fail(`handler 触发了 ${mmHandlerCalled} 次，但未到达 empty-group 分支`);
+  info(`_emptyGroupCurrent 检查:`, state.interaction._emptyGroupCurrent);
+  if (state.interaction._emptyGroupCurrent && state.interaction._emptyGroupCurrent.x !== startSX) {
+    console.log('%c  ✅ _emptyGroupCurrent 已更新 (程序化 dispatch 有效)', 'color:green');
+  } else {
+    console.log('%c  ❌ _emptyGroupCurrent 未更新 (值仍为:', 'color:red', JSON.stringify(state.interaction._emptyGroupCurrent) + ')');
+    console.log('  👉 请检查上面的 [DIAG-*] 日志:');
+    console.log('     - 看到 [DIAG-TOP] = handler 入口被触发');
+    console.log('     - 看到 [DIAG-BLOCK] = 被 _isForwarding 或 Fabric 拦截');
+    console.log('     - 看到 [DIAG-EMPTY] = 成功到达 empty-group 更新代码');
   }
-
-  // 方式2: dispatch on document (bubbles to window)
-  mmHandlerCalled = 0;
-  mmReachedEmptyGroup = false;
-  state.interaction._emptyGroupCurrent = { x: startSX, y: startSY }; // reset
-  const mm2 = new MouseEvent('mousemove', {
-    clientX: endCX, clientY: endCY,
-    button: 0, buttons: 1, bubbles: true, cancelable: true
-  });
-  document.dispatchEvent(mm2);
-  info(`方式2 (document.dispatch): handlerCalled=${mmHandlerCalled}, reachedEmptyGroup=${mmReachedEmptyGroup}, _emptyGroupCurrent=`, state.interaction._emptyGroupCurrent);
-
-  // 方式3: dispatch on canvasWrap (bubbles to window)
-  mmHandlerCalled = 0;
-  mmReachedEmptyGroup = false;
-  state.interaction._emptyGroupCurrent = { x: startSX, y: startSY }; // reset
-  const mm3 = new MouseEvent('mousemove', {
-    clientX: endCX, clientY: endCY,
-    button: 0, buttons: 1, bubbles: true, cancelable: true
-  });
-  canvasWrap.dispatchEvent(mm3);
-  info(`方式3 (canvasWrap.dispatch): handlerCalled=${mmHandlerCalled}, reachedEmptyGroup=${mmReachedEmptyGroup}, _emptyGroupCurrent=`, state.interaction._emptyGroupCurrent);
-
-  // 方式4: 直接调用 screenToWorld 然后手动更新
-  mmHandlerCalled = 0;
-  mmReachedEmptyGroup = false;
-  state.interaction._emptyGroupCurrent = { x: startSX, y: startSY }; // reset
-  if (state.interaction.mode === 'drawing-empty-group') {
-    const world = screenToWorld(endSX, endSY);
-    state.interaction._emptyGroupCurrent = { x: world.x, y: world.y };
-  }
-  info(`方式4 (直接调用 screenToWorld+手动赋值): _emptyGroupCurrent=`, state.interaction._emptyGroupCurrent);
-  pass('直接调用成功，说明 screenToWorld 和逻辑层没问题');
-
-  // ---- 清理 spy ----
-  window.removeEventListener('mousemove', mmSpy);
 
   // ---- mouseup ----
-  info('dispatch mouseup...');
+  console.log('%c--- 派发 mouseup 到 window ---', 'color:orange');
   const muEvent = new MouseEvent('mouseup', {
     clientX: endCX, clientY: endCY,
     button: 0, buttons: 0, bubbles: true, cancelable: true
   });
   window.dispatchEvent(muEvent);
-  info(`mode after mouseup: "${state.interaction.mode}"`);
 
   const groupsAfter = state.groups.length;
+  info(`groups: ${groupsBefore} → ${groupsAfter}`);
   if (groupsAfter > groupsBefore) {
-    pass(`group 已创建！ groups: ${groupsBefore} → ${groupsAfter}`);
+    console.log('%c  ✅ group 已创建', 'color:green');
   } else {
-    const s = state.interaction._emptyGroupStart;
-    const c = state.interaction._emptyGroupCurrent;
-    info(`_emptyGroupStart (mouseup 时) =`, s);
-    info(`_emptyGroupCurrent (mouseup 时) =`, c);
-    // 查看 mouseup 清理后的值
-    info(`_emptyGroupStart (清理后) =`, state.interaction._emptyGroupStart);
-    info(`_emptyGroupCurrent (清理后) =`, state.interaction._emptyGroupCurrent);
+    console.log('%c  ❌ group 未创建', 'color:red');
   }
 
-  // 清理
-  setDrawingTool('select');
+  // 保持 empty-group 模式让用户手动尝试
+  setDrawingTool('empty-group');
+  console.log('%c--- 现在请在画布上手动拖拽，观察 DIAG 日志 ---', 'color:cyan;font-weight:bold');
+  console.log('手动拖拽时控制台应出现 [DIAG-TOP] → [DIAG-EMPTY] 或 [DIAG-BLOCK]');
 }
 
 setTimeout(runEmptyGroupTest, 2000);
