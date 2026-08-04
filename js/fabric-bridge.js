@@ -59,6 +59,18 @@ function initFabricCanvas() {
   fabricCanvas.on('object:removed', () => { renderLayerList(); });
   fabricCanvas.on('selection:created', () => {
     _syncFabricSelToState();
+    // Only show controls/borders on double-click
+    if (!state.interaction._fabricDblClick) {
+      const sel = fabricCanvas.getActiveObject();
+      if (sel) {
+        if (sel.type === 'activeselection') {
+          sel.getObjects().forEach(o => { o.hasBorders = false; o.hasControls = false; });
+        } else {
+          sel.hasBorders = false;
+          sel.hasControls = false;
+        }
+      }
+    }
     renderLayerList();
     updateInspectorForFabricSelection();
     render();
@@ -298,6 +310,17 @@ function _forwardToFabric(type, e) {
   if (!fabricCanvas || _isForwarding) return;
   _isForwarding = true;
   try {
+    // Double-click detection for Fabric shapes: only show controls on double-click
+    if (type === 'mousedown') {
+      const now = Date.now();
+      const dx = Math.abs(e.clientX - (state.interaction._lastFabricClickX || 0));
+      const dy = Math.abs(e.clientY - (state.interaction._lastFabricClickY || 0));
+      const dt = now - (state.interaction._lastFabricClickTime || 0);
+      state.interaction._fabricDblClick = (dt < 400 && dx < 10 && dy < 10);
+      state.interaction._lastFabricClickTime = now;
+      state.interaction._lastFabricClickX = e.clientX;
+      state.interaction._lastFabricClickY = e.clientY;
+    }
     // mousedown target: upperCanvasEl (Fabric's handler is bound directly).
     // bubbles: false — no need to bubble since handler is on the target element,
     // and this prevents re-entering canvasWrap's mousedown handler.
