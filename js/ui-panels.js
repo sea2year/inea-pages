@@ -1942,21 +1942,20 @@ function updateInspector() {
       if (group) {
         const mode = group.sizingMode || 'fit';
         const memberCount = group.cardIds.length;
-        propsContent.innerHTML = `
-          <div class="inspector-row" style="font-weight:550;color:#6554CB;">编辑组</div>
-          <div class="inspector-row"><label>名称</label><input type="text" id="insp-group-name" value="${escAttr(group.name || '')}"></div>
-          <div class="inspector-row"><label>成员</label><span style="font-size:11px;color:#888;">${memberCount} 张卡片</span></div>
-          <div class="inspector-row"><label>模式</label>
-            <div style="display:flex;gap:4px;">
-              <button id="insp-group-fit" style="flex:1;height:24px;border:1px solid #6554CB;border-radius:4px;background:${mode === 'fit' ? '#6554CB' : '#fff'};color:${mode === 'fit' ? '#fff' : '#6554CB'};font-size:11px;cursor:pointer;">适应</button>
-              <button id="insp-group-fixed" style="flex:1;height:24px;border:1px solid #6554CB;border-radius:4px;background:${mode === 'fixed' ? '#6554CB' : '#fff'};color:${mode === 'fixed' ? '#fff' : '#6554CB'};font-size:11px;cursor:pointer;">固定</button>
-            </div>
-          </div>
-          ${mode === 'fixed' ? `
-          <div class="inspector-row"><label>宽度</label><input type="number" id="insp-group-width" value="${Math.round(group.width || 200)}" step="1" min="100"></div>
-          <div class="inspector-row"><label>高度</label><input type="number" id="insp-group-height" value="${Math.round(group.height || 60)}" step="1" min="60"></div>
-          ` : ''}
-        `;
+        const infoHtml = _row('名称', `<input type="text" id="insp-group-name" value="${escAttr(group.name || '')}">`) +
+          _row('成员', `<span style="font-size:11px;color:#888;">${memberCount} 张卡片</span>`);
+        const modeHtml = _row('模式', `<div style="display:flex;gap:4px;">
+            <button id="insp-group-fit" style="flex:1;height:24px;border:1px solid #6554CB;border-radius:4px;background:${mode === 'fit' ? '#6554CB' : '#fff'};color:${mode === 'fit' ? '#fff' : '#6554CB'};font-size:11px;cursor:pointer;">适应</button>
+            <button id="insp-group-fixed" style="flex:1;height:24px;border:1px solid #6554CB;border-radius:4px;background:${mode === 'fixed' ? '#6554CB' : '#fff'};color:${mode === 'fixed' ? '#fff' : '#6554CB'};font-size:11px;cursor:pointer;">固定</button>
+          </div>`);
+        let groupHtml = _secStatic('编辑组', infoHtml) + _secDivider() +
+          _secStatic('模式', modeHtml);
+        if (mode === 'fixed') {
+          groupHtml += _secDivider() + _secStatic('尺寸',
+            _pair('宽', 'insp-group-width', Math.round(group.width || 200), '高', 'insp-group-height', Math.round(group.height || 60)));
+        }
+        propsContent.innerHTML = groupHtml;
+        _bindSectionToggles();
         setTimeout(() => {
           const nameInput = propsContent.querySelector('#insp-group-name');
           if (nameInput) {
@@ -1975,6 +1974,7 @@ function updateInspector() {
               pushUndo();
               group.sizingMode = 'fit';
               group.x = undefined; group.y = undefined; group.width = undefined; group.height = undefined;
+              document.activeElement?.blur();
               render();
             });
           }
@@ -1995,6 +1995,7 @@ function updateInspector() {
                 group.height = group.height || 60;
               }
               group.sizingMode = 'fixed';
+              document.activeElement?.blur();
               render();
             });
           }
