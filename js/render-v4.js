@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=52');
+console.log('[inea] render-v4.js v=53');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1089,8 +1089,8 @@ function renderGroup(group) {
     if (rf) {
       const hw = 6 / state.canvas.zoom;
       const handles = [
-        { name: 'nw', x: rf.x, y: rf.y },
-        { name: 'ne', x: rf.x + rf.w, y: rf.y },
+        { name: 'nw', x: rf.x, y: rf.y + rf.titleH },
+        { name: 'ne', x: rf.x + rf.w, y: rf.y + rf.titleH },
         { name: 'se', x: rf.x + rf.w, y: rf.y + rf.h },
         { name: 'sw', x: rf.x, y: rf.y + rf.h },
       ];
@@ -1708,8 +1708,8 @@ function hitTest(sx, sy) {
       const grf = getGroupFrame(group);
       if (!grf) continue;
       const handles = [
-        { name: 'nw', x: grf.x, y: grf.y },
-        { name: 'ne', x: grf.x + grf.w, y: grf.y },
+        { name: 'nw', x: grf.x, y: grf.y + grf.titleH },
+        { name: 'ne', x: grf.x + grf.w, y: grf.y + grf.titleH },
         { name: 'se', x: grf.x + grf.w, y: grf.y + grf.h },
         { name: 'sw', x: grf.x, y: grf.y + grf.h },
       ];

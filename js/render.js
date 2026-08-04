@@ -1092,21 +1092,21 @@ function renderGroup(group) {
     ctx.fillText(group.name || 'Group', frameX + 22, frameY + 11);
   }
 
-  // Resize handles for fixed-mode non-collapsed groups (corners only, fixed size)
+  // Resize handles for fixed-mode non-collapsed groups (corners only)
   if (isSelected && !group.collapsed && group.sizingMode === 'fixed') {
     const frame = getGroupFrame(group);
     if (frame) {
-      const hw = 6;
+      const hw = 6 / state.canvas.zoom;
       const handles = [
-        { name: 'nw', x: frame.x, y: frame.y },
-        { name: 'ne', x: frame.x + frame.w, y: frame.y },
+        { name: 'nw', x: frame.x, y: frame.y + frame.titleH },
+        { name: 'ne', x: frame.x + frame.w, y: frame.y + frame.titleH },
         { name: 'se', x: frame.x + frame.w, y: frame.y + frame.h },
         { name: 'sw', x: frame.x, y: frame.y + frame.h },
       ];
       for (const h of handles) {
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#6554CB';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 / state.canvas.zoom;
         ctx.fillRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
         ctx.strokeRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
       }
@@ -1659,8 +1659,8 @@ function hitTest(sx, sy) {
       const frame = getGroupFrame(group);
       if (!frame) continue;
       const handles = [
-        { name: 'nw', x: frame.x, y: frame.y },
-        { name: 'ne', x: frame.x + frame.w, y: frame.y },
+        { name: 'nw', x: frame.x, y: frame.y + frame.titleH },
+        { name: 'ne', x: frame.x + frame.w, y: frame.y + frame.titleH },
         { name: 'se', x: frame.x + frame.w, y: frame.y + frame.h },
         { name: 'sw', x: frame.x, y: frame.y + frame.h },
       ];
