@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=97');
+console.log('[inea] render-v4.js v=98');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2670,21 +2670,21 @@ function updateHintBar() {
   let hint = '';
 
   if (pb.isPlaying) {
-    hint = '空格 暂停  ·  Esc 停止';
+    hint = '空格 暂停\nEsc 停止';
   } else if (pb.pausedAt > 0 && (pb.sequence.length > 0 || pb.playbackMode === 'group')) {
-    hint = '空格 继续  ·  右键 定格 / 裁剪';
+    hint = '空格 继续\n右键 定格 / 裁剪';
   } else if (state.interaction.mode === 'connecting') {
-    hint = '拖至目标卡片释放  ·  Esc 取消';
+    hint = '拖至目标卡片释放\nEsc 取消';
   } else if (selCount === 1) {
-    hint = '空格 播放  ·  拖拽右侧圆点连线  ·  右键 更多操作';
+    hint = '空格 播放\n拖拽右侧圆点连线\n右键 更多操作';
   } else if (selCount > 1) {
-    hint = '右键 创建组  ·  Delete 删除';
+    hint = '右键 创建组\nDelete 删除';
   } else if (selGroupCount === 1) {
     hint = '空格 播放组内素材';
   } else if (hasConnections) {
-    hint = '点击连线可切换转场或删除  ·  拖拽框选  ·  右键导入素材';
+    hint = '点击连线可切换转场或删除\n拖拽框选\n右键导入素材';
   } else {
-    hint = '拖拽框选  ·  右键导入素材';
+    hint = '拖拽框选\n右键导入素材';
   }
 
   el.textContent = hint;

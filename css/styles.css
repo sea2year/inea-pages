@@ -186,13 +186,13 @@ canvas {
 #hint-bar {
   position: absolute;
   top: 24px;
-  left: 16px;
+  left: 260px;
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 20px 16px 16px 16px;
+  flex-direction: column;
+  gap: 0;
+  padding: 24px 16px 16px 16px;
   min-width: 200px;
-  max-width: 260px;
+  max-width: 240px;
   background: rgba(0,0,0,0.004);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -203,23 +203,25 @@ canvas {
   transition: opacity 0.3s ease;
 }
 #hint-badge {
+  position: absolute;
+  top: -14px;
+  left: -11px;
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #D4FF00;
+  background: #B9EE3F;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: -32px;
-  margin-left: -4px;
 }
 #hint-text {
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: #1a1a1a;
   font-family: "Inter", system-ui, sans-serif;
   font-weight: 400;
+  white-space: pre-line;
 }
 
 /* Floating toolbar — Figma-style bottom-center (底部工具栏) */
