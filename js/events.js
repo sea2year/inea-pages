@@ -1520,7 +1520,7 @@ window.addEventListener('mousemove', (e) => {
       const cw = getCardWidth(c);
       const ch = (c.type === 'text') ? (c.height || 40) : CARD_HEIGHT;
       const cLeft = c.x, cRight = c.x + cw, cBottom = c.y + ch;
-      let bestDx = 0, bestDy = 0, bestDistX = SNAP, bestDistY = SNAP;
+      let bestDx = 0, bestDy = 0, bestTargetX = 0, bestTargetY = 0, bestDistX = SNAP, bestDistY = SNAP;
       for (const other of state.cards) {
         if (dragIds.has(other.id)) continue;
         const ow = getCardWidth(other);
@@ -1531,18 +1531,19 @@ window.addEventListener('mousemove', (e) => {
           for (const ev of [cLeft, cRight]) {
             for (const oev of [oLeft, oRight]) {
               const dist = Math.abs(ev - oev);
-              if (dist < bestDistX) { bestDistX = dist; bestDx = oev - ev; }
+              if (dist < bestDistX) { bestDistX = dist; bestDx = oev - ev; bestTargetX = oev; }
             }
           }
         }
-        // Bottom snap — only if cards are horizontally close
-        if (Math.abs(c.x - other.x) < CROSS_AXIS_X) {
+        // Bottom snap — only if cards overlap or are close horizontally
+        const hGap = Math.max(0, cLeft - oRight, oLeft - cRight);
+        if (hGap < CROSS_AXIS_X) {
           const dist = Math.abs(cBottom - oBottom);
-          if (dist < bestDistY) { bestDistY = dist; bestDy = oBottom - cBottom; }
+          if (dist < bestDistY) { bestDistY = dist; bestDy = oBottom - cBottom; bestTargetY = oBottom; }
         }
       }
-      if (bestDistX < SNAP) { snapDx = bestDx; snapLines.push({ orient: 'v', pos: c.x + bestDx }); }
-      if (bestDistY < SNAP) { snapDy = bestDy; snapLines.push({ orient: 'h', pos: c.y + ch + bestDy }); }
+      if (bestDistX < SNAP) { snapDx = bestDx; snapLines.push({ orient: 'v', pos: bestTargetX }); }
+      if (bestDistY < SNAP) { snapDy = bestDy; snapLines.push({ orient: 'h', pos: bestTargetY }); }
     }
     // Apply snap
     if (snapDx !== 0 || snapDy !== 0) {
