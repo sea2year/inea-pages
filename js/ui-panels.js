@@ -1971,8 +1971,8 @@ function updateInspector() {
           const fitBtn = propsContent.querySelector('#insp-group-fit');
           const fixedBtn = propsContent.querySelector('#insp-group-fixed');
           if (fitBtn) {
-            fitBtn.addEventListener('click', () => {
-              console.log('[DEBUG] 适应按钮被点击, before: sizingMode=', group.sizingMode);
+            fitBtn.addEventListener('click', (e) => {
+              console.log('[DEBUG] 适应按钮被点击, target.id=', e.target.id, 'currentTarget.id=', e.currentTarget?.id, 'before: sizingMode=', group.sizingMode);
               if (group.sizingMode === 'fit') return;
               pushUndo();
               group.sizingMode = 'fit';
@@ -1982,9 +1982,9 @@ function updateInspector() {
             });
           }
           if (fixedBtn) {
-            fixedBtn.addEventListener('click', () => {
+            fixedBtn.addEventListener('click', (e) => {
               if (group.sizingMode === 'fixed') return;
-              console.log('[DEBUG] 固定按钮被点击, before: sizingMode=', group.sizingMode);
+              console.log('[DEBUG] 固定按钮被点击, target.id=', e.target.id, 'before: sizingMode=', group.sizingMode);
               pushUndo();
               const frame = getGroupFrame(group);
               if (frame) {
