@@ -190,7 +190,7 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 24px 16px 16px 16px;
+  padding: 24px 16px 16px 24px;
   min-width: 200px;
   max-width: 240px;
   background: rgba(0,0,0,0.004);
@@ -209,7 +209,7 @@ canvas {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #B9EE3F;
+  background: #D4FF00;
   display: flex;
   align-items: center;
   justify-content: center;
