@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=62');
+console.log('[inea] render-v4.js v=63');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2720,8 +2720,9 @@ function startCardLabelEdit(cardId) {
   const card = state.cards.find(c => c.id === cardId);
   const group = state.groups.find(g => g.id === cardId);
   const isGroup = !!group;
+  console.log('[LABELEDIT] cardId=', cardId, 'isGroup=', isGroup, 'group=', group);
 
-  if (!card && !isGroup) return;
+  if (!card && !isGroup) { console.log('[LABELEDIT] no card and no group, returning'); return; }
 
   const isVideo = card && (card.type === 'video' || card.type === 'synthesized-video');
   const isAudio = card && card.type === 'audio';
@@ -2761,12 +2762,14 @@ function startCardLabelEdit(cardId) {
 
     if (isGroup) {
       const frame = getGroupFrame(group);
+      console.log('[LABELEDIT] reposition group frame=', frame);
       if (!frame) { el.style.display = 'none'; return; }
       el.style.display = 'flex';
       const titleH = frame.titleH || 22;
       const s = worldToScreen(frame.x, frame.y + titleH);
       const fontSize = Math.max(10, 12 / zoom) * zoom;
       const editorH = Math.max(16, fontSize * 1.3);
+      console.log('[LABELEDIT] pos: s=', s, 'editorH=', editorH, 'fontSize=', fontSize);
       el.style.fontSize = fontSize + 'px';
       el.style.height = editorH + 'px';
       el.style.left = s.x + 'px';

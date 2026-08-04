@@ -1064,7 +1064,10 @@ canvasWrap.addEventListener('mousedown', (e) => {
     // Double-click to rename
     const groupNow = Date.now();
     const groupPrev = state.interaction._lastGroupClick || 0;
-    if (groupNow - groupPrev < 400 && state.interaction._lastGroupClickId === group.id) {
+    const isDbl = groupNow - groupPrev < 400 && state.interaction._lastGroupClickId === group.id;
+    console.log('[DBLCLICK] groupNow=', groupNow, 'groupPrev=', groupPrev, 'diff=', groupNow - groupPrev, 'isDbl=', isDbl);
+    if (isDbl) {
+      console.log('[DBLCLICK] calling startCardLabelEdit for group.id=', group.id);
       startCardLabelEdit(group.id);
       return;
     }
