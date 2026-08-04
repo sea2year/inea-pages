@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=38');
+console.log('[inea] render-v4.js v=39');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1016,72 +1016,61 @@ function renderGroup(group) {
   // Drill-down: group is selected but user has clicked into individual cards
   const hasCardSelected = state.selection.cardIds.some(cid => group.cardIds.includes(cid));
   const isDrillDown = isSelected && hasCardSelected;
+  const purple = '101,84,203'; // #6554CB
   if (group.collapsed) {
     const gx = group.x;
     const gy = group.y;
     const gw = group.width || 200;
     const gh = group.height || 60;
 
-    const gAlpha = isDropTarget ? 0.18 : (isDrillDown ? 0.04 : (isSelected ? 0.24 : (isHovered ? 0.10 : 0.06)));
-    const gStrokeAlpha = isDropTarget ? 0.75 : (isDrillDown ? 0.2 : (isSelected ? 0.9 : (isHovered ? 0.5 : 0.35)));
-    ctx.fillStyle = `rgba(100,100,255,${gAlpha})`;
-    ctx.strokeStyle = `rgba(100,100,255,${gStrokeAlpha})`;
-    ctx.lineWidth = (isSelected ? 2.5 : (isHovered ? 2 : 1.5)) / state.canvas.zoom;
+    const gAlpha = isDropTarget ? 0.08 : (isDrillDown ? 0 : (isSelected ? 0.08 : (isHovered ? 0.04 : 0)));
+    const gStrokeAlpha = isDropTarget ? 0.9 : (isDrillDown ? 0.2 : (isSelected ? 0.9 : (isHovered ? 0.6 : 0.35)));
+    ctx.fillStyle = `rgba(${purple},${gAlpha})`;
+    ctx.strokeStyle = `rgba(${purple},${gStrokeAlpha})`;
+    ctx.lineWidth = (isSelected || isDropTarget ? 1.5 : 1) / state.canvas.zoom;
     roundRect(gx, gy, gw, gh, 8);
-    ctx.fill();
+    if (gAlpha > 0) ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#555';
-    ctx.font = '500 12px "Inter", system-ui, sans-serif';
+    ctx.fillStyle = `#6554CB`;
+    ctx.font = `bold ${Math.max(10, 12 / state.canvas.zoom)}px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.fillText(group.name || 'Group', gx + 10, gy + gh / 2 - 4);
 
     const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
     const totalDur = memberCards.reduce((s, c) => s + (c.trimOut - c.trimIn), 0);
-    ctx.fillStyle = '#999';
-    ctx.font = '400 10px "Inter", system-ui, sans-serif';
+    ctx.fillStyle = `rgba(${purple},0.5)`;
+    ctx.font = `${Math.max(8, 10 / state.canvas.zoom)}px "Inter", system-ui, sans-serif`;
     ctx.fillText(`${memberCards.length}段 · ${Math.round(totalDur)}秒`, gx + 10, gy + gh / 2 + 12);
   } else {
     const frame = getGroupFrame(group);
     if (!frame) return;
     const frameX = frame.x, frameY = frame.y, frameW = frame.w, frameH = frame.h;
 
-    // Background
-    const gAlpha2 = isDropTarget ? 0.14 : (isDrillDown ? 0.02 : (isSelected ? 0.16 : (isHovered ? 0.05 : 0.03)));
-    const gStrokeAlpha2 = isDropTarget ? 0.7 : (isDrillDown ? 0.15 : (isSelected ? 0.85 : (isHovered ? 0.4 : 0.25)));
-    ctx.fillStyle = `rgba(100,100,255,${gAlpha2})`;
-    ctx.strokeStyle = `rgba(100,100,255,${gStrokeAlpha2})`;
-    ctx.lineWidth = (isSelected || isDropTarget ? 2.5 : (isHovered ? 2 : 1.5)) / state.canvas.zoom;
+    // Outline only — no fill background
+    const gAlpha2 = isDropTarget ? 0.06 : (isDrillDown ? 0 : (isSelected ? 0.06 : (isHovered ? 0.03 : 0)));
+    const gStrokeAlpha2 = isDropTarget ? 0.85 : (isDrillDown ? 0.18 : (isSelected ? 0.85 : (isHovered ? 0.55 : 0.3)));
+    ctx.fillStyle = `rgba(${purple},${gAlpha2})`;
+    ctx.strokeStyle = `rgba(${purple},${gStrokeAlpha2})`;
+    ctx.lineWidth = (isSelected || isDropTarget ? 1.5 : 1) / state.canvas.zoom;
     ctx.setLineDash([]);
     roundRect(frameX, frameY, frameW, frameH, 10);
-    ctx.fill();
+    if (gAlpha2 > 0) ctx.fill();
     ctx.stroke();
 
-    // Title bar background
-    const titleAlpha = isDrillDown ? 0.03 : (isSelected ? 0.18 : (isHovered ? 0.12 : 0.06));
-    ctx.fillStyle = `rgba(100,100,255,${titleAlpha})`;
-    ctx.beginPath();
-    ctx.moveTo(frameX + 10, frameY);
-    ctx.lineTo(frameX + frameW - 10, frameY);
-    ctx.quadraticCurveTo(frameX + frameW, frameY, frameX + frameW, frameY + 10);
-    ctx.lineTo(frameX + frameW, frameY + 22);
-    ctx.lineTo(frameX, frameY + 22);
-    ctx.lineTo(frameX, frameY + 10);
-    ctx.quadraticCurveTo(frameX, frameY, frameX + 10, frameY);
-    ctx.closePath();
-    ctx.fill();
-
     // Collapse/expand toggle dot
-    ctx.fillStyle = isHovered ? '#4488ff' : '#999';
+    ctx.fillStyle = `#6554CB`;
+    ctx.globalAlpha = isHovered ? 0.9 : 0.5;
     ctx.beginPath();
-    ctx.arc(frameX + 10, frameY + 11, 4, 0, Math.PI * 2);
+    ctx.arc(frameX + 12, frameY + 12, 3.5 / state.canvas.zoom, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = 1;
 
     // Title
-    ctx.fillStyle = '#555';
-    ctx.font = '500 12px "Inter", system-ui, sans-serif';
+    ctx.fillStyle = `#6554CB`;
+    ctx.font = `bold ${Math.max(10, 12 / state.canvas.zoom)}px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
-    ctx.fillText(group.name || 'Group', frameX + 22, frameY + 11);
+    ctx.fillText(group.name || 'Group', frameX + 22, frameY + 12);
   }
 }
 
