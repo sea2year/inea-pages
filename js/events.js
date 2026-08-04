@@ -1000,20 +1000,6 @@ canvasWrap.addEventListener('mousedown', (e) => {
       }
       state.interaction._lastTextClick = now;
     }
-    // Double-click bgm card to rename
-    if (card && card.type === 'bgm') {
-      const now = Date.now();
-      const prev = state.interaction._lastBgmClick || 0;
-      if (now - prev < 400 && state.selection.cardIds.length === 1 && state.selection.cardIds[0] === card.id) {
-        const newName = prompt('重命名', card.label);
-        if (newName && newName.trim()) {
-          card.label = newName.trim();
-          render();
-          return;
-        }
-      }
-      state.interaction._lastBgmClick = now;
-    }
     // If auto-paused, just select without dragging
     if (state.interaction._autoPaused) {
       render();
