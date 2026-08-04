@@ -4099,6 +4099,17 @@ window.addEventListener('keyup', (e) => {
     }
     // If Space was pressed while paused, resume
     if (spaceResume) {
+      // If single card selected and differs from current playback source, switch to it
+      if (state.selection.cardIds.length === 1 && state.playback.playbackMode === 'linear') {
+        const selId = state.selection.cardIds[0];
+        const firstInSeq = state.playback.sequence[0];
+        if (selId !== firstInSeq) {
+          stopPlayback();
+          startPlayback(selId);
+          render();
+          return;
+        }
+      }
       togglePlayback();
       return;
     }
