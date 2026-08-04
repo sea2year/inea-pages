@@ -1415,14 +1415,23 @@ function renderPlayhead() {
   pb._playheadX = px;
   pb._playheadCardId = card.id;
 
-  // Red playhead line
+  // Red playhead line — slightly taller than the card content
+  const isVid = card.type === 'video' || card.type === 'synthesized-video';
+  const ch = card.type === 'image' ? (card.height || CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT) :
+             isVid ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
+             card.type === 'composition' ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
+             card.type === 'audio' ? CARD_WAVEFORM_HEIGHT + CARD_LABEL_HEIGHT + 4 :
+             CARD_HEIGHT;
+  const pad = 6 / state.canvas.zoom;
+  const topY = card.y - pad;
+  const botY = card.y + ch + pad;
   ctx.strokeStyle = '#FF3333';
   ctx.lineWidth = 2 / state.canvas.zoom;
   ctx.lineCap = 'round';
   ctx.setLineDash([]);
   ctx.beginPath();
-  ctx.moveTo(px, card.y);
-  ctx.lineTo(px, card.y + CARD_HEIGHT);
+  ctx.moveTo(px, topY);
+  ctx.lineTo(px, botY);
   ctx.stroke();
 
   // Triangle head at top
@@ -1430,9 +1439,9 @@ function renderPlayhead() {
   const triW = 5 / state.canvas.zoom;
   ctx.fillStyle = '#FF3333';
   ctx.beginPath();
-  ctx.moveTo(px, card.y);
-  ctx.lineTo(px - triW, card.y - triH);
-  ctx.lineTo(px + triW, card.y - triH);
+  ctx.moveTo(px, topY);
+  ctx.lineTo(px - triW, topY - triH);
+  ctx.lineTo(px + triW, topY - triH);
   ctx.closePath();
   ctx.fill();
 
@@ -1443,8 +1452,8 @@ function renderPlayhead() {
   ctx.strokeStyle = '#FF3333';
   ctx.lineWidth = 1.5 / state.canvas.zoom;
   ctx.beginPath();
-  ctx.moveTo(px, card.y);
-  ctx.lineTo(px, card.y + CARD_HEIGHT);
+  ctx.moveTo(px, topY);
+  ctx.lineTo(px, botY);
   ctx.stroke();
   ctx.restore();
 }
@@ -1938,8 +1947,9 @@ function renderGroupPlayhead(group, playheadX) {
   const frame = getGroupFrame(group);
   if (!frame) return;
 
-  const topY = frame.y + frame.titleH;
-  const bottomY = frame.y + frame.h;
+  const pad = 6 / state.canvas.zoom;
+  const topY = frame.y + frame.titleH - pad;
+  const bottomY = frame.y + frame.h + pad;
 
   ctx.strokeStyle = '#FF3333';
   ctx.lineWidth = 2 / state.canvas.zoom;
