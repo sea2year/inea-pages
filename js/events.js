@@ -2570,6 +2570,20 @@ function showContextMenu(clientX, clientY, hit) {
       html += `<div class="cm-sep"></div>`;
       html += `<div class="cm-item danger" data-action="delete-editbox">删除编辑盒</div>`;
     }
+  } else if (hit.groupId) {
+    // Group selected
+    const group = state.groups.find(g => g.id === hit.groupId);
+    if (group) {
+      html += `<div class="cm-item" data-action="ungroup">取消分组</div>`;
+      html += `<div class="cm-sep"></div>`;
+      html += `<div class="cm-item${state.clipboard ? '' : ' disabled'}" data-action="paste">粘贴</div>`;
+      html += `<div class="cm-sep"></div>`;
+      html += `<div class="cm-item" data-action="import-video">导入视频</div>`;
+      html += `<div class="cm-item" data-action="import-audio">导入音频</div>`;
+      html += `<div class="cm-item" data-action="import-image">导入图片</div>`;
+      html += `<div class="cm-sep"></div>`;
+      html += `<div class="cm-item" data-action="auto-arrange">排列全部</div>`;
+    }
   } else {
     // Canvas / empty area — also check for selected shapes
     const hasSelectedShapes = state.selection.shapeId || (fabricCanvas && fabricCanvas.getActiveObject() && fabricCanvas.getActiveObject()._shapeId);
@@ -2872,16 +2886,22 @@ function handleContextAction(action, hit) {
       break;
     }
     case 'ungroup': {
-      const selIds = state.selection.cardIds;
+      // Find groups to remove: via hit.groupId (right-click on group) or via selected cards
       const toRemove = [];
-      for (const g of state.groups) {
-        if (g.cardIds.some(cid => selIds.includes(cid))) {
-          toRemove.push(g.id);
+      if (hit.groupId && state.groups.some(g => g.id === hit.groupId)) {
+        toRemove.push(hit.groupId);
+      } else {
+        const selIds = state.selection.cardIds;
+        for (const g of state.groups) {
+          if (g.cardIds.some(cid => selIds.includes(cid))) {
+            toRemove.push(g.id);
+          }
         }
       }
       if (toRemove.length > 0) {
         pushUndo();
         state.groups = state.groups.filter(g => !toRemove.includes(g.id));
+        state.selection.groupIds = state.selection.groupIds.filter(id => !toRemove.includes(id));
         render();
       }
       break;
@@ -3303,6 +3323,14 @@ canvasWrap.addEventListener('contextmenu', (e) => {
     state.selection.editBoxId = hit.editBoxId;
     state.selection.cardIds = [];
     state.selection.groupIds = [];
+    state.selection.connectionId = null;
+    render();
+  }
+
+  // Right-click on group — select it if not already
+  if (hit.groupId && !state.selection.groupIds.includes(hit.groupId)) {
+    state.selection.groupIds = [hit.groupId];
+    state.selection.cardIds = [];
     state.selection.connectionId = null;
     render();
   }
