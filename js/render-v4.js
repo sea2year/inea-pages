@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=40');
+console.log('[inea] render-v4.js v=41');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1025,14 +1025,14 @@ function renderGroup(group) {
     const gh = group.height || 60;
     const titleH = 18 / state.canvas.zoom;
 
-    // Title — outside, above the rect
-    ctx.fillStyle = `#6554CB`;
-    ctx.font = `bold ${titleFontSize}px "Inter", system-ui, sans-serif`;
-    ctx.textBaseline = 'top';
-    ctx.fillText(group.name || 'Group', gx, gy);
-
     // Rect — no rounded corners, below title
     const rx = gx, ry = gy + titleH, rw = gw, rh = gh - titleH;
+
+    // Title — outside, above the rect (bottom-left anchor)
+    ctx.fillStyle = `#6554CB`;
+    ctx.font = `bold ${titleFontSize}px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(group.name || 'Group', gx, ry);
     const gAlpha = isDropTarget ? 0.08 : (isDrillDown ? 0 : (isSelected ? 0.08 : (isHovered ? 0.04 : 0)));
     const gStrokeAlpha = isDropTarget ? 0.9 : (isDrillDown ? 0.2 : (isSelected ? 0.9 : (isHovered ? 0.6 : 0.35)));
     ctx.fillStyle = `rgba(${purple},${gAlpha})`;
@@ -1055,14 +1055,14 @@ function renderGroup(group) {
     const frameX = frame.x, frameY = frame.y, frameW = frame.w, frameH = frame.h;
     const titleH = frame.titleH || 22;
 
-    // Title — outside, above the rect
-    ctx.fillStyle = `#6554CB`;
-    ctx.font = `bold ${titleFontSize}px "Inter", system-ui, sans-serif`;
-    ctx.textBaseline = 'top';
-    ctx.fillText(group.name || 'Group', frameX, frameY + 1);
-
     // Rect — no rounded corners, cards area only
     const rx = frameX, ry = frameY + titleH, rw = frameW, rh = frameH - titleH;
+
+    // Title — outside, above the rect (bottom-left anchor)
+    ctx.fillStyle = `#6554CB`;
+    ctx.font = `bold ${titleFontSize}px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(group.name || 'Group', frameX, ry);
     const gAlpha2 = isDropTarget ? 0.06 : (isDrillDown ? 0 : (isSelected ? 0.06 : (isHovered ? 0.03 : 0)));
     const gStrokeAlpha2 = isDropTarget ? 0.85 : (isDrillDown ? 0.18 : (isSelected ? 0.85 : (isHovered ? 0.55 : 0.3)));
     ctx.fillStyle = `rgba(${purple},${gAlpha2})`;
