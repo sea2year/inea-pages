@@ -1561,6 +1561,22 @@ window.addEventListener('mousemove', (e) => {
             globalBestDy = oBottom - cBottom;
             globalTargetY = oBottom;
           }
+          // Video card bottom ↔ BGM card top (titles are on opposite sides)
+          if (isVid && other.type === 'audio') {
+            const d = Math.abs(cBottom - other.y);
+            if (d < globalBestDistY) {
+              globalBestDistY = d;
+              globalBestDy = other.y - cBottom;
+              globalTargetY = other.y;
+            }
+          } else if (c.type === 'audio' && oVid) {
+            const d = Math.abs(c.y - oBottom);
+            if (d < globalBestDistY) {
+              globalBestDistY = d;
+              globalBestDy = oBottom - c.y;
+              globalTargetY = oBottom;
+            }
+          }
         }
       }
     }
