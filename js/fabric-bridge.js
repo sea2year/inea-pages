@@ -59,8 +59,6 @@ function initFabricCanvas() {
   fabricCanvas.on('object:removed', () => { renderLayerList(); });
   fabricCanvas.on('selection:created', () => {
     _syncFabricSelToState();
-    // Double-click → show controls; single-click → hide
-    _applyFabricControlVisibility();
     renderLayerList();
     updateInspectorForFabricSelection();
     render();
@@ -68,10 +66,6 @@ function initFabricCanvas() {
   });
   fabricCanvas.on('selection:updated', () => {
     _syncFabricSelToState();
-    // Double-click → show controls if not already showing
-    if (state.interaction._fabricDblClick && !state.interaction._fabricShowControls) {
-      _applyFabricControlVisibility();
-    }
     updateInspectorForFabricSelection();
     render();
     fabricCanvas.requestRenderAll();
@@ -301,47 +295,39 @@ function _restoreFabricShapeSelection() {
 // synchronously trigger render() → syncFabricSizeAndTransform() →
 // event callbacks that try to forward again.
 let _isForwarding = false;
-function _applyFabricControlVisibility() {
+
+function _hideFabricControls() {
+  if (state.interaction._fabricShowControls) return; // double-click cancelled it
   const sel = fabricCanvas.getActiveObject();
   if (!sel) return;
-  const show = state.interaction._fabricDblClick;
-  state.interaction._fabricShowControls = show;
-  if (show) {
-    if (sel.type === 'activeselection') {
-      sel.getObjects().forEach(o => { o.hasBorders = true; o.hasControls = true; });
-    } else {
-      sel.hasBorders = true;
-      sel.hasControls = true;
-    }
+  if (sel.type === 'activeselection') {
+    sel.getObjects().forEach(o => { o.hasBorders = false; o.hasControls = false; });
   } else {
-    if (sel.type === 'activeselection') {
-      sel.getObjects().forEach(o => { o.hasBorders = false; o.hasControls = false; });
-    } else {
-      sel.hasBorders = false;
-      sel.hasControls = false;
-    }
+    sel.hasBorders = false;
+    sel.hasControls = false;
   }
+  fabricCanvas.requestRenderAll();
 }
 
 function _forwardToFabric(type, e) {
   if (!fabricCanvas || _isForwarding) return;
   _isForwarding = true;
   try {
-    // Double-click detection for Fabric shapes: only show controls on double-click
     if (type === 'mousedown') {
       const now = Date.now();
       const dx = Math.abs(e.clientX - (state.interaction._lastFabricClickX || 0));
       const dy = Math.abs(e.clientY - (state.interaction._lastFabricClickY || 0));
       const dt = now - (state.interaction._lastFabricClickTime || 0);
-      state.interaction._fabricDblClick = (dt < 400 && dx < 10 && dy < 10);
+      const isDbl = (dt < 400 && dx < 10 && dy < 10);
       state.interaction._lastFabricClickTime = now;
       state.interaction._lastFabricClickX = e.clientX;
       state.interaction._lastFabricClickY = e.clientY;
-    }
-    // On mouseup after double-click, show controls (Fabric drag has finished)
-    if (type === 'mouseup' && state.interaction._fabricDblClick && fabricCanvas.getActiveObject()) {
-      _applyFabricControlVisibility();
-      fabricCanvas.requestRenderAll();
+      if (isDbl) {
+        state.interaction._fabricShowControls = true;
+      } else {
+        // Single click: hide controls after Fabric finishes selection
+        setTimeout(() => _hideFabricControls(), 0);
+      }
     }
     // mousedown target: upperCanvasEl (Fabric's handler is bound directly).
     // bubbles: false — no need to bubble since handler is on the target element,
