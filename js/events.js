@@ -1186,6 +1186,7 @@ canvasWrap.addEventListener('mousedown', (e) => {
 // Input: Mouse move
 // ================================================================
 window.addEventListener('mousemove', (e) => {
+  try {
   // [DIAG] Trace execution
   if (state && state.interaction && state.interaction.mode === 'drawing-empty-group') {
     console.log('[DIAG-TOP] handler entered, mode=drawing-empty-group, e.target=', e.target?.tagName || e.target);
@@ -1207,8 +1208,10 @@ window.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
+  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-AFTER-COORDS] sx=', sx, 'sy=', sy);
 
   // Line preview — 2D canvas
+  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-AT-CHECKS] entering mode check chain');
   if (state.interaction.mode === 'drawing-line' && state._drawing) {
     const world = screenToWorld(sx, sy);
     let nx = world.x, ny = world.y;
@@ -1928,6 +1931,9 @@ window.addEventListener('mousemove', (e) => {
   } else {
     _setCanvasCursor('default');
   }
+} catch (err) {
+  console.error('[DIAG-CRASH] mousemove handler error:', err);
+}
 });
 
 // ================================================================
