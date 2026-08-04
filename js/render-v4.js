@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=42');
+console.log('[inea] render-v4.js v=43');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1025,7 +1025,7 @@ function renderGroup(group) {
   const hasCardSelected = state.selection.cardIds.some(cid => group.cardIds.includes(cid));
   const isDrillDown = isSelected && hasCardSelected;
   const purple = '101,84,203'; // #6554CB
-  const titleFontSize = Math.max(10, Math.min(16, 12 / state.canvas.zoom));
+  const titleFontSize = Math.max(10, 12 / state.canvas.zoom);
   if (group.collapsed) {
     const gx = group.x;
     const gy = group.y;
