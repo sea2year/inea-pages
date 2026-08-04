@@ -205,7 +205,7 @@
 <script src="js/state.js?v=5"></script>
 <script src="js/canvas-core.js?v=5"></script>
 <script src="js/editbox.js"></script>
-<script src="js/render-v4.js?v=95"></script>
+<script src="js/render-v4.js?v=96"></script>
 <script src="js/import.js?v=9"></script>
 <script src="js/fabric-bridge.js?v=8"></script>
 <script src="js/events.js?v=31"></script>
@@ -276,7 +276,13 @@
     loadingPct.textContent = 'START';
     enterBtn.classList.add('done');
 
+    var autoTimer = setTimeout(function() {
+      overlay.classList.add('hidden');
+      setTimeout(function() { overlay.remove(); }, 600);
+    }, 10000);
+
     enterBtn.addEventListener('click', function() {
+      clearTimeout(autoTimer);
       overlay.classList.add('hidden');
       setTimeout(function() { overlay.remove(); }, 600);
     });
