@@ -6,6 +6,9 @@ state.transform = { dragMode: null }; // null | 'body' | 'nw'|'n'|'ne'|'e'|'se'|
 function calculateVideoRect(card) {
   const outW = 320, outH = 180;
   if (card.type !== 'video') return null;
+  // Always use fixed 16:9 output frame as reference — no async video dimension
+  // detection. This matches compositeGroupFrame behavior for 16:9 sources where
+  // the unscaled video fills the entire output. Anchors at top-left (tx, ty).
   const ts = card.transformScale || 1.0;
   const tx = card.transformX || 0;
   const ty = card.transformY || 0;
@@ -18,7 +21,7 @@ function calculateVideoRect(card) {
 }
 
 function shouldShowOverlay() {
-  // Show overlay when paused (group mode, card-in-group, or standalone video)
+  // Show overlay when paused (group mode or card-in-group)
   if (state.playback.isPlaying) {
     return false;
   }
@@ -28,10 +31,9 @@ function shouldShowOverlay() {
   // (the card-body handler auto-switches to group mode, but this covers edge cases)
   if (state.selection.cardIds.length === 1) {
     const card = state.cards.find(c => c.id === state.selection.cardIds[0]);
-    if (!card) return false;
-    if (state.groups.some(g => g.cardIds.includes(card.id))) return true;
-    // Standalone video card (not in any group) — enable transform overlay
-    if (card.type === 'video') return true;
+    if (card && state.groups.some(g => g.cardIds.includes(card.id))) {
+      return true;
+    }
   }
   return false;
 }
@@ -46,8 +48,6 @@ function shouldShowHandles() {
 
 // Seek the group playhead so the given card is visible in the preview.
 function seekPlayheadToCard(cardId) {
-  // Guard: only works in group playback mode and needs a valid card
-  if (state.playback.playbackMode !== 'group') return;
   const card = state.cards.find(c => c.id === cardId);
   if (!card || card.type !== 'video') return;
   const gp = state.playback.groupPlayback;
@@ -277,20 +277,6 @@ function hitTestVideoInGroupFS(mx, my, sx, sy) {
   return null;
 }
 
-function _hitTestStandaloneVideo(mx, my) {
-  const cssW = groupPreviewCanvas.getBoundingClientRect().width;
-  const cssH = groupPreviewCanvas.getBoundingClientRect().height;
-  if (cssW <= 0 || cssH <= 0) return null;
-  const sx = cssW / 320, sy = cssH / 180;
-  const selCard = state.selection.cardIds.length === 1 ? state.cards.find(c => c.id === state.selection.cardIds[0]) : null;
-  if (!selCard || selCard.type !== 'video') return null;
-  const rect = calculateVideoRect(selCard);
-  if (!rect) return null;
-  const rx = rect.x * sx, ry = rect.y * sy, rw = rect.w * sx, rh = rect.h * sy;
-  if (mx >= rx && mx <= rx + rw && my >= ry && my <= ry + rh) return selCard.id;
-  return null;
-}
-
 function renderTransformOverlay() {
   const shouldShow = shouldShowOverlay();
   if (!shouldShow) {
@@ -465,57 +451,6 @@ function _ensureGroupPlaybackMode() {
 
 function _recompositePreviewForTransform() {
   const pb = state.playback;
-
-  // Standalone video card (not in a group) — draw video with transform directly
-  if (pb.playbackMode !== 'group') {
-    const card = state.cards.find(c => c.id === state.selection.cardIds[0]);
-    if (!card || card.type !== 'video') return null;
-    const outW = 320, outH = 180;
-    if (groupPreviewCanvas.width !== outW || groupPreviewCanvas.height !== outH) {
-      groupPreviewCanvas.width = outW;
-      groupPreviewCanvas.height = outH;
-    }
-    const pc = groupPreviewCanvas.getContext('2d');
-    pc.clearRect(0, 0, outW, outH);
-    pc.fillStyle = '#000';
-    pc.fillRect(0, 0, outW, outH);
-    if (card.isFreezeFrame && card.frameImage && card.frameImage.complete) {
-      // Freeze frame: draw frameImage with transforms
-      try {
-        const iw = card.frameImage.naturalWidth || card.frameImage.width;
-        const ih = card.frameImage.naturalHeight || card.frameImage.height;
-        const baseScale = Math.min(outW / iw, outH / ih);
-        const ts = card.transformScale || 1.0;
-        const tx = card.transformX || 0;
-        const ty = card.transformY || 0;
-        const scale = baseScale * ts;
-        const dw = iw * scale, dh = ih * scale;
-        const sx = (outW - iw * baseScale) / 2 + tx;
-        const sy = (outH - ih * baseScale) / 2 + ty;
-        pc.drawImage(card.frameImage, sx, sy, dw, dh);
-      } catch(e) {}
-    } else if (playbackVideo.readyState >= 2 && playbackVideo.videoWidth > 0) {
-      try {
-        const vw = playbackVideo.videoWidth, vh = playbackVideo.videoHeight;
-        const baseScale = Math.min(outW / vw, outH / vh);
-        const ts = card.transformScale || 1.0;
-        const tx = card.transformX || 0;
-        const ty = card.transformY || 0;
-        const scale = baseScale * ts;
-        const dw = vw * scale, dh = vh * scale;
-        const sx = (outW - vw * baseScale) / 2 + tx;
-        const sy = (outH - vh * baseScale) / 2 + ty;
-        pc.drawImage(playbackVideo, sx, sy, dw, dh);
-      } catch(e) {}
-    }
-    groupPreviewCanvas.style.width = '100%';
-    groupPreviewCanvas.style.height = '100%';
-    if (groupPreviewCanvas.style.display !== 'block') groupPreviewCanvas.style.display = 'block';
-    if (playbackVideo.style.display !== 'none') playbackVideo.style.display = 'none';
-    return groupPreviewCanvas;
-  }
-
-  // Group mode (existing code)
   if (!_ensureGroupPlaybackMode()) return null;
   // Clear stale effective props so compositeGroupFrame reads live card transform values
   delete pb._effectiveProps;
@@ -528,8 +463,9 @@ function _recompositePreviewForTransform() {
       groupPreviewCanvas.height = 180;
       const pc = groupPreviewCanvas.getContext('2d');
       pc.drawImage(resultCanvas, 0, 0);
-      groupPreviewCanvas.style.width = '100%';
-      groupPreviewCanvas.style.height = '100%';
+      const displayW = rightPanel.clientWidth - 24;
+      groupPreviewCanvas.style.width = displayW + 'px';
+      groupPreviewCanvas.style.height = (displayW * 180 / 320) + 'px';
       groupPreviewCanvas.style.display = 'block';
       playbackVideo.style.display = 'none';
       return resultCanvas;
@@ -541,68 +477,29 @@ function _recompositePreviewForTransform() {
 function _recompositeFullscreenForTransform() {
   if (!fullscreenOverlay.classList.contains('fullscreen-active')) return;
   const pb = state.playback;
-  const fw = parseInt(fullscreenCanvas.style.width);
-  const fh = parseInt(fullscreenCanvas.style.height);
-  if (fw <= 0 || fh <= 0) return;
-  const dpr = window.devicePixelRatio || 1;
-  const fc = fullscreenCanvas.getContext('2d');
-  fc.setTransform(dpr, 0, 0, dpr, 0, 0);
-  fc.fillStyle = '#000';
-  fc.fillRect(0, 0, fw, fh);
-
-  // Standalone video card (not in a group)
-  if (pb.playbackMode !== 'group') {
-    const card = state.cards.find(c => c.id === state.selection.cardIds[0]);
-    if (card && card.type === 'video') {
-      if (card.isFreezeFrame && card.frameImage && card.frameImage.complete) {
-        // Freeze frame: draw frameImage with transforms (fullscreen)
-        try {
-          const iw = card.frameImage.naturalWidth || card.frameImage.width;
-          const ih = card.frameImage.naturalHeight || card.frameImage.height;
-          const baseScale = Math.min(fw / iw, fh / ih);
-          const ts = card.transformScale || 1.0;
-          const tx = card.transformX || 0;
-          const ty = card.transformY || 0;
-          const scale = baseScale * ts;
-          const dw = iw * scale, dh = ih * scale;
-          const sx = (fw - iw * baseScale) / 2 + tx * (fw / 320);
-          const sy = (fh - ih * baseScale) / 2 + ty * (fh / 180);
-          fc.drawImage(card.frameImage, sx, sy, dw, dh);
-        } catch(e) {}
-      } else if (playbackVideo.readyState >= 2 && playbackVideo.videoWidth > 0) {
-        try {
-          const vw = playbackVideo.videoWidth, vh = playbackVideo.videoHeight;
-          const baseScale = Math.min(fw / vw, fh / vh);
-          const ts = card.transformScale || 1.0;
-          const tx = card.transformX || 0;
-          const ty = card.transformY || 0;
-          const scale = baseScale * ts;
-          const dw = vw * scale, dh = vh * scale;
-          const sx = (fw - vw * baseScale) / 2 + tx * (fw / 320);
-          const sy = (fh - vh * baseScale) / 2 + ty * (fh / 180);
-          fc.drawImage(playbackVideo, sx, sy, dw, dh);
-        } catch(e) {}
-      }
-      if (shouldShowHandles()) {
-        drawFullscreenHandles(fc, fw, fh);
-      }
-    }
-    return;
-  }
-
-  // Group mode (existing code)
   if (!_ensureGroupPlaybackMode()) return;
   const group = state.groups.find(g => g.id === pb.groupPlayback.groupId);
   if (group && !group.collapsed) {
-    const playheadX = pb.groupPlayback.groupStartX + (pb.pausedAt * PIXELS_PER_SECOND);
-    const resultCanvas = compositeGroupFrame(group, pb.groupPlayback.timelineCards || [], playheadX, Math.round(fw), Math.round(fh));
-    if (resultCanvas) {
-      fc.drawImage(resultCanvas, 0, 0);
-    } else if (groupPreviewCanvas.width > 0 && groupPreviewCanvas.height > 0) {
-      fc.drawImage(groupPreviewCanvas, 0, 0, fw, fh);
-    }
-    if (shouldShowHandles()) {
-      drawFullscreenHandles(fc, fw, fh);
+    const fw = parseInt(fullscreenCanvas.style.width);
+    const fh = parseInt(fullscreenCanvas.style.height);
+    if (fw > 0 && fh > 0) {
+      const playheadX = pb.groupPlayback.groupStartX + (pb.pausedAt * PIXELS_PER_SECOND);
+      // Composite at fullscreen resolution to avoid blur
+      const resultCanvas = compositeGroupFrame(group, pb.groupPlayback.timelineCards || [], playheadX, Math.round(fw), Math.round(fh));
+      const dpr = window.devicePixelRatio || 1;
+      const fc = fullscreenCanvas.getContext('2d');
+      fc.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fc.fillStyle = '#000';
+      fc.fillRect(0, 0, fw, fh);
+      if (resultCanvas) {
+        fc.drawImage(resultCanvas, 0, 0);
+      } else if (groupPreviewCanvas.width > 0 && groupPreviewCanvas.height > 0) {
+        fc.drawImage(groupPreviewCanvas, 0, 0, fw, fh);
+      }
+      // Draw transform handles if a video card is selected
+      if (shouldShowHandles()) {
+        drawFullscreenHandles(fc, fw, fh);
+      }
     }
   }
 }
@@ -719,16 +616,12 @@ transformOverlayCanvas.addEventListener('mousedown', (e) => {
   }
 
   // Step 2: Click-to-select — find which video card is under the cursor
-  const hitCardId = hitTestVideoInGroup(mx, my) || _hitTestStandaloneVideo(mx, my);
+  const hitCardId = hitTestVideoInGroup(mx, my);
   if (hitCardId) {
     state.selection.cardIds = [hitCardId];
     state.selection.groupIds = [];
     if (_ensureGroupPlaybackMode()) {
       seekPlayheadToCard(hitCardId);
-      _recompositePreviewForTransform();
-      renderTransformOverlay();
-    } else {
-      // Standalone video card
       _recompositePreviewForTransform();
       renderTransformOverlay();
     }
@@ -749,7 +642,7 @@ window.addEventListener('mousemove', (e) => {
         transformOverlayCanvas.style.cursor = handle ? getCursorForHandle(handle) : 'default';
       } else {
         // No card selected yet — show pointer if a video is under the cursor (click-to-select)
-        const hitId = hitTestVideoInGroup(mx, my) || _hitTestStandaloneVideo(mx, my);
+        const hitId = hitTestVideoInGroup(mx, my);
         transformOverlayCanvas.style.cursor = hitId ? 'pointer' : 'default';
       }
     }
@@ -870,12 +763,10 @@ window.addEventListener('mouseup', () => {
 function enterFullscreen() {
   if (state.playback.isPlaying) return;
   if (state.playback.pausedAt <= 0) return;
+  if (state.playback.playbackMode !== 'group') return;
 
-  // For group mode, validate the group is available
-  if (state.playback.playbackMode === 'group') {
-    const group = state.groups.find(g => g.id === state.playback.groupPlayback.groupId);
-    if (!group || group.collapsed) return;
-  }
+  const group = state.groups.find(g => g.id === state.playback.groupPlayback.groupId);
+  if (!group || group.collapsed) return;
 
   fullscreenOverlay.classList.add('fullscreen-active');
 
@@ -899,8 +790,19 @@ function enterFullscreen() {
   fullscreenCanvas.style.width = fw + 'px';
   fullscreenCanvas.style.height = fh + 'px';
 
-  // Delegate rendering to _recompositeFullscreenForTransform (handles both group + standalone)
-  _recompositeFullscreenForTransform();
+  // Composite at fullscreen resolution to avoid blur
+  const fc = fullscreenCanvas.getContext('2d');
+  fc.setTransform(dpr, 0, 0, dpr, 0, 0);
+  fc.fillStyle = '#000';
+  fc.fillRect(0, 0, Math.ceil(fw), Math.ceil(fh));
+
+  const playheadX = state.playback.groupPlayback.groupStartX + (state.playback.pausedAt * PIXELS_PER_SECOND);
+  const resultCanvas = compositeGroupFrame(group, state.playback.groupPlayback.timelineCards || [], playheadX, Math.round(fw), Math.round(fh));
+  if (resultCanvas) {
+    fc.drawImage(resultCanvas, 0, 0);
+  } else if (groupPreviewCanvas.width > 0 && groupPreviewCanvas.height > 0) {
+    fc.drawImage(groupPreviewCanvas, 0, 0, fw, fh);
+  }
 }
 
 function exitFullscreen() {
@@ -960,12 +862,13 @@ function renderImmersiveEditBox() {
   fc.save();
   fc.translate(fw / 2, fh / 2);
   fc.scale(scale, scale);
-  fc.translate(-eb.width / 2 - eb.x, -eb.height / 2 - eb.y);
-  // Camera zoom/pan for immersive preview navigation
+  fc.translate(-eb.width / 2, -eb.height / 2);
+
+  // Draw shapes
+  fc.save();
   fc.translate(cam.offsetX, cam.offsetY);
   fc.scale(cam.zoom, cam.zoom);
 
-  // Draw shapes (world coords)
   for (const s of (eb.shapes || [])) {
     fc.globalAlpha = s.opacity != null ? s.opacity : 1;
     if (s.shapeType === 'rect') {
@@ -977,7 +880,7 @@ function renderImmersiveEditBox() {
       if (s.fill) { fc.fillStyle = s.fill; fc.fill(); }
       if (s.stroke) { fc.strokeStyle = s.stroke; fc.lineWidth = s.strokeWidth || 2; fc.stroke(); }
     } else if (s.shapeType === 'line') {
-      fc.strokeStyle = s.stroke || '#88C405';
+      fc.strokeStyle = s.stroke || '#D4FF00';
       fc.lineWidth = s.strokeWidth || 2;
       fc.beginPath(); fc.moveTo(s.x1, s.y1); fc.lineTo(s.x2, s.y2); fc.stroke();
     } else if (s.shapeType === 'text') {
@@ -989,6 +892,7 @@ function renderImmersiveEditBox() {
     }
   }
   fc.globalAlpha = 1;
+  fc.restore();
   fc.restore();
 }
 
@@ -1044,26 +948,26 @@ eboxImmersiveCanvas.addEventListener('mousedown', (e) => {
   const fh = rect.height;
   const cam = eb.camera || { zoom: 1, offsetX: 0, offsetY: 0 };
   const scale = Math.min(fw / eb.width, fh / eb.height);
-  // Convert screen coords to world coords (accounts for camera zoom/pan)
-  const worldX = ((sx - fw / 2) / scale - cam.offsetX) / cam.zoom + eb.width / 2 + eb.x;
-  const worldY = ((sy - fh / 2) / scale - cam.offsetY) / cam.zoom + eb.height / 2 + eb.y;
+  // Convert screen coords to edit box local coords
+  const localX = ((sx - fw / 2) / scale + eb.width / 2 - cam.offsetX) / cam.zoom;
+  const localY = ((sy - fh / 2) / scale + eb.height / 2 - cam.offsetY) / cam.zoom;
 
   const id = 'shape_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
   if (_immersiveTool === 'rect') {
     eb.shapes = eb.shapes || [];
-    eb.shapes.push({ id, shapeType: 'rect', left: worldX, top: worldY, width: 0, height: 0, fill: 'rgba(136,196,5,0.15)', stroke: '#88C405', strokeWidth: 2, opacity: 1 });
+    eb.shapes.push({ id, shapeType: 'rect', left: localX, top: localY, width: 0, height: 0, fill: 'rgba(212,255,0,0.2)', stroke: '#D4FF00', strokeWidth: 2, opacity: 1 });
     eb._drawingIdx = eb.shapes.length - 1;
-    eb._drawStart = { x: worldX, y: worldY };
+    eb._drawStart = { x: localX, y: localY };
   } else if (_immersiveTool === 'ellipse') {
     eb.shapes = eb.shapes || [];
-    eb.shapes.push({ id, shapeType: 'ellipse', left: worldX, top: worldY, width: 0, height: 0, fill: 'rgba(136,196,5,0.15)', stroke: '#88C405', strokeWidth: 2, opacity: 1 });
+    eb.shapes.push({ id, shapeType: 'ellipse', left: localX, top: localY, width: 0, height: 0, fill: 'rgba(212,255,0,0.2)', stroke: '#D4FF00', strokeWidth: 2, opacity: 1 });
     eb._drawingIdx = eb.shapes.length - 1;
-    eb._drawStart = { x: worldX, y: worldY };
+    eb._drawStart = { x: localX, y: localY };
   } else if (_immersiveTool === 'line') {
     eb.shapes = eb.shapes || [];
-    eb.shapes.push({ id, shapeType: 'line', x1: worldX, y1: worldY, x2: worldX, y2: worldY, stroke: '#88C405', strokeWidth: 2, opacity: 1 });
+    eb.shapes.push({ id, shapeType: 'line', x1: localX, y1: localY, x2: localX, y2: localY, stroke: '#D4FF00', strokeWidth: 2, opacity: 1 });
     eb._drawingIdx = eb.shapes.length - 1;
-    eb._drawStart = { x: worldX, y: worldY };
+    eb._drawStart = { x: localX, y: localY };
     eb._lineDrawing = true;
   }
   renderImmersiveEditBox();
@@ -1080,20 +984,19 @@ eboxImmersiveCanvas.addEventListener('mousemove', (e) => {
   const fh = rect.height;
   const cam = eb.camera || { zoom: 1, offsetX: 0, offsetY: 0 };
   const scale = Math.min(fw / eb.width, fh / eb.height);
-  // Convert screen coords to world coords (accounts for camera zoom/pan)
-  const worldX = ((sx - fw / 2) / scale - cam.offsetX) / cam.zoom + eb.width / 2 + eb.x;
-  const worldY = ((sy - fh / 2) / scale - cam.offsetY) / cam.zoom + eb.height / 2 + eb.y;
+  const localX = ((sx - fw / 2) / scale + eb.width / 2 - cam.offsetX) / cam.zoom;
+  const localY = ((sy - fh / 2) / scale + eb.height / 2 - cam.offsetY) / cam.zoom;
 
   const s = (eb.shapes || [])[eb._drawingIdx];
   if (!s) return;
   if (eb._lineDrawing) {
-    s.x2 = worldX;
-    s.y2 = worldY;
+    s.x2 = localX;
+    s.y2 = localY;
   } else {
-    s.left = Math.min(eb._drawStart.x, worldX);
-    s.top = Math.min(eb._drawStart.y, worldY);
-    s.width = Math.abs(worldX - eb._drawStart.x);
-    s.height = Math.abs(worldY - eb._drawStart.y);
+    s.left = Math.min(eb._drawStart.x, localX);
+    s.top = Math.min(eb._drawStart.y, localY);
+    s.width = Math.abs(localX - eb._drawStart.x);
+    s.height = Math.abs(localY - eb._drawStart.y);
   }
   renderImmersiveEditBox();
 });
@@ -1481,7 +1384,70 @@ function renderLayerList() {
     }
     item.draggable = true;
 
-    // Name only (Figma: text + type icon, no thumbnail)
+    // Thumbnail canvas
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.className = 'layer-thumb';
+    thumbCanvas.width = 48;
+    thumbCanvas.height = 27;
+    const tctx = thumbCanvas.getContext('2d');
+
+    if (card.type === 'text') {
+      tctx.fillStyle = '#e8f0fe';
+      tctx.fillRect(0, 0, 48, 27);
+      tctx.fillStyle = '#D4FF00';
+      tctx.font = 'bold 14px "Inter", system-ui, sans-serif';
+      tctx.textAlign = 'center';
+      tctx.fillText('T', 24, 19);
+      tctx.textAlign = 'start';
+    } else if (card.type === 'audio' || card.type === 'bgm') {
+      // Solid color + waveform icon for audio
+      tctx.fillStyle = '#D4FF00';
+      tctx.fillRect(0, 0, 48, 27);
+      // Mini waveform bars
+      if (card.waveform && card.waveform.length > 0) {
+        const peaks = card.waveform;
+        const barCount = 16;
+        for (let j = 0; j < barCount; j++) {
+          const idx = Math.floor(j / barCount * peaks.length);
+          const peak = peaks[Math.min(idx, peaks.length - 1)];
+          const barH = Math.max(1, peak * 20);
+          tctx.fillStyle = '#7c6ea0';
+          tctx.fillRect(4 + j * 2.5, 13 - barH / 2, 1.8, barH);
+        }
+      }
+      tctx.fillStyle = '#a78bfa';
+      tctx.font = '9px "Inter", system-ui, sans-serif';
+      tctx.textAlign = 'center';
+      tctx.fillText(card.type === 'bgm' ? 'BGM' : 'AUD', 38, 21);
+      tctx.textAlign = 'start';
+    } else if (card.thumbStrip) {
+      try {
+        const stripW = card.thumbStrip.width;
+        const fracIn = card.trimIn / (card.duration || 1);
+        const fracOut = card.trimOut / (card.duration || 1);
+        const srcX = stripW * fracIn;
+        const srcW = stripW * (fracOut - fracIn);
+        if (srcW > 0) {
+          tctx.drawImage(card.thumbStrip, srcX, 0, srcW, card.thumbStrip.height, 0, 0, 48, 27);
+        } else {
+          tctx.fillStyle = '#f0f0f0';
+          tctx.fillRect(0, 0, 48, 27);
+        }
+      } catch (e) {
+        tctx.fillStyle = '#f0f0f0';
+        tctx.fillRect(0, 0, 48, 27);
+      }
+    } else {
+      tctx.fillStyle = '#f0f0f0';
+      tctx.fillRect(0, 0, 48, 27);
+    }
+
+    item.appendChild(thumbCanvas);
+
+    // Info: name + duration / description
+    const info = document.createElement('div');
+    info.className = 'layer-info';
+
     const nameSpan = document.createElement('span');
     nameSpan.className = 'layer-name';
     if (card.type === 'text') {
@@ -1489,34 +1455,50 @@ function renderLayerList() {
     } else {
       nameSpan.textContent = card.label;
     }
-    item.appendChild(nameSpan);
+    info.appendChild(nameSpan);
 
-    // Type indicator icon (Figma: right-aligned letter badge or shape outline)
-    const typeIcon = document.createElement('span');
-    typeIcon.className = 'layer-type-icon';
-    if (card.type === 'video' || card.type === 'synthesized-video') {
-      typeIcon.classList.add('type-video');
-      typeIcon.textContent = 'V';
-    } else if (card.type === 'audio' || card.type === 'bgm') {
-      typeIcon.classList.add('type-bgm');
-      typeIcon.textContent = 'B';
-    } else if (card.type === 'text') {
-      typeIcon.classList.add('type-editbox');
-      typeIcon.textContent = 'T';
-    } else if (card.type === 'composition') {
-      typeIcon.classList.add('type-editbox');
-      typeIcon.textContent = 'E';
-    } else if (card.type === 'image') {
-      typeIcon.classList.add('type-square');
-      typeIcon.textContent = 'I';
+    const durSpan = document.createElement('span');
+    durSpan.className = 'layer-dur';
+    if (card.type === 'text') {
+      durSpan.textContent = '文字';
     } else {
-      // Shape types: circle/square outline
-      typeIcon.classList.add('type-square');
+      durSpan.textContent = formatTime(dur);
     }
-    item.appendChild(typeIcon);
+    info.appendChild(durSpan);
+
+    item.appendChild(info);
+
+    // Type badge
+    if (card.type === 'audio' || card.type === 'bgm') {
+      const badge = document.createElement('span');
+      badge.className = 'layer-badge';
+      badge.textContent = card.type === 'bgm' ? 'BGM' : 'AUD';
+      item.appendChild(badge);
+    } else if (card.type === 'text') {
+      const badge = document.createElement('span');
+      badge.className = 'layer-badge';
+      badge.textContent = 'T';
+      badge.style.background = '#D4FF00';
+      item.appendChild(badge);
+    } else if (card.type === 'composition') {
+      const badge = document.createElement('span');
+      badge.className = 'layer-badge';
+      badge.textContent = '合成';
+      badge.style.background = '#b3d900';
+      badge.style.color = '#fff';
+      badge.style.fontSize = '8px';
+      item.appendChild(badge);
+    }
+
+    // Drag handle
+    const handle = document.createElement('div');
+    handle.className = 'layer-drag-handle';
+    handle.innerHTML = '<div class="layer-drag-dot-grid"><span></span><span></span><span></span><span></span><span></span><span></span></div>';
+    item.appendChild(handle);
 
     // Click to select (deferred so dblclick can fire first)
     item.addEventListener('click', (e) => {
+      if (e.target.closest('.layer-drag-handle')) return; // handled by dnd
       if (e.target.tagName === 'INPUT') return;
       if (item._clickTimer) { clearTimeout(item._clickTimer); item._clickTimer = null; }
       const shiftKey = e.shiftKey;
@@ -1613,242 +1595,110 @@ function renderLayerList() {
 }
 
 // ================================================================
-// Right-panel inspector — dynamic content (Figma dark theme design)
+// Right-panel inspector — dynamic content
 // ================================================================
-
-/* ---- tiny HTML helpers ---- */
-function _secDivider() {
-  return '<div class="section-divider"></div>';
-}
-
-function _sec(title, bodyHtml, collapsed) {
-  const toggleSymbol = collapsed ? '+' : '\u2212';
-  const bodyClass = collapsed ? 'section-body collapsed' : 'section-body';
-  return `<div class="panel-section">
-    <div class="section-header" data-sec-toggle>
-      <span>${escHtml(title)}</span>
-      <span class="section-toggle">${toggleSymbol}</span>
-    </div>
-    <div class="${bodyClass}">${bodyHtml}</div>
-  </div>`;
-}
-
-// Non-collapsible section — just title, no +/- toggle
-function _secStatic(title, bodyHtml) {
-  return `<div class="panel-section">
-    <div class="section-header section-header-static">
-      <span>${escHtml(title)}</span>
-    </div>
-    <div class="section-body">${bodyHtml}</div>
-  </div>`;
-}
-
-// Full-width row — no label, child elements fill space with justify
-function _rowFull(innerHtml) {
-  return `<div class="inspector-row inspector-row-full">${innerHtml}</div>`;
-}
-
-function _row(labelHtml, innerHtml, wideLabel) {
-  const labelClass = wideLabel ? 'label-wide' : '';
-  return `<div class="inspector-row"><label class="${labelClass}">${labelHtml}</label>${innerHtml}</div>`;
-}
-
-function _pair(aLabel, aId, aVal, bLabel, bId, bVal) {
-  return `<div class="inspector-pair" style="display:flex;gap:5px;margin-bottom:6px;">
-    <div class="input-box" style="box-sizing:border-box;width:101px;flex:none;display:flex;align-items:center;height:22px;padding:0 6px;gap:4px;border:1px solid transparent;border-radius:5px;background:#f2f2f2;"><span class="box-label" style="font-size:8px;color:#6c6c6c;font-weight:400;flex-shrink:0;">${aLabel}</span><input type="number" id="${aId}" value="${aVal}" step="1" style="flex:1;min-width:0;border:none;background:transparent;font-size:8px;color:#6c6c6c;outline:none;padding:0;font-family:inherit;"></div>
-    <div class="input-box" style="box-sizing:border-box;width:101px;flex:none;display:flex;align-items:center;height:22px;padding:0 6px;gap:4px;border:1px solid transparent;border-radius:5px;background:#f2f2f2;"><span class="box-label" style="font-size:8px;color:#6c6c6c;font-weight:400;flex-shrink:0;">${bLabel}</span><input type="number" id="${bId}" value="${bVal}" step="1" style="flex:1;min-width:0;border:none;background:transparent;font-size:8px;color:#6c6c6c;outline:none;padding:0;font-family:inherit;"></div>
-  </div>`;
-}
-
-function _slider(id, val, min, max, suffix) {
-  return `<input type="range" id="${id}" min="${min}" max="${max}" value="${val}">
-    <span style="font-family:var(--font-mono);font-size:10px;color:#999;width:36px;text-align:right;flex-shrink:0;">${val}${suffix || ''}</span>`;
-}
-
-function _easingSelect(id, currentVal) {
-  const opts = [
-    ['linear', '线性 (Linear)'],
-    ['easeIn', '缓入 (Ease In)'],
-    ['easeOut', '缓出 (Ease Out)'],
-    ['easeInOut', '缓入缓出 (Ease In-Out)']
-  ];
-  let s = `<select id="${id}">`;
-  for (const [v, label] of opts) {
-    s += `<option value="${v}" ${currentVal === v ? 'selected' : ''}>${label}</option>`;
-  }
-  s += '</select>';
-  return s;
-}
-
 function updateInspector() {
-  if (document.activeElement && document.activeElement.closest('#props-content')) return;
+  // Don't rebuild inspector HTML while user is actively editing a field
+  // (change handlers blur first before triggering render, so this only
+  // blocks rebuilds from external render() calls like mousemove)
+  if (document.activeElement && document.activeElement.closest('#props-content')) {
+    return;
+  }
 
-  // Line shape (2D canvas)
+  // If a line shape is selected (pure 2D canvas), show line inspector
   if (state.selection.shapeId) {
     const shape = state.shapes.find(s => s.id === state.selection.shapeId);
-    if (shape && shape.shapeType === 'line') { updateLineInspector(shape); return; }
-  }
-
-  // Fabric shapes (rectangle, ellipse, path, text)
-  const activeObj = fabricCanvas && fabricCanvas.getActiveObject();
-  if (activeObj && activeObj._shapeId) { updateInspectorForFabricSelection(); return; }
-
-  // ================================================================
-  // eb-chain playback: always show insert keyframe button (gray when playing)
-  // ================================================================
-  if (state.playback.playbackMode === 'eb-chain') {
-    const chainData = state.playback._ebChain;
-    if (chainData && chainData.chain && chainData.chain.length >= 2) {
-      const isPaused = state.playback.pausedAt > 0 && !state.playback.isPlaying;
-      propsContent.innerHTML = `<div style="margin-top:16px;text-align:center;">
-        <button id="insp-eb-insert-kf" class="inspector-btn${isPaused ? ' accent' : ''}" style="width:160px;padding:4px 16px;${isPaused ? '' : 'opacity:0.4;pointer-events:none;'}">插入关键帧</button>
-      </div>`;
-      if (isPaused) {
-        const btn = document.getElementById('insp-eb-insert-kf');
-        if (btn) {
-          btn.addEventListener('click', () => {
-          const chain = chainData.chain;
-          const duration = chainData.duration || 1;
-          const totalElapsed = state.playback.pausedAt;
-          const chainProgress = Math.min(1, totalElapsed / Math.max(0.001, duration));
-
-          // Find the segment and position within the chain
-          let timeAccum = 0;
-          let foundSegIdx = -1;
-          let foundLocalT = 0;
-          let foundFromEb = null;
-          let foundToEb = null;
-          let foundConn = null;
-
-          for (let i = 0; i < chain.length - 1; i++) {
-            const eb = findEditBoxById(chain[i]);
-            const nextEb = findEditBoxById(chain[i + 1]);
-            if (!eb || !nextEb) continue;
-
-            const conn = state.connections.find(c =>
-              c.type === 'eb-keyframe' &&
-              ((c.fromEditBoxId === chain[i] && c.toEditBoxId === chain[i + 1]) ||
-               (c.fromEditBoxId === chain[i + 1] && c.toEditBoxId === chain[i]))
-            );
-
-            let segDur;
-            if (conn && conn.transitionDuration > 0) {
-              segDur = conn.transitionDuration;
-            } else {
-              segDur = Math.abs(nextEb.x - eb.x) / PIXELS_PER_SECOND;
-            }
-
-            if (totalElapsed >= timeAccum && totalElapsed < timeAccum + segDur) {
-              foundSegIdx = i;
-              foundLocalT = segDur > 0 ? (totalElapsed - timeAccum) / segDur : 0;
-              foundFromEb = eb;
-              foundToEb = nextEb;
-              foundConn = conn;
-              break;
-            }
-            timeAccum += segDur;
-          }
-
-          if (foundSegIdx < 0 || !foundFromEb || !foundToEb) return;
-
-          pushUndo();
-          const easing = foundConn ? (foundConn.easing || 'linear') : 'linear';
-          const interpShapes = interpolateShapes(foundFromEb.shapes || [], foundToEb.shapes || [], foundLocalT, easing);
-          const fromSide = foundConn ? foundConn.fromSide : 'right';
-          const toSide = foundConn ? foundConn.toSide : 'left';
-
-          const newEb = {
-            id: 'ebox_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-            x: foundFromEb.x + (foundToEb.x - foundFromEb.x) * foundLocalT,
-            y: foundFromEb.y + (foundToEb.y - foundFromEb.y) * foundLocalT,
-            width: foundFromEb.width + (foundToEb.width - foundFromEb.width) * foundLocalT,
-            height: foundFromEb.height + (foundToEb.height - foundFromEb.height) * foundLocalT,
-            shapes: interpShapes,
-            _shapesWorldCoords: !!(foundFromEb._shapesWorldCoords || foundToEb._shapesWorldCoords),
-            camera: { zoom: (foundFromEb.camera ? foundFromEb.camera.zoom : 1), offsetX: 0, offsetY: 0 }
-          };
-          state.editBoxes.push(newEb);
-
-          // Remove old connection, create two new ones
-          if (foundConn) {
-            state.connections = state.connections.filter(c => c.id !== foundConn.id);
-          }
-          const connDur = foundConn ? (foundConn.transitionDuration || 1) : 1;
-          state.connections.push({
-            id: 'conn_' + Date.now() + '_a',
-            type: 'eb-keyframe',
-            fromEditBoxId: foundFromEb.id,
-            toEditBoxId: newEb.id,
-            fromSide: fromSide,
-            toSide: 'left',
-            transitionDuration: connDur * foundLocalT,
-            easing: easing
-          });
-          state.connections.push({
-            id: 'conn_' + (Date.now() + 1) + '_b',
-            type: 'eb-keyframe',
-            fromEditBoxId: newEb.id,
-            toEditBoxId: foundToEb.id,
-            fromSide: 'right',
-            toSide: toSide,
-            transitionDuration: connDur * (1 - foundLocalT),
-            easing: easing
-          });
-
-          state.selection.editBoxId = newEb.id;
-          state.selection.cardIds = [];
-          state.selection.groupIds = [];
-          state.selection.connectionId = null;
-          state.selection.connectionIds = [];
-          render();
-        });
-      }
-      }
+    if (shape && shape.shapeType === 'line') {
+      updateLineInspector(shape);
       return;
     }
+  }
+
+  // If a Fabric shape is selected, show shape inspector
+  const activeObj = fabricCanvas && fabricCanvas.getActiveObject();
+  if (activeObj && activeObj._shapeId) {
+    updateInspectorForFabricSelection();
+    return;
   }
 
   const selCount = state.selection.cardIds.length;
   const selConn = state.selection.connectionId;
   const selConns = state.selection.connectionIds;
-  let html = '';
 
-  // ================================================================
-  // State: Multiple connections — batch edit
-  // ================================================================
+  // Multiple connections selected — batch edit
   if (selConns.length > 1 && selCount === 0) {
     const firstConn = state.connections.find(c => c.id === selConns[0]);
     const firstType = firstConn ? firstConn.transition : 'cut';
     const firstDur = firstConn ? firstConn.transitionDuration : 0.5;
-    html = `<div class="inspector-row" style="font-weight:550;color:#fff;">已选 ${selConns.length} 条连线</div>
-      ${_row('类型', `<select id="insp-transition-type">
-        <option value="cut" ${firstType === 'cut' ? 'selected' : ''}>切</option>
-        <option value="dissolve" ${firstType === 'dissolve' ? 'selected' : ''}>叠</option>
-        <option value="fade" ${firstType === 'fade' ? 'selected' : ''}>黑</option>
-      </select>`)}
-      ${_row('时长', `<input type="number" id="insp-transition-dur" value="${firstDur}" step="0.1" min="0.1" max="5">`)}`;
-    propsContent.innerHTML = html;
+    propsContent.innerHTML = `
+      <div class="inspector-row"><label>已选 ${selConns.length} 条连线</label></div>
+      <div class="inspector-row">
+        <label>批量转场</label>
+        <select id="insp-transition-type">
+          <option value="cut" ${firstType === 'cut' ? 'selected' : ''}>切</option>
+          <option value="dissolve" ${firstType === 'dissolve' ? 'selected' : ''}>叠</option>
+          <option value="fade" ${firstType === 'fade' ? 'selected' : ''}>黑</option>
+        </select>
+      </div>
+      <div class="inspector-row">
+        <label>时长</label>
+        <input type="number" id="insp-transition-dur" value="${firstDur}" step="0.1" min="0.1" max="5">
+      </div>
+    `;
     bindInspectorEvents(null, null);
     return;
   }
 
-  // ================================================================
-  // State: Single connection
-  // ================================================================
+  // Connection selected (single)
   if (selConn && selCount === 0) {
     const conn = state.connections.find(c => c.id === selConn);
     if (!conn) { propsContent.innerHTML = '<div class="inspector-hint">选中卡片以编辑属性</div>'; return; }
 
-    if (conn.type === 'eb-keyframe') {
+    const isTween = conn.type === 'tween';
+    const isKeyframe = conn.type === 'keyframe';
+    const isEbKeyframe = conn.type === 'eb-keyframe';
+    if (isEbKeyframe) {
       const fromEb = findEditBoxById(conn.fromEditBoxId);
       const toEb = findEditBoxById(conn.toEditBoxId);
+      const fromLabel = fromEb ? ('编辑盒 ' + (fromEb.id || '').slice(0, 8)) : '未知';
+      const toLabel = toEb ? ('编辑盒 ' + (toEb.id || '').slice(0, 8)) : '未知';
+      const fromShapeCount = fromEb ? (fromEb.shapes || []).length : 0;
+      const toShapeCount = toEb ? (toEb.shapes || []).length : 0;
+      const hasCommon = fromEb && toEb ? hasCommonShapes(fromEb.shapes || [], toEb.shapes || []) : false;
       const effDur = conn.transitionDuration > 0 ? conn.transitionDuration : (fromEb && toEb ? Math.abs(toEb.x - fromEb.x) / PIXELS_PER_SECOND : 1);
       const effEasing = conn.easing || 'linear';
-
-      html = _secStatic('编辑盒关键帧',
-        _row('时长', `<input type="number" id="insp-eb-kf-dur" value="${effDur.toFixed(1)}" step="0.1" min="0.1" max="30">`)
-      ) + _secDivider() + _sec('缓动曲线', _row('缓动', _easingSelect('insp-eb-kf-easing', effEasing)), true);
-    } else if (conn.type === 'keyframe') {
+      propsContent.innerHTML = `
+        <div class="inspector-row">
+          <label>类型</label>
+          <span style="color:#ff9800;">编辑盒关键帧连线</span>
+        </div>
+        <div class="inspector-row">
+          <label>来源</label>
+          <span style="font-size:11px;">${fromLabel} (${fromShapeCount} 图形)</span>
+        </div>
+        <div class="inspector-row">
+          <label>目标</label>
+          <span style="font-size:11px;">${toLabel} (${toShapeCount} 图形)</span>
+        </div>
+        <div class="inspector-row">
+          <label>图形匹配</label>
+          <span style="font-size:11px;color:${hasCommon ? '#4caf50' : '#ff9800'};">${hasCommon ? '有同名图形，可做图形级插值' : '无同名图形，将做整体淡入淡出'}</span>
+        </div>
+        <div class="inspector-row">
+          <label>时长</label>
+          <input type="number" id="insp-eb-kf-dur" value="${effDur.toFixed(1)}" step="0.1" min="0.1" max="30">
+        </div>
+        <div class="inspector-row">
+          <label>缓动</label>
+          <select id="insp-eb-kf-easing">
+            <option value="linear" ${effEasing === 'linear' ? 'selected' : ''}>线性 (Linear)</option>
+            <option value="easeIn" ${effEasing === 'easeIn' ? 'selected' : ''}>缓入 (Ease In)</option>
+            <option value="easeOut" ${effEasing === 'easeOut' ? 'selected' : ''}>缓出 (Ease Out)</option>
+            <option value="easeInOut" ${effEasing === 'easeInOut' ? 'selected' : ''}>缓入缓出 (Ease In-Out)</option>
+          </select>
+        </div>
+      `;
+    } else if (isKeyframe) {
       const fromCard = state.cards.find(c => c.id === conn.fromCardId);
       const toCard = state.cards.find(c => c.id === conn.toCardId);
       const aOpacity = fromCard ? (fromCard.opacity != null ? fromCard.opacity : 1) : 1;
@@ -1859,122 +1709,236 @@ function updateInspector() {
       const bScale = toCard ? (toCard.transformScale || 1) : 1;
       const bX = toCard ? (toCard.transformX || 0) : 0;
       const bY = toCard ? (toCard.transformY || 0) : 0;
+
       const _diff = (a, b) => Math.abs(a - b) > 0.001;
+      const diffOpacity = _diff(aOpacity, bOpacity);
+      const diffScale = _diff(aScale, bScale);
+      const diffX = _diff(aX, bX);
+      const diffY = _diff(aY, bY);
+
       const activeProps = conn.properties || ['opacity', 'transformScale', 'transformX', 'transformY'];
-      const hasProp = (n) => activeProps.includes(n);
-      const fmtVal = (a, b, diff) => diff ? `<span style="color:#ff9800;">${a} → ${b}</span>` : a;
+      const hasProp = (name) => activeProps.includes(name);
+      const fmtVal = (a, b, diff) => diff ? `<span style="color:#ff9800;">${a} → ${b}</span>` : `<span style="color:#666;">${a}</span>`;
 
       const propRow = (id, label, aVal, bVal, diff) => {
         const checked = hasProp(id) ? 'checked' : '';
-        const highlight = diff ? ' diff-highlight' : '';
-        return `<label class="kf-prop-row${highlight}">
+        const highlight = diff ? 'diff-highlight' : '';
+        return `<label class="kf-prop-row ${highlight}">
           <input type="checkbox" id="insp-kf-prop-${id}" ${checked}>
           <span>${label}</span>
           <span style="font-size:10px;font-family:var(--font-mono);margin-left:auto;">${fmtVal(aVal, bVal, diff)}</span>
         </label>`;
       };
 
-      const infoHtml = `${_row('锚点', _slider('insp-kf-frompos', Math.round((conn.fromPosition || 0) * 100), 0, 100, '%'))}
-        <div style="font-size:11px;color:#aaa;margin-top:6px;margin-bottom:4px;">控制属性</div>
-        <div style="display:flex;flex-direction:column;gap:2px;">
-          ${propRow('opacity', '透明度', aOpacity, bOpacity, _diff(aOpacity, bOpacity))}
-          ${propRow('transformScale', '缩放', aScale.toFixed(2), bScale.toFixed(2), _diff(aScale, bScale))}
-          ${propRow('transformX', '位移 X', Math.round(aX), Math.round(bX), _diff(aX, bX))}
-          ${propRow('transformY', '位移 Y', Math.round(aY), Math.round(bY), _diff(aY, bY))}
-        </div>
+      propsContent.innerHTML = `
         <style>
           .kf-prop-row { display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;font-size:11px;cursor:pointer; }
           .kf-prop-row.diff-highlight { background:rgba(255,152,0,0.1);border:1px solid rgba(255,152,0,0.3); }
-        </style>`;
-      const easingHtml = _row('缓动', _easingSelect('insp-easing', conn.easing || 'linear'));
-
-      html = _sec('关键帧连线', infoHtml, false) + _secDivider() + _sec('缓动曲线', easingHtml, true);
-    } else if (conn.type === 'tween') {
-      const infoHtml = `<div class="inspector-row" style="margin-bottom:4px;"><span style="color:#D4FF00;font-weight:500;">补间连线</span></div>`;
-      const easingHtml = _row('缓动', _easingSelect('insp-easing', conn.easing || 'linear'));
-      html = _sec('补间', infoHtml, false) + _secDivider() + _sec('缓动曲线', easingHtml, true);
+        </style>
+        <div class="inspector-row">
+          <label>类型</label>
+          <span style="color:#ff9800;">关键帧连线</span>
+        </div>
+        <div class="inspector-row">
+          <label>缓动</label>
+          <select id="insp-easing">
+            <option value="linear" ${conn.easing === 'linear' ? 'selected' : ''}>线性 (Linear)</option>
+            <option value="easeIn" ${conn.easing === 'easeIn' ? 'selected' : ''}>缓入 (Ease In)</option>
+            <option value="easeOut" ${conn.easing === 'easeOut' ? 'selected' : ''}>缓出 (Ease Out)</option>
+            <option value="easeInOut" ${conn.easing === 'easeInOut' ? 'selected' : ''}>缓入缓出 (Ease In-Out)</option>
+          </select>
+        </div>
+        <div class="inspector-row">
+          <label>锚点位置</label>
+          <input type="range" id="insp-kf-frompos" min="0" max="100" value="${Math.round((conn.fromPosition || 0) * 100)}">
+          <span style="font-family:var(--font-mono);font-size:10px;color:#999;width:32px;text-align:right;">${Math.round((conn.fromPosition || 0) * 100)}%</span>
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:#aaa;">控制属性</div>
+        <div style="display:flex;flex-direction:column;gap:2px;margin-top:2px;">
+          ${propRow('opacity', '透明度', aOpacity, bOpacity, diffOpacity)}
+          ${propRow('transformScale', '缩放', aScale.toFixed(2), bScale.toFixed(2), diffScale)}
+          ${propRow('transformX', '位移 X', Math.round(aX), Math.round(bX), diffX)}
+          ${propRow('transformY', '位移 Y', Math.round(aY), Math.round(bY), diffY)}
+        </div>
+      `;
+    } else if (isTween) {
+      propsContent.innerHTML = `
+        <div class="inspector-row">
+          <label>类型</label>
+          <span style="color:#D4FF00;">补间连线</span>
+        </div>
+        <div class="inspector-row">
+          <label>缓动</label>
+          <select id="insp-easing">
+            <option value="linear" ${conn.easing === 'linear' ? 'selected' : ''}>线性 (Linear)</option>
+            <option value="easeIn" ${conn.easing === 'easeIn' ? 'selected' : ''}>缓入 (Ease In)</option>
+            <option value="easeOut" ${conn.easing === 'easeOut' ? 'selected' : ''}>缓出 (Ease Out)</option>
+            <option value="easeInOut" ${conn.easing === 'easeInOut' ? 'selected' : ''}>缓入缓出 (Ease In-Out)</option>
+          </select>
+        </div>
+      `;
     } else {
-      // cut / dissolve / fade transitions
-      html = _sec('转场',
-        _row('时长', `<input type="number" id="insp-transition-dur" value="${conn.transitionDuration}" step="0.1" min="0.1" max="5">`) +
-        _row('类型', `<select id="insp-transition-type">
-          <option value="cut" ${conn.transition === 'cut' ? 'selected' : ''}>切</option>
-          <option value="dissolve" ${conn.transition === 'dissolve' ? 'selected' : ''}>叠</option>
-          <option value="fade" ${conn.transition === 'fade' ? 'selected' : ''}>黑</option>
-        </select>`),
-        false
-      );
+      propsContent.innerHTML = `
+        <div class="inspector-row">
+          <label>转场</label>
+          <select id="insp-transition-type">
+            <option value="cut" ${conn.transition === 'cut' ? 'selected' : ''}>切</option>
+            <option value="dissolve" ${conn.transition === 'dissolve' ? 'selected' : ''}>叠</option>
+            <option value="fade" ${conn.transition === 'fade' ? 'selected' : ''}>黑</option>
+          </select>
+        </div>
+        <div class="inspector-row">
+          <label>时长</label>
+          <input type="number" id="insp-transition-dur" value="${conn.transitionDuration}" step="0.1" min="0.1" max="5">
+        </div>
+      `;
     }
-    propsContent.innerHTML = html;
-    _bindSectionToggles();
     bindInspectorEvents(selConn, null);
     return;
   }
 
-  // ================================================================
-  // State: No cards / no connections
-  // ================================================================
+  // Cards selected
   if (selCount === 0 && selConns.length === 0) {
-    // Marker card
+    // Show marker card inspector when a marker is selected with no cards
     if (state.selection.markerCardId) {
       const marker = state.markerCards.find(m => m.id === state.selection.markerCardId);
       if (marker) {
         const parentCard = state.cards.find(c => c.id === marker.parentCardId);
         const parentLabel = parentCard ? (parentCard.label || '(未命名)') : '(未知卡片)';
-        html = _sec('标记卡',
-          _row('来源', `<span style="font-size:11px;">${escHtml(parentLabel)}</span>`) +
-          _row('帧时间', `<span style="font-size:11px;font-family:var(--font-mono);">${(marker.frameTime || 0).toFixed(2)} 秒</span>`) +
-          _row('透明度', _slider('insp-mkr-opacity', Math.round((marker.properties.opacity || 1) * 100), 0, 100, '%')) +
-          _row('缩放', _slider('insp-mkr-scale', Math.round((marker.properties.transformScale || 1) * 100), 10, 500, '%')) +
-          _pair('X', 'insp-mkr-tx', (marker.properties.transformX || 0).toFixed(0), 'Y', 'insp-mkr-ty', (marker.properties.transformY || 0).toFixed(0)) +
-          `<div class="inspector-row"><button id="insp-mkr-delete" class="inspector-btn" style="width:100%;color:#e04040;">删除标记卡</button></div>`,
-          false
-        );
-        propsContent.innerHTML = html;
-        _bindSectionToggles();
+        propsContent.innerHTML = `
+          <div class="inspector-row" style="font-weight:550; color:#ff9800;">标记卡</div>
+          <div class="inspector-row"><label>来源卡片</label><span style="font-size:11px;color:#888;">${escHtml(parentLabel)}</span></div>
+          <div class="inspector-row"><label>帧时间</label><span style="font-size:11px;font-family:var(--font-mono);">${(marker.frameTime || 0).toFixed(2)} 秒</span></div>
+          <div class="inspector-row"><label>时间位置</label><span style="font-size:11px;font-family:var(--font-mono);">${marker.x.toFixed(0)} px</span></div>
+          <div class="inspector-row"><label>透明度</label><input type="range" id="insp-mkr-opacity" min="0" max="100" value="${Math.round((marker.properties.opacity || 1) * 100)}"><span style="font-family:var(--font-mono);font-size:10px;color:#999;width:32px;text-align:right;">${Math.round((marker.properties.opacity || 1) * 100)}%</span></div>
+          <div class="inspector-row"><label>缩放</label><input type="range" id="insp-mkr-scale" min="10" max="500" value="${Math.round((marker.properties.transformScale || 1) * 100)}"><span style="font-family:var(--font-mono);font-size:10px;color:#999;width:36px;text-align:right;">${Math.round((marker.properties.transformScale || 1) * 100)}%</span></div>
+          <div class="inspector-row"><label>X偏移</label><input type="number" id="insp-mkr-tx" value="${(marker.properties.transformX || 0).toFixed(0)}" step="1" style="width:60px;"></div>
+          <div class="inspector-row"><label>Y偏移</label><input type="number" id="insp-mkr-ty" value="${(marker.properties.transformY || 0).toFixed(0)}" step="1" style="width:60px;"></div>
+          <div class="inspector-row"><button id="insp-mkr-delete" style="width:100%;height:26px;border:1px solid #e04040;border-radius:4px;background:#f0f0f0;color:#e04040;font-size:11px;cursor:pointer;">删除标记卡</button></div>
+        `;
         bindMarkerInspectorEvents(marker);
         return;
       }
     }
-    // Audio mixer
-    const audioCards = state.cards.filter(c => c.type === 'audio');
-    if (audioCards.length > 0) {
-      let mixerHtml = '';
-      for (const ac of audioCards) {
-        const isActive = state.bgmEntries && state.bgmEntries.some(e => e.cardId === ac.id && e.active);
-        mixerHtml += `<div class="inspector-row" style="display:flex;align-items:center;gap:4px;">
-          <span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(ac.label)}</span>
-          <span style="font-size:8px;color:${isActive ? '#4CAF50' : '#999'};min-width:20px;">${isActive ? 'ON' : 'off'}</span>
-          <input type="range" class="mixer-vol" data-card-id="${ac.id}" min="0" max="100" value="${Math.round(ac.volume * 100)}" style="width:60px;">
-          <span style="font-size:10px;color:#999;width:28px;">${Math.round(ac.volume * 100)}%</span>
-        </div>`;
-      }
-      html = _sec('音频混音器', mixerHtml, false);
-      propsContent.innerHTML = html;
-      _bindSectionToggles();
-      setTimeout(() => {
-        propsContent.querySelectorAll('.mixer-vol').forEach(slider => {
-          slider.addEventListener('input', () => {
-            const cid = slider.dataset.cardId;
-            const c = state.cards.find(cc => cc.id === cid);
-            if (c) {
-              c.volume = parseInt(slider.value) / 100;
-              const entry = state.bgmEntries && state.bgmEntries.find(e => e.cardId === cid && e.active);
-              if (entry && entry.audio) entry.audio.volume = c.volume;
+    // Group selected — show group properties
+    if (state.selection.groupIds.length > 0) {
+      const group = state.groups.find(g => g.id === state.selection.groupIds[0]);
+      if (group) {
+        const mode = group.sizingMode || 'fit';
+        const memberCount = group.cardIds.length;
+        propsContent.innerHTML = `
+          <div class="inspector-row" style="font-weight:550;color:#6554CB;">编辑组</div>
+          <div class="inspector-row"><label>名称</label><input type="text" id="insp-group-name" value="${escAttr(group.name || '')}"></div>
+          <div class="inspector-row"><label>成员</label><span style="font-size:11px;color:#888;">${memberCount} 张卡片</span></div>
+          <div class="inspector-row"><label>模式</label>
+            <div style="display:flex;gap:4px;">
+              <button id="insp-group-fit" style="flex:1;height:24px;border:1px solid #6554CB;border-radius:4px;background:${mode === 'fit' ? '#6554CB' : '#fff'};color:${mode === 'fit' ? '#fff' : '#6554CB'};font-size:11px;cursor:pointer;">适应</button>
+              <button id="insp-group-fixed" style="flex:1;height:24px;border:1px solid #6554CB;border-radius:4px;background:${mode === 'fixed' ? '#6554CB' : '#fff'};color:${mode === 'fixed' ? '#fff' : '#6554CB'};font-size:11px;cursor:pointer;">固定</button>
+            </div>
+          </div>
+          ${mode === 'fixed' ? `
+          <div class="inspector-row"><label>宽度</label><input type="number" id="insp-group-width" value="${Math.round(group.width || 200)}" step="1" min="100"></div>
+          <div class="inspector-row"><label>高度</label><input type="number" id="insp-group-height" value="${Math.round(group.height || 60)}" step="1" min="60"></div>
+          ` : ''}
+        `;
+        // Bind events
+        setTimeout(() => {
+          const nameInput = propsContent.querySelector('#insp-group-name');
+          if (nameInput) {
+            const commitName = () => {
+              const v = nameInput.value.trim();
+              if (v) { pushUndo(); group.name = v; render(); }
+            };
+            nameInput.addEventListener('blur', commitName);
+            nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { nameInput.blur(); } });
+          }
+          const fitBtn = propsContent.querySelector('#insp-group-fit');
+          const fixedBtn = propsContent.querySelector('#insp-group-fixed');
+          if (fitBtn) {
+            fitBtn.addEventListener('click', () => {
+              if (group.sizingMode === 'fit') return;
+              pushUndo();
+              group.sizingMode = 'fit';
+              group.x = undefined; group.y = undefined; group.width = undefined; group.height = undefined;
               render();
-            }
-          });
-        });
-      }, 0);
-    } else {
-      propsContent.innerHTML = '<div class="inspector-hint">选中卡片以编辑属性</div>';
+            });
+          }
+          if (fixedBtn) {
+            fixedBtn.addEventListener('click', () => {
+              if (group.sizingMode === 'fixed') return;
+              pushUndo();
+              // Capture current frame dimensions
+              const frame = getGroupFrame(group);
+              if (frame) {
+                group.x = frame.x;
+                group.y = frame.y;
+                group.width = frame.w;
+                group.height = frame.h;
+              } else {
+                group.x = group.x || 0;
+                group.y = group.y || 0;
+                group.width = group.width || 200;
+                group.height = group.height || 60;
+              }
+              group.sizingMode = 'fixed';
+              render();
+            });
+          }
+          const wInput = propsContent.querySelector('#insp-group-width');
+          const hInput = propsContent.querySelector('#insp-group-height');
+          if (wInput) {
+            const commitW = () => {
+              const v = parseInt(wInput.value);
+              if (!isNaN(v) && v >= 100) { pushUndo(); group.width = v; render(); }
+            };
+            wInput.addEventListener('blur', commitW);
+            wInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { wInput.blur(); } });
+          }
+          if (hInput) {
+            const commitH = () => {
+              const v = parseInt(hInput.value);
+              if (!isNaN(v) && v >= 60) { pushUndo(); group.height = v; render(); }
+            };
+            hInput.addEventListener('blur', commitH);
+            hInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { hInput.blur(); } });
+          }
+        }, 0);
+        return;
+      }
     }
+    // No marker selected — show audio mixer or hint
+    const audioCards = state.cards.filter(c => c.type === 'audio');
+    let mixerHtml = '<div class="inspector-row" style="font-weight:550;">音频混音器</div>';
+    for (const ac of audioCards) {
+      const isActive = state.bgmEntries && state.bgmEntries.some(e => e.cardId === ac.id && e.active);
+      mixerHtml += `<div class="inspector-row" style="display:flex;align-items:center;gap:4px;">
+        <span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(ac.label)}</span>
+        <span style="font-size:8px;color:${isActive ? '#4CAF50' : '#999'};min-width:20px;">${isActive ? 'ON' : 'off'}</span>
+        <input type="range" class="mixer-vol" data-card-id="${ac.id}" min="0" max="100" value="${Math.round(ac.volume * 100)}" style="width:60px;">
+        <span style="font-size:10px;color:#999;width:28px;">${Math.round(ac.volume * 100)}%</span>
+      </div>`;
+    }
+    propsContent.innerHTML = mixerHtml;
+    // Bind volume sliders
+    setTimeout(() => {
+      propsContent.querySelectorAll('.mixer-vol').forEach(slider => {
+        slider.addEventListener('input', () => {
+          const cid = slider.dataset.cardId;
+          const c = state.cards.find(cc => cc.id === cid);
+          if (c) {
+            c.volume = parseInt(slider.value) / 100;
+            // Update active BGM entry volume
+            const entry = state.bgmEntries && state.bgmEntries.find(e => e.cardId === cid && e.active);
+            if (entry && entry.audio) entry.audio.volume = c.volume;
+            render();
+          }
+        });
+      });
+    }, 0);
     return;
   }
 
-  // ================================================================
-  // State: Edit box chain (no cards, no connection, editBoxId set)
-  // ================================================================
+  // Edit box chain info: show when an edit box is selected and belongs to a chain
   if (selCount === 0 && !selConn && state.selection.editBoxId) {
     const selEb = findEditBoxById(state.selection.editBoxId);
     if (selEb) {
@@ -1985,25 +1949,23 @@ function updateInspector() {
       if (ebConns.length > 0) {
         const chain = buildEditBoxChain(state.selection.editBoxId);
         const chainDuration = getEditBoxChainDuration(chain);
-        let chainRows = _row('当前', `<span style="font-size:11px;">编辑盒 ${(state.selection.editBoxId || '').slice(0, 8)} (${(selEb.shapes || []).length} 图形)</span>`) +
-          _row('链长度', `<span style="font-size:11px;">${chain.length} 个编辑盒 / ${chainDuration.toFixed(1)}s</span>`);
-        chainRows += '<div class="inspector-row"><label>链</label></div>';
+        let html = `<div class="inspector-row" style="font-weight:550;color:#ff9800;">关键帧链</div>`;
+        html += `<div class="inspector-row"><label>选中</label><span style="font-size:11px;">编辑盒 ${(state.selection.editBoxId || '').slice(0, 8)} (${(selEb.shapes || []).length} 图形)</span></div>`;
+        html += `<div class="inspector-row"><label>链长度</label><span style="font-size:11px;">${chain.length} 个编辑盒 / ${chainDuration.toFixed(1)}s</span></div>`;
+        html += `<div class="inspector-row" style="margin-top:4px;"><label>链中编辑盒</label></div>`;
         for (let i = 0; i < chain.length; i++) {
           const ebId = chain[i];
           const eb = findEditBoxById(ebId);
           const isCurrent = ebId === state.selection.editBoxId;
           const label = eb ? ('编辑盒 ' + (ebId || '').slice(0, 8)) : ('未知 ' + (ebId || '').slice(0, 8));
-          chainRows += `<div class="inspector-row" style="display:flex;align-items:center;gap:4px;${isCurrent ? 'background:rgba(255,152,0,0.1);border-radius:4px;padding:2px 4px;' : ''}">
+          html += `<div class="inspector-row" style="display:flex;align-items:center;gap:4px;${isCurrent ? 'background:rgba(255,152,0,0.1);border-radius:4px;padding:2px 4px;' : ''}">
             <span style="font-size:10px;color:#888;min-width:14px;">${i + 1}.</span>
-            <span class="eb-chain-nav" data-eb-id="${escAttr(ebId)}" style="cursor:pointer;color:${isCurrent ? '#ff9800' : '#c4b5fd'};font-size:11px;flex:1;">${escHtml(label)}${isCurrent ? ' (当前)' : ''}</span>
+            <span class="eb-chain-nav" data-eb-id="${escAttr(ebId)}" style="cursor:pointer;color:${isCurrent ? '#ff9800' : '#b3d900'};font-size:11px;flex:1;">${escHtml(label)}${isCurrent ? ' (当前)' : ''}</span>
             <span style="font-size:9px;color:#666;">${eb ? (eb.shapes || []).length : 0} 图形</span>
           </div>`;
         }
-        html = _sec('关键帧链', chainRows, false) + _secDivider() +
-          _sec('时长', _row('总时长', `<input type="number" id="insp-chain-duration" value="${chainDuration.toFixed(1)}" step="0.1" min="0.1" max="300">`), false);
         propsContent.innerHTML = html;
-        _bindSectionToggles();
-        // Chain navigation
+        // Bind chain navigation click handlers
         setTimeout(() => {
           propsContent.querySelectorAll('.eb-chain-nav').forEach(el => {
             el.addEventListener('click', () => {
@@ -2013,7 +1975,9 @@ function updateInspector() {
               const canvasEl = document.getElementById('main-canvas');
               if (canvasEl) {
                 const pad = 8;
-                const fitZoom = Math.min((canvasEl.clientWidth - pad * 2) / eb.width, (canvasEl.clientHeight - pad * 2) / eb.height);
+                const availW = canvasEl.clientWidth - pad * 2;
+                const availH = canvasEl.clientHeight - pad * 2;
+                const fitZoom = Math.min(availW / eb.width, availH / eb.height);
                 state.canvas.zoom = Math.min(1, fitZoom);
                 state.canvas.offsetX = -(eb.x + eb.width / 2) * state.canvas.zoom + canvasEl.clientWidth / 2;
                 state.canvas.offsetY = -(eb.y + eb.height / 2) * state.canvas.zoom + canvasEl.clientHeight / 2;
@@ -2027,163 +1991,222 @@ function updateInspector() {
         return;
       }
     }
-    // Single edit box, no connections — blank
-    propsContent.innerHTML = '<div class="inspector-hint">选中卡片以编辑属性</div>';
-    return;
   }
 
-  // ================================================================
-  // State: Cards selected
-  // ================================================================
+  // Show first selected card's props
   const card = state.cards.find(c => c.id === state.selection.cardIds[0]);
   if (!card) { propsContent.innerHTML = '<div class="inspector-hint">选中卡片以编辑属性</div>'; return; }
 
+  // Multiple cards selected hint
   if (selCount > 1) {
     propsContent.innerHTML = `<div class="inspector-hint">已选 ${selCount} 张卡片</div>`;
     return;
   }
 
-  // ---- TEXT card ----
   if (card.type === 'text') {
-    const fontSize = card.fontSize || 24;
-    const fontW = card.fontWeight || 'Regular';
-    html = _secStatic('字体',
-      _row('字号', `<input type="number" id="insp-fontsize" value="${fontSize}" min="8" max="200">`) +
-      _row('粗细', `<select id="insp-fontweight">
-        <option value="Regular" ${fontW === 'Regular' ? 'selected' : ''}>常规</option>
-        <option value="Bold" ${fontW === 'Bold' ? 'selected' : ''}>粗体</option>
-        <option value="Light" ${fontW === 'Light' ? 'selected' : ''}>细体</option>
-      </select>`)
-    ) + _secDivider() +
-    _secStatic('对齐',
-      _row('水平', `<select id="insp-textalign">
-        <option value="left" ${card.textAlign === 'left' ? 'selected' : ''}>左对齐</option>
-        <option value="center" ${card.textAlign === 'center' ? 'selected' : ''}>居中</option>
-        <option value="right" ${card.textAlign === 'right' ? 'selected' : ''}>右对齐</option>
-      </select>`)
-    ) + _secDivider() +
-    _secStatic('颜色',
-      `<div class="inspector-color-bar">
-        <span class="color-swatch" style="background:${card.color || '#000000'};"></span>
-        <span>${(card.color || '#000000').toUpperCase()}</span>
-        <input type="color" id="insp-color" value="${card.color || '#000000'}">
-        <span class="opacity-val">${Math.round((card.opacity != null ? card.opacity : 1) * 100)}%</span>
-      </div>`
-    );
-    propsContent.innerHTML = html;
-    _bindSectionToggles();
+    propsContent.innerHTML = `
+      <div class="inspector-row"><label>文本</label><input type="text" id="insp-text" value="${escAttr(card.text || '')}"></div>
+      <div class="inspector-row"><label>字号</label><input type="number" id="insp-fontsize" value="${card.fontSize || 24}" min="8" max="200"></div>
+      <div class="inspector-row"><label>颜色</label><input type="color" id="insp-color" value="${card.color || '#000000'}"></div>
+      <div class="inspector-row"><label>对齐</label>
+        <select id="insp-textalign">
+          <option value="left" ${card.textAlign === 'left' ? 'selected' : ''}>左对齐</option>
+          <option value="center" ${card.textAlign === 'center' ? 'selected' : ''}>居中</option>
+          <option value="right" ${card.textAlign === 'right' ? 'selected' : ''}>右对齐</option>
+        </select>
+      </div>
+      <div class="inspector-row"><label>粗细</label>
+        <select id="insp-fontweight">
+          <option value="Regular" ${card.fontWeight === 'Regular' ? 'selected' : ''}>常规</option>
+          <option value="Bold" ${card.fontWeight === 'Bold' ? 'selected' : ''}>粗体</option>
+          <option value="Light" ${card.fontWeight === 'Light' ? 'selected' : ''}>细体</option>
+        </select>
+      </div>
+    `;
     bindInspectorEvents(null, card);
     return;
   }
 
-  // ---- VIDEO / SYNTHESIZED-VIDEO / COMPOSITION / AUDIO cards ----
+
   const dur = card.trimOut - card.trimIn;
   const maxDuration = card.totalDuration || card.duration;
-  const isVideoLike = card.type === 'video' || card.type === 'synthesized-video' || card.type === 'image';
-  const isComposition = card.type === 'composition';
+  const rows = [];
 
-  // 1. Info section (static, no +/-)
-  const isImage = card.type === 'image';
-  const durReadonly = isImage ? '' : 'readonly';
-  const durStyle = isImage ? '' : 'style="color:#888;"';
-  let infoHtml = _row('名称', `<input type="text" id="insp-name" value="${escAttr(card.label || '')}">`) +
-    _row('时长', `<input type="number" id="insp-duration" value="${maxDuration.toFixed(1)}" step="0.5" min="0.5" max="300" ${durReadonly} ${durStyle}>`);
-  html = _secStatic('信息', infoHtml) + _secDivider();
+  // Freeze frame indicator
+  if (card.isFreezeFrame) {
+    rows.push(`<div class="inspector-row" style="margin-bottom:6px;">
+      <span style="display:inline-block;background:#D4FF00;color:#fff;font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;">定格帧</span>
+    </div>`);
+  }
 
-  // Synthesized-video extra info (collapsible)
+  rows.push(
+    `<div class="inspector-row">
+      <label>名称</label>
+      <input type="text" id="insp-name" value="${escAttr(card.label || '')}">
+    </div>`,
+    `<div class="inspector-row">
+      <label>总时长</label>
+      <input type="text" value="${formatTime(dur)} / ${formatTime(maxDuration)}" readonly style="color:#888;">
+    </div>`,
+    `<div class="inspector-row">
+      <label>Duration</label>
+      <input type="number" id="insp-duration" value="${(dur || 0).toFixed(1)}" step="0.1" min="0.1" style="width:60px;">
+      <span style="font-size:10px;color:#888;">秒</span>
+    </div>`,
+    `<div class="inspector-row">
+      <label>入点</label>
+      <input type="number" id="insp-trimin" value="${(card.trimIn || 0).toFixed(1)}" step="0.1" min="0" max="${((card.trimOut || maxDuration) - 0.1).toFixed(1)}">
+    </div>`,
+    `<div class="inspector-row">
+      <label>出点</label>
+      <input type="number" id="insp-trimout" value="${(card.trimOut || maxDuration).toFixed(1)}" step="0.1" min="${((card.trimIn || 0) + 0.1).toFixed(1)}" max="${(maxDuration || 5).toFixed(1)}">
+    </div>`);
+
+  // Synthesized-video card: show edit box chain info
   if (card.type === 'synthesized-video') {
     const chain = card.editBoxChain || [];
     const chainDuration = card.totalDuration || 0;
-    let chainRows = _row('类型', '<span style="color:rgb(101,84,203);font-weight:500;">合成视频</span>') +
-      _row('链', `<span style="font-size:11px;">${chain.length} 个编辑盒 / ${chainDuration.toFixed(1)}s</span>`);
+    rows.push(`<div class="inspector-row">
+      <label>类型</label>
+      <span style="color:#ff9800;font-weight:500;">合成动画</span>
+    </div>`);
+    rows.push(`<div class="inspector-row">
+      <label>链</label>
+      <span style="font-size:11px;">${chain.length} 个编辑盒 / ${chainDuration.toFixed(1)}s</span>
+    </div>`);
+    rows.push(`<div class="inspector-row">
+      <label>FPS</label>
+      <input type="number" id="insp-synth-fps" value="${card.fps || 30}" min="1" max="60" step="1" style="width:60px;">
+    </div>`);
+    rows.push(`<div class="inspector-row" style="margin-top:4px;">
+      <label>编辑盒链</label>
+    </div>`);
     for (let i = 0; i < chain.length; i++) {
       const ebId = chain[i];
       const eb = findEditBoxById(ebId);
       const label = eb ? ('编辑盒 ' + (ebId || '').slice(0, 8)) : ('未知 ' + (ebId || '').slice(0, 8));
       const shapeCount = eb ? (eb.shapes || []).length : 0;
-      chainRows += `<div class="inspector-row" style="display:flex;align-items:center;gap:4px;">
+      rows.push(`<div class="inspector-row" style="display:flex;align-items:center;gap:4px;">
         <span style="font-size:10px;color:#888;min-width:14px;">${i + 1}.</span>
-        <span class="eb-chain-jump" data-eb-id="${escAttr(ebId)}" style="cursor:pointer;color:#c4b5fd;font-size:11px;flex:1;">${escHtml(label)}</span>
+        <span class="eb-chain-jump" data-eb-id="${escAttr(ebId)}" style="cursor:pointer;color:#b3d900;font-size:11px;flex:1;" title="跳转到此编辑盒">${escHtml(label)}</span>
         <span style="font-size:9px;color:#666;">${shapeCount} 图形</span>
-      </div>`;
+      </div>`);
     }
-    html += _sec('编辑盒链', chainRows, true) + _secDivider();
+    rows.push(`<div class="inspector-row">
+      <button id="insp-locate-eb-chain" style="width:100%;height:26px;border:1px solid #ff9800;border-radius:4px;background:#f0f0f0;color:#ff9800;font-size:11px;cursor:pointer;">定位链首编辑盒</button>
+    </div>`);
   }
 
-  // Composition: locate edit box button
-  if (isComposition) {
-    html += _secStatic('编辑盒',
-      `<div class="inspector-row"><button id="insp-locate-editbox" class="inspector-btn" style="width:100%;">定位编辑盒</button></div>`
-    ) + _secDivider();
+  // Composition card: show edit box link instead of video-specific fields
+  if (card.type === 'composition') {
+    rows.push(`<div class="inspector-row">
+      <button id="insp-locate-editbox" style="width:100%;height:26px;border:1px solid #b3d900;border-radius:4px;background:#f0f0f0;color:#b3d900;font-size:11px;cursor:pointer;">定位编辑盒</button>
+    </div>`);
   }
 
-  // 2. Position (static, no +/-) — for video/synthesized-video
-  //    x/y pair → scale slider below, no reset button
-  if (isVideoLike) {
-    const tx = (card.transformX || 0).toFixed(0);
-    const ty = (card.transformY || 0).toFixed(0);
-    const scale = Math.round((card.transformScale || 1.0) * 100);
-    const posHtml = _pair('X', 'insp-transform-x', tx, 'Y', 'insp-transform-y', ty) +
-      _row('缩放', _slider('insp-transform-scale', scale, 10, 500, '%'));
-    html += _secStatic('位置', posHtml) + _secDivider();
+  if (card.type !== 'synthesized-video') {
+    rows.push(
+      `<div class="inspector-row">
+        <label>音量</label>
+        <input type="range" id="insp-volume" min="0" max="100" value="${Math.round((card.volume || 1) * 100)}">
+        <span style="font-family:var(--font-mono);font-size:10px;color:#999;width:32px;text-align:right;">${Math.round((card.volume || 1) * 100)}%</span>
+      </div>`,
+      `<div class="inspector-row">
+        <label>淡入</label>
+        <input type="number" id="insp-fadein" value="${card.fadeIn || 0}" step="0.1" min="0" max="10" style="width:60px;">
+        <span style="font-size:10px;color:#999;">秒</span>
+      </div>`,
+      `<div class="inspector-row">
+        <label>淡出</label>
+        <input type="number" id="insp-fadeout" value="${card.fadeOut || 0}" step="0.1" min="0" max="10" style="width:60px;">
+        <span style="font-size:10px;color:#999;">秒</span>
+      </div>`
+    );
   }
 
-  // 3. Volume (static, no +/-) — non-composition; slider fills full width
-  if (!isComposition) {
-    html += _secStatic('音量',
-      _rowFull(_slider('insp-volume', Math.round((card.volume || 1) * 100), 0, 100, '%'))
-    ) + _secDivider();
+  // Transform controls — video cards only
+  if (card.type === 'video') {
+    rows.push(`<div class="inspector-row" style="font-size:11px;color:#999;margin-top:8px;">变换 (Transform)</div>`);
+    rows.push(`<div class="inspector-row">
+      <label>缩放</label>
+      <input type="range" id="insp-transform-scale" min="10" max="500" value="${Math.round((card.transformScale || 1.0) * 100)}">
+      <span style="font-family:var(--font-mono);font-size:10px;color:#999;width:36px;text-align:right;">${Math.round((card.transformScale || 1.0) * 100)}%</span>
+    </div>`);
+    rows.push(`<div class="inspector-row">
+      <label>X偏移</label>
+      <input type="number" id="insp-transform-x" value="${(card.transformX || 0).toFixed(0)}" step="1" style="width:60px;">
+      <span style="font-size:10px;color:#999;">px</span>
+    </div>`);
+    rows.push(`<div class="inspector-row">
+      <label>Y偏移</label>
+      <input type="number" id="insp-transform-y" value="${(card.transformY || 0).toFixed(0)}" step="1" style="width:60px;">
+      <span style="font-size:10px;color:#999;">px</span>
+    </div>`);
+    rows.push(`<div class="inspector-row">
+      <button id="insp-transform-reset" style="width:100%;height:26px;border:1px solid #444;border-radius:4px;background:#f0f0f0;color:#e0e0e0;font-size:11px;cursor:pointer;">重置变换</button>
+    </div>`);
+
+    // Freeze frame button (only for non-freeze video cards)
+    if (!card.isFreezeFrame) {
+      const canCapture = playbackVideo._cardId === card.id && playbackVideo.readyState >= 2;
+      rows.push(`<div class="inspector-row" style="margin-top:8px;">
+        <button id="insp-freeze-frame" style="width:100%;height:30px;border:1px solid #D4FF00;border-radius:4px;background:#f0f0f0;color:#D4FF00;font-size:12px;font-weight:500;cursor:pointer;"${canCapture ? '' : ' disabled'}>定格</button>
+      </div>`);
+    }
   }
 
-  // 4. Animation (collapsible, +/- toggle) — at the bottom
-  if (!isComposition) {
-    const animHtml = _row('淡入', `<input type="number" id="insp-fadein" value="${card.fadeIn || 0}" step="0.1" min="0" max="10"><span style="font-size:10px;color:#999;">秒</span>`) +
-      _row('淡出', `<input type="number" id="insp-fadeout" value="${card.fadeOut || 0}" step="0.1" min="0" max="10"><span style="font-size:10px;color:#999;">秒</span>`);
-    html += _sec('动画', animHtml, true);
+  if (card.markers && card.markers.length > 0) {
+    rows.push(`<div class="inspector-row" style="font-size:11px;color:#666;margin-top:8px;">标记点</div>`);
+    for (let mi = 0; mi < card.markers.length; mi++) {
+      const m = card.markers[mi];
+      rows.push(`<div class="inspector-row" style="display:flex;align-items:center;gap:4px;">
+        <span style="display:inline-block;width:10px;height:10px;background:${m.color};border-radius:2px;flex-shrink:0;"></span>
+        <span class="marker-jump" data-card-id="${card.id}" data-marker-idx="${mi}" style="cursor:pointer;color:#D4FF00;font-size:11px;flex:1;" title="跳转到标记位置">${escHtml(m.label)}</span>
+        <span style="font-size:10px;color:#999;white-space:nowrap;">${formatTime(m.time)}</span>
+        <span class="marker-delete" data-card-id="${card.id}" data-marker-idx="${mi}" style="cursor:pointer;color:#ccc;font-size:12px;" title="删除标记">x</span>
+      </div>`);
+    }
   }
 
-  propsContent.innerHTML = html;
-  _bindSectionToggles();
+  propsContent.innerHTML = rows.join('');
   bindInspectorEvents(null, card);
 
-  // eb-chain jump buttons (synthesized-video)
+  // Marker click handlers (after DOM is built)
   setTimeout(() => {
-    propsContent.querySelectorAll('.eb-chain-jump').forEach(el => {
+    propsContent.querySelectorAll('.marker-jump').forEach(el => {
       el.addEventListener('click', () => {
-        const ebId = el.dataset.ebId;
-        const eb = findEditBoxById(ebId);
-        if (!eb) return;
-        const canvasEl = document.getElementById('main-canvas');
-        if (canvasEl) {
-          const pad = 8;
-          const fitZoom = Math.min((canvasEl.clientWidth - pad * 2) / eb.width, (canvasEl.clientHeight - pad * 2) / eb.height);
-          state.canvas.zoom = Math.min(1, fitZoom);
-          state.canvas.offsetX = -(eb.x + eb.width / 2) * state.canvas.zoom + canvasEl.clientWidth / 2;
-          state.canvas.offsetY = -(eb.y + eb.height / 2) * state.canvas.zoom + canvasEl.clientHeight / 2;
+        const cid = el.dataset.cardId;
+        const mi = parseInt(el.dataset.markerIdx);
+        const c = state.cards.find(cc => cc.id === cid);
+        if (c && c.markers && c.markers[mi]) {
+          const pb = state.playback;
+          if (pb.isPlaying) togglePlayback();
+          pb.currentCardId = cid;
+          pb.pausedCardTime = c.markers[mi].time;
+          const dur = c.trimOut - c.trimIn;
+          pb.cardProgress = dur > 0 ? (c.markers[mi].time - c.trimIn) / dur : 0;
+          pb.pausedAt = computeSequenceTimeForCard(cid, c.markers[mi].time);
+          pb.startTime = 0;
+          syncPlaybackVideo();
+          render();
+          updatePreviewPanel();
         }
-        state.selection.editBoxId = eb.id;
-        state.selection.cardIds = [];
-        render();
+      });
+    });
+    propsContent.querySelectorAll('.marker-delete').forEach(el => {
+      el.addEventListener('click', () => {
+        const cid = el.dataset.cardId;
+        const mi = parseInt(el.dataset.markerIdx);
+        const c = state.cards.find(cc => cc.id === cid);
+        if (c && c.markers) {
+          pushUndo();
+          c.markers.splice(mi, 1);
+          updateInspector();
+          render();
+        }
       });
     });
   }, 0);
-}
-
-function _bindSectionToggles() {
-  propsContent.querySelectorAll('[data-sec-toggle]').forEach(header => {
-    header.addEventListener('click', () => {
-      const body = header.nextElementSibling;
-      const toggle = header.querySelector('.section-toggle');
-      if (!body || !toggle) return;
-      if (body.classList.contains('collapsed')) {
-        body.classList.remove('collapsed');
-        toggle.textContent = '\u2212';
-      } else {
-        body.classList.add('collapsed');
-        toggle.textContent = '+';
-      }
-    });
-  });
 }
 
 function escAttr(s) {
@@ -2217,36 +2240,36 @@ function computeSequenceTimeForCard(cardId, cardTime) {
 
 function bindInspectorEvents(connOrId, card) {
   const conn = (typeof connOrId === 'string') ? state.connections.find(c => c.id === connOrId) : connOrId;
-
-  // ---- Connection events ----
   if (conn) {
-    // Transition type (cut/dissolve/fade connections)
     const selType = document.getElementById('insp-transition-type');
+    const selDur = document.getElementById('insp-transition-dur');
+    const selEasing = document.getElementById('insp-easing');
     if (selType) {
       selType.addEventListener('change', () => {
-        pushUndo(); conn.transition = selType.value; render();
+        pushUndo();
+        conn.transition = selType.value;
+        render();
       });
     }
-    // Transition duration
-    const selDur = document.getElementById('insp-transition-dur');
     if (selDur) {
       selDur.addEventListener('change', () => {
         const v = parseFloat(selDur.value);
         if (isFinite(v) && v > 0) { pushUndo(); conn.transitionDuration = v; render(); }
       });
     }
-    // Easing (keyframe / tween / eb-keyframe)
-    const selEasing = document.getElementById('insp-easing');
     if (selEasing) {
       selEasing.addEventListener('change', () => {
-        pushUndo(); conn.easing = selEasing.value; render();
+        pushUndo();
+        conn.easing = selEasing.value;
+        render();
       });
     }
-    // Keyframe anchor position
     const kfFromPos = document.getElementById('insp-kf-frompos');
     if (kfFromPos) {
       kfFromPos.addEventListener('input', () => {
-        pushUndo(); conn.fromPosition = parseInt(kfFromPos.value) / 100; render();
+        pushUndo();
+        conn.fromPosition = parseInt(kfFromPos.value) / 100;
+        render();
       });
     }
     // Keyframe property checkboxes
@@ -2256,19 +2279,25 @@ function bindInspectorEvents(connOrId, card) {
         cb.addEventListener('change', () => {
           pushUndo();
           if (!conn.properties) conn.properties = ['opacity', 'transformScale', 'transformX', 'transformY'];
-          if (cb.checked) { if (!conn.properties.includes(prop)) conn.properties.push(prop); }
-          else { conn.properties = conn.properties.filter(p => p !== prop); }
+          if (cb.checked) {
+            if (!conn.properties.includes(prop)) conn.properties.push(prop);
+          } else {
+            conn.properties = conn.properties.filter(p => p !== prop);
+          }
+          // Re-render inspector to update highlight state
           updateInspector();
         });
       }
     });
-    // EB-keyframe duration
+    // Eb-keyframe duration
     const ebKfDur = document.getElementById('insp-eb-kf-dur');
     if (ebKfDur) {
       ebKfDur.addEventListener('change', () => {
         const v = parseFloat(ebKfDur.value);
         if (isFinite(v) && v > 0) {
-          pushUndo(); conn.transitionDuration = v;
+          pushUndo();
+          conn.transitionDuration = v;
+          // Recalculate totalDuration on synthesized-video cards referencing this connection
           for (const c of state.cards) {
             if (c.type !== 'synthesized-video') continue;
             const chain = c.editBoxChain || [];
@@ -2280,64 +2309,79 @@ function bindInspectorEvents(connOrId, card) {
         }
       });
     }
-    // EB-keyframe easing
+    // Eb-keyframe easing
     const ebKfEasing = document.getElementById('insp-eb-kf-easing');
     if (ebKfEasing) {
       ebKfEasing.addEventListener('change', () => {
-        pushUndo(); conn.easing = ebKfEasing.value; render();
+        pushUndo();
+        conn.easing = ebKfEasing.value;
+        render();
       });
     }
   }
-
-  // ---- Card events ----
   if (card) {
-    // Text card
     if (card.type === 'text') {
+      const textInput = document.getElementById('insp-text');
       const fontSize = document.getElementById('insp-fontsize');
-      const fontWeight = document.getElementById('insp-fontweight');
       const color = document.getElementById('insp-color');
       const textAlign = document.getElementById('insp-textalign');
+      const fontWeight = document.getElementById('insp-fontweight');
+      if (textInput) textInput.addEventListener('change', () => { card.text = textInput.value; render(); });
       if (fontSize) fontSize.addEventListener('change', () => { card.fontSize = parseInt(fontSize.value) || 24; render(); });
-      if (fontWeight) fontWeight.addEventListener('change', () => { card.fontWeight = fontWeight.value; render(); });
       if (color) color.addEventListener('change', () => { card.color = color.value; render(); });
       if (textAlign) textAlign.addEventListener('change', () => { card.textAlign = textAlign.value; render(); });
+      if (fontWeight) fontWeight.addEventListener('change', () => { card.fontWeight = fontWeight.value; render(); });
       return;
     }
-
-    // Non-text cards
     const nameInput = document.getElementById('insp-name');
-    if (nameInput) nameInput.addEventListener('change', () => { card.label = nameInput.value || card.label; render(); });
+    const trimIn = document.getElementById('insp-trimin');
+    const trimOut = document.getElementById('insp-trimout');
+    const volSlider = document.getElementById('insp-volume');
 
-    // Image card: editable duration
-    if (card.type === 'image') {
-      const durInput = document.getElementById('insp-duration');
-      if (durInput) durInput.addEventListener('change', () => {
+    if (nameInput) {
+      nameInput.addEventListener('change', () => {
+        card.label = nameInput.value || card.label;
+        render();
+      });
+    }
+    if (trimIn) {
+      trimIn.addEventListener('change', () => {
+        const v = parseFloat(trimIn.value);
+        if (isFinite(v) && v >= 0 && v < card.trimOut) { card.trimIn = v; render(); }
+      });
+    }
+    if (trimOut) {
+      trimOut.addEventListener('change', () => {
+        const v = parseFloat(trimOut.value);
+        const maxD = card.totalDuration || card.duration;
+        if (isFinite(v) && v > (card.trimIn || 0) && v <= maxD) { card.trimOut = v; render(); }
+      });
+    }
+    // Duration field
+    const durInput = document.getElementById('insp-duration');
+    if (durInput) {
+      durInput.addEventListener('change', () => {
         const v = parseFloat(durInput.value);
-        if (isFinite(v) && v >= 0.5 && v <= 300) {
-          pushUndo();
-          card.duration = v;
-          card.trimOut = v;
-          card.width = v * PIXELS_PER_SECOND;
-          render();
+        if (isFinite(v) && v > 0) {
+          const curDur = card.trimOut - card.trimIn;
+          if (v !== curDur) {
+            pushUndo();
+            card.trimOut = card.trimIn + v;
+            durInput.blur();
+            render();
+          }
         }
       });
     }
-
-    // Volume
-    const volSlider = document.getElementById('insp-volume');
     if (volSlider) {
       volSlider.addEventListener('input', () => {
-        pushUndo(); card.volume = parseInt(volSlider.value) / 100; render();
+        pushUndo();
+        card.volume = parseInt(volSlider.value) / 100;
+        render();
       });
     }
 
-    // Fade in/out
-    const fadeIn = document.getElementById('insp-fadein');
-    const fadeOut = document.getElementById('insp-fadeout');
-    if (fadeIn) fadeIn.addEventListener('change', () => { const v = parseFloat(fadeIn.value); if (isFinite(v) && v >= 0) { pushUndo(); card.fadeIn = v; render(); } });
-    if (fadeOut) fadeOut.addEventListener('change', () => { const v = parseFloat(fadeOut.value); if (isFinite(v) && v >= 0) { pushUndo(); card.fadeOut = v; render(); } });
-
-    // Locate edit box (composition)
+    // Locate edit box button (composition cards)
     const locateBtn = document.getElementById('insp-locate-editbox');
     if (locateBtn) {
       locateBtn.addEventListener('click', () => {
@@ -2346,7 +2390,9 @@ function bindInspectorEvents(connOrId, card) {
         const canvasEl = document.getElementById('main-canvas');
         if (canvasEl) {
           const pad = 8;
-          const fitZoom = Math.min((canvasEl.clientWidth - pad * 2) / eb.width, (canvasEl.clientHeight - pad * 2) / eb.height);
+          const availW = canvasEl.clientWidth - pad * 2;
+          const availH = canvasEl.clientHeight - pad * 2;
+          const fitZoom = Math.min(availW / eb.width, availH / eb.height);
           state.canvas.zoom = Math.min(1, fitZoom);
           state.canvas.offsetX = -(eb.x + eb.width / 2) * state.canvas.zoom + canvasEl.clientWidth / 2;
           state.canvas.offsetY = -(eb.y + eb.height / 2) * state.canvas.zoom + canvasEl.clientHeight / 2;
@@ -2357,7 +2403,16 @@ function bindInspectorEvents(connOrId, card) {
       });
     }
 
-    // Synthesized-video: locate chain start
+    // Synthesized-video card: FPS change
+    const synthFps = document.getElementById('insp-synth-fps');
+    if (synthFps) {
+      synthFps.addEventListener('change', () => {
+        const v = parseInt(synthFps.value);
+        if (isFinite(v) && v >= 1 && v <= 60) { pushUndo(); card.fps = v; render(); }
+      });
+    }
+
+    // Synthesized-video card: locate chain start
     const locateChainBtn = document.getElementById('insp-locate-eb-chain');
     if (locateChainBtn) {
       locateChainBtn.addEventListener('click', () => {
@@ -2368,7 +2423,9 @@ function bindInspectorEvents(connOrId, card) {
         const canvasEl = document.getElementById('main-canvas');
         if (canvasEl) {
           const pad = 8;
-          const fitZoom = Math.min((canvasEl.clientWidth - pad * 2) / firstEb.width, (canvasEl.clientHeight - pad * 2) / firstEb.height);
+          const availW = canvasEl.clientWidth - pad * 2;
+          const availH = canvasEl.clientHeight - pad * 2;
+          const fitZoom = Math.min(availW / firstEb.width, availH / firstEb.height);
           state.canvas.zoom = Math.min(1, fitZoom);
           state.canvas.offsetX = -(firstEb.x + firstEb.width / 2) * state.canvas.zoom + canvasEl.clientWidth / 2;
           state.canvas.offsetY = -(firstEb.y + firstEb.height / 2) * state.canvas.zoom + canvasEl.clientHeight / 2;
@@ -2379,24 +2436,91 @@ function bindInspectorEvents(connOrId, card) {
       });
     }
 
-    // Synthesized-video FPS
-    const synthFps = document.getElementById('insp-synth-fps');
-    if (synthFps) synthFps.addEventListener('change', () => { const v = parseInt(synthFps.value); if (isFinite(v) && v >= 1 && v <= 60) { pushUndo(); card.fps = v; render(); } });
+    // Synthesized-video card: chain jump buttons
+    setTimeout(() => {
+      propsContent.querySelectorAll('.eb-chain-jump').forEach(el => {
+        el.addEventListener('click', () => {
+          const ebId = el.dataset.ebId;
+          const eb = findEditBoxById(ebId);
+          if (!eb) return;
+          const canvasEl = document.getElementById('main-canvas');
+          if (canvasEl) {
+            const pad = 8;
+            const availW = canvasEl.clientWidth - pad * 2;
+            const availH = canvasEl.clientHeight - pad * 2;
+            const fitZoom = Math.min(availW / eb.width, availH / eb.height);
+            state.canvas.zoom = Math.min(1, fitZoom);
+            state.canvas.offsetX = -(eb.x + eb.width / 2) * state.canvas.zoom + canvasEl.clientWidth / 2;
+            state.canvas.offsetY = -(eb.y + eb.height / 2) * state.canvas.zoom + canvasEl.clientHeight / 2;
+          }
+          state.selection.editBoxId = eb.id;
+          state.selection.cardIds = [];
+          render();
+        });
+      });
+    }, 0);
 
-    // Transform (video / synthesized-video / image)
-    if (card.type === 'video' || card.type === 'synthesized-video' || card.type === 'image') {
+    const fadeIn = document.getElementById('insp-fadein');
+    const fadeOut = document.getElementById('insp-fadeout');
+    if (fadeIn) {
+      fadeIn.addEventListener('change', () => {
+        const v = parseFloat(fadeIn.value);
+        if (isFinite(v) && v >= 0) { pushUndo(); card.fadeIn = v; render(); }
+      });
+    }
+    if (fadeOut) {
+      fadeOut.addEventListener('change', () => {
+        const v = parseFloat(fadeOut.value);
+        if (isFinite(v) && v >= 0) { pushUndo(); card.fadeOut = v; render(); }
+      });
+    }
+
+    // Transform controls — video cards only
+    if (card.type === 'video') {
       const scaleSlider = document.getElementById('insp-transform-scale');
       const xInput = document.getElementById('insp-transform-x');
       const yInput = document.getElementById('insp-transform-y');
       const resetBtn = document.getElementById('insp-transform-reset');
-      if (scaleSlider) scaleSlider.addEventListener('input', () => { const v = parseInt(scaleSlider.value) / 100; if (isFinite(v)) { pushUndo(); card.transformScale = v; render(); renderTransformOverlay(); } });
-      if (xInput) xInput.addEventListener('change', () => { const v = parseInt(xInput.value); if (isFinite(v)) { pushUndo(); card.transformX = v; render(); } });
-      if (yInput) yInput.addEventListener('change', () => { const v = parseInt(yInput.value); if (isFinite(v)) { pushUndo(); card.transformY = v; render(); } });
-      if (resetBtn) resetBtn.addEventListener('click', () => { pushUndo(); card.transformScale = 1.0; card.transformX = 0; card.transformY = 0; render(); });
+      if (scaleSlider) {
+        scaleSlider.addEventListener('input', () => {
+          const v = parseInt(scaleSlider.value) / 100;
+          if (isFinite(v)) { pushUndo(); card.transformScale = v; render(); renderTransformOverlay(); }
+        });
+      }
+      if (xInput) {
+        xInput.addEventListener('change', () => {
+          const v = parseInt(xInput.value);
+          if (isFinite(v)) { pushUndo(); card.transformX = v; render(); }
+        });
+      }
+      if (yInput) {
+        yInput.addEventListener('change', () => {
+          const v = parseInt(yInput.value);
+          if (isFinite(v)) { pushUndo(); card.transformY = v; render(); }
+        });
+      }
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          pushUndo();
+          card.transformScale = 1.0;
+          card.transformX = 0;
+          card.transformY = 0;
+          render();
+        });
+      }
+
+      // Freeze frame button
+      const freezeBtn = document.getElementById('insp-freeze-frame');
+      if (freezeBtn) {
+        freezeBtn.addEventListener('click', () => {
+          captureFreezeFrame(card.id);
+        });
+      }
+
     }
   }
 
-  // Batch connection editing
+  // Batch connection editing (no conn, no card, but multiple connectionIds selected)
   if (!conn && !card && state.selection.connectionIds.length > 1) {
     const selType = document.getElementById('insp-transition-type');
     const selDur = document.getElementById('insp-transition-dur');

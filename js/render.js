@@ -1,41 +1,90 @@
 // ================================================================
-// Rendering: Dot pattern background (Figma "画板页")
+// Rendering: Grid (checkerboard + major lines)
 // ================================================================
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
   const h = canvas.height / dpr;
 
-  const dotSpacing = 20; // px in world space
+  const checkerSize = 40;
+  const majorEvery = 4;  // major line every N checkers
+  const majorSize = checkerSize * majorEvery;
 
   // Visible world rect
   const topLeft = screenToWorld(0, 0);
   const bottomRight = screenToWorld(w, h);
 
-  const startCol = Math.floor(topLeft.x / dotSpacing);
-  const endCol = Math.ceil(bottomRight.x / dotSpacing);
-  const startRow = Math.floor(topLeft.y / dotSpacing);
-  const endRow = Math.ceil(bottomRight.y / dotSpacing);
+  // Align to checker grid in world space
+  const startCol = Math.floor(topLeft.x / checkerSize);
+  const endCol = Math.ceil(bottomRight.x / checkerSize);
+  const startRow = Math.floor(topLeft.y / checkerSize);
+  const endRow = Math.ceil(bottomRight.y / checkerSize);
 
-  const totalCols = endCol - startCol + 1;
-  const totalRows = endRow - startRow + 1;
-  const totalDots = totalCols * totalRows;
-
-  // When zoomed far out, the dot grid becomes too dense → lag. Skip if > 8000 dots.
-  if (totalDots > 8000) return;
-
-  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  // Draw checkerboard — batch by color to reduce state changes
+  const evenCells = [];
+  const oddCells = [];
 
   for (let row = startRow; row <= endRow; row++) {
     for (let col = startCol; col <= endCol; col++) {
-      const wx = col * dotSpacing;
-      const wy = row * dotSpacing;
-      const s = worldToScreen(wx, wy);
-      const r = Math.max(1, 1 * state.canvas.zoom);
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
-      ctx.fill();
+      const cell = {
+        x: col * checkerSize,
+        y: row * checkerSize,
+        w: checkerSize,
+        h: checkerSize
+      };
+      if ((row + col) % 2 === 0) {
+        evenCells.push(cell);
+      } else {
+        oddCells.push(cell);
+      }
     }
+  }
+
+  // Draw even cells (canvas color — slightly lighter)
+  if (evenCells.length > 0) {
+    ctx.fillStyle = '#f5f5f5';
+    for (const c of evenCells) {
+      const s = worldToScreen(c.x, c.y);
+      const sz = checkerSize * state.canvas.zoom;
+      ctx.fillRect(s.x, s.y, sz + 1, sz + 1);
+    }
+  }
+
+  // Draw odd cells (checker color)
+  if (oddCells.length > 0) {
+    ctx.fillStyle = '#f0f0f0';
+    for (const c of oddCells) {
+      const s = worldToScreen(c.x, c.y);
+      const sz = checkerSize * state.canvas.zoom;
+      ctx.fillRect(s.x, s.y, sz + 1, sz + 1);
+    }
+  }
+
+  // Major grid lines
+  const majorStartCol = Math.floor(topLeft.x / majorSize);
+  const majorEndCol = Math.ceil(bottomRight.x / majorSize);
+  const majorStartRow = Math.floor(topLeft.y / majorSize);
+  const majorEndRow = Math.ceil(bottomRight.y / majorSize);
+
+  ctx.strokeStyle = '#ebebeb';
+  ctx.lineWidth = 1;
+
+  for (let col = majorStartCol; col <= majorEndCol; col++) {
+    const wx = col * majorSize;
+    const s = worldToScreen(wx, 0);
+    ctx.beginPath();
+    ctx.moveTo(s.x, 0);
+    ctx.lineTo(s.x, h);
+    ctx.stroke();
+  }
+
+  for (let row = majorStartRow; row <= majorEndRow; row++) {
+    const wy = row * majorSize;
+    const s = worldToScreen(0, wy);
+    ctx.beginPath();
+    ctx.moveTo(0, s.y);
+    ctx.lineTo(w, s.y);
+    ctx.stroke();
   }
 }
 
@@ -44,218 +93,200 @@ function renderGrid() {
 // ================================================================
 function renderCard(card) {
   const cw = getCardWidth(card);
-  const ch = card.type === 'image' ? (card.height || CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT) :
-             (card.type === 'video' || card.type === 'composition' || card.type === 'synthesized-video') ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
-             card.type === 'audio' ? 41 : CARD_HEIGHT;
+  const ch = (card.type === 'audio')
+    ? CARD_WAVEFORM_HEIGHT
+    : CARD_HEIGHT;
   const x = card.x;
   const y = card.y;
-  const r = 10; // Figma cornerRadius
+  const r = 8;
   const lw = 1 / state.canvas.zoom;
   const isSelected = state.selection.cardIds.includes(card.id);
   const isHovered = state.hoveredCardId === card.id;
   const showHandles = isSelected;
   const colors = getCardColors(card);
-  const contentY = y + CARD_LABEL_HEIGHT; // thumbnail area starts below label (Figma layout)
-  const isVideoLike = card.type === 'video' || card.type === 'synthesized-video';
-  // Figma: card body (background, border, clip) is just the thumbnail; label floats above
-  const bodyY = isVideoLike ? contentY : y;
-  const bodyH = isVideoLike ? CARD_THUMB_HEIGHT : ch;
 
-  // --- Image cards: pure image, no frame ---
-  if (card.type === 'image') {
-    if (card.thumbStrip) {
-      try {
-        // Draw image with rounded corners
-        ctx.save();
-        ctx.beginPath();
-        roundRectPath(x, y, cw, ch, 4);
-        ctx.clip();
-        ctx.drawImage(card.thumbStrip, x, y, cw, ch);
-        ctx.restore();
-      } catch (e) {
-        ctx.fillStyle = '#e0e0e0';
-        ctx.fillRect(x, y, cw, ch);
-      }
-    } else {
-      ctx.fillStyle = '#e0e0e0';
-      ctx.fillRect(x, y, cw, ch);
-    }
-    // Selection outline
-    if (isSelected) {
-      ctx.strokeStyle = colors.border;
-      ctx.lineWidth = 2 / state.canvas.zoom;
-      ctx.beginPath();
-      roundRectPath(x, y, cw, ch, 4);
-      ctx.stroke();
-    }
-    return;
-  }
-
-  // Card border color per type (from dynamic color system)
-  const cardBorderColor = colors.border;
-
-  // Perf: skip expensive effects when zoomed far out (they're invisible anyway)
-  const zoom = state.canvas.zoom;
-  const skipEffects = zoom < 0.2;
-  const shadowBlur = skipEffects ? 0 : Math.min(12 / zoom, 24);
-
-  // --- Card background ---
-  // Figma gradient fill: per-type tint from color system
-  const drawGradient = !skipEffects && (card.type === 'video' || card.type === 'audio' || card.type === 'composition' || card.type === 'synthesized-video');
+  // --- Selection glow ---
   if (isSelected) {
     ctx.save();
-    if (!skipEffects) {
-      ctx.shadowColor = colors.shadow;
-      ctx.shadowBlur = shadowBlur;
-    }
-    // Draw background
+    ctx.shadowColor = colors.shadow;
+    ctx.shadowBlur = 12 / state.canvas.zoom;
     ctx.fillStyle = '#ffffff';
-    roundRect(x, bodyY, cw, bodyH, r, true, false);
-    if (drawGradient) {
-      const grad = ctx.createLinearGradient(x, bodyY, x, bodyY + bodyH);
-      grad.addColorStop(0, colors.gradientTop);
-      grad.addColorStop(1, colors.gradientBot);
-      ctx.fillStyle = grad;
-      roundRect(x, bodyY, cw, bodyH, r, true, false);
-    }
-    // Border — type color, thicker
-    ctx.strokeStyle = cardBorderColor;
+    ctx.strokeStyle = colors.border;
     ctx.lineWidth = 1.5 / state.canvas.zoom;
-    roundRect(x, bodyY, cw, bodyH, r, false, true);
+    roundRect(x, y, cw, ch, r, true, true);
     ctx.restore();
   } else if (isHovered) {
     ctx.fillStyle = '#ffffff';
-    roundRect(x, bodyY, cw, bodyH, r, true, false);
-    if (drawGradient) {
-      const grad = ctx.createLinearGradient(x, bodyY, x, bodyY + bodyH);
-      grad.addColorStop(0, colors.gradientTop);
-      grad.addColorStop(1, colors.gradientBot);
-      ctx.fillStyle = grad;
-      roundRect(x, bodyY, cw, bodyH, r, true, false);
-    }
-    ctx.strokeStyle = cardBorderColor;
+    ctx.strokeStyle = '#cccccc';
     ctx.lineWidth = lw;
-    roundRect(x, bodyY, cw, bodyH, r, false, true);
+    roundRect(x, y, cw, ch, r, true, true);
 
     // Subtle shadow on hover
-    if (!skipEffects) {
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.08)';
-      ctx.shadowBlur = Math.min(8 / zoom, 16);
-      ctx.shadowOffsetY = 2 / zoom;
-      ctx.fillStyle = '#ffffff';
-      roundRect(x, bodyY, cw, bodyH, r, true, false);
-      ctx.restore();
-    }
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.08)';
+    ctx.shadowBlur = 8 / state.canvas.zoom;
+    ctx.shadowOffsetY = 2 / state.canvas.zoom;
+    ctx.fillStyle = '#ffffff';
+    roundRect(x, y, cw, ch, r, true, false);
+    ctx.restore();
   } else {
     ctx.fillStyle = '#ffffff';
-    roundRect(x, bodyY, cw, bodyH, r, true, false);
-    if (drawGradient) {
-      const grad = ctx.createLinearGradient(x, bodyY, x, bodyY + bodyH);
-      grad.addColorStop(0, colors.gradientTop);
-      grad.addColorStop(1, colors.gradientBot);
-      ctx.fillStyle = grad;
-      roundRect(x, bodyY, cw, bodyH, r, true, false);
-    }
-    ctx.strokeStyle = cardBorderColor;
+    ctx.strokeStyle = '#e6e6e6';
     ctx.lineWidth = lw;
-    roundRect(x, bodyY, cw, bodyH, r, false, true);
+    roundRect(x, y, cw, ch, r, true, true);
   }
 
-  // --- Clip to card body for content (Figma: label floats above, outside clip) ---
+  // --- Clip to card for content ---
   ctx.save();
   ctx.beginPath();
-  roundRectPath(x, bodyY, cw, bodyH, r);
+  roundRectPath(x, y, cw, ch, r);
   ctx.clip();
 
   if (card.type === 'audio') {
-    // ===== AudioCard (Figma BGM: 41px, waveform content + bottom label row) =====
-    const audioContentH = 18;
+    // ===== Audio/BGM Card (Figma design: compact waveform strip) =====
+    const accentColor = '#f35d5d'; // Figma: rgb(243, 93, 93)
+    const waveformColor = '#f798aa'; // Figma: rgb(247, 152, 170)
 
-    // BGM badge (Figma: pink pill, top-right, 31x13)
-    const badgeW = 31, badgeH = 13;
-    const badgeX = x + cw - badgeW - 5;
-    const badgeY = y + 3;
-    ctx.fillStyle = colors.badgeFill;
-    ctx.strokeStyle = colors.badgeStroke;
+    // Card body background
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(x, y, cw, ch);
+
+    // Left accent bar
+    ctx.fillStyle = accentColor;
+    ctx.fillRect(x, y, 3 / state.canvas.zoom, ch);
+
+    // Right accent bar
+    ctx.fillStyle = accentColor;
+    ctx.fillRect(x + cw - 3 / state.canvas.zoom, y, 3 / state.canvas.zoom, ch);
+
+    // Body bottom border
+    ctx.strokeStyle = accentColor;
     ctx.lineWidth = 1 / state.canvas.zoom;
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(x, y + ch);
+    ctx.lineTo(x + cw, y + ch);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // BGM type badge (compact, top-right)
+    const badgeW = 22 / state.canvas.zoom;
+    const badgeH = 10 / state.canvas.zoom;
+    ctx.fillStyle = 'rgba(243,93,93,0.12)';
+    ctx.strokeStyle = 'rgba(243,93,93,0.35)';
+    ctx.lineWidth = 0.8 / state.canvas.zoom;
+    const badgeX = x + cw - badgeW - 4 / state.canvas.zoom;
+    const badgeY = y + 2 / state.canvas.zoom;
     ctx.beginPath();
     roundRectPath(badgeX, badgeY, badgeW, badgeH, badgeH / 2);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '400 6px "Inter", system-ui, sans-serif';
+    ctx.fillStyle = accentColor;
+    ctx.font = `500 ${Math.max(7, 9 / state.canvas.zoom)}px "Inter", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('BGM', badgeX + badgeW / 2, badgeY + badgeH / 2);
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
 
-    // Waveform bars — fill content area with exaggerated peaks
-    const wfPad = 4;
-    const barGap = 0.5;
-    const barW = 1.5;
-    const wfContentW = cw - wfPad * 2 - 12;
+    // Waveform area
+    const wfPad = 6 / state.canvas.zoom;
+    const wfX = x + wfPad;
+    const wfW = cw - wfPad * 2 - 32 / state.canvas.zoom; // leave room for volume on right
+    const wfCenterY = y + ch / 2;
+
+    // Waveform bars (pink, Figma style)
     if (card.waveform && card.waveform.length > 0) {
       const peaks = card.waveform;
-      const barCount = Math.floor(wfContentW / (barW + barGap));
-      const maxBarH = audioContentH - 2;
-      const barCenterY = y + (ch - 13) / 2; // centered between top border and separator
-      const trimStart = card.trimIn / (card.duration || 1);
-      const trimEnd = card.trimOut / (card.duration || 1);
+      const barCount = Math.min(peaks.length, Math.floor(wfW / (1.5 / state.canvas.zoom)));
+      const barW = wfW / barCount;
+      const maxBarH = ch - wfPad * 2;
+      const trimStart = card.trimIn / card.duration;
+      const trimEnd = card.trimOut / card.duration;
+
       for (let i = 0; i < barCount; i++) {
         const idxFloat = (i / barCount) * (trimEnd - trimStart) + trimStart;
         const idx = Math.floor(idxFloat * peaks.length);
         const peak = peaks[Math.min(idx, peaks.length - 1)];
-        const barH = Math.max(1, peak * maxBarH);
-        ctx.fillStyle = 'rgba(247, 152, 170, 0.85)';
-        ctx.fillRect(x + wfPad + 12 + i * (barW + barGap), barCenterY - barH / 2, barW, barH);
+        const barH = Math.max(1 / state.canvas.zoom, peak * maxBarH);
+        ctx.fillStyle = waveformColor;
+        ctx.fillRect(
+          wfX + i * barW,
+          wfCenterY - barH / 2,
+          Math.max(0.5 / state.canvas.zoom, barW - 0.5 / state.canvas.zoom),
+          barH
+        );
       }
     } else {
-      ctx.strokeStyle = '#f0d0d5';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = '#e8e8e8';
+      ctx.fillRect(wfX, wfCenterY - 0.5 / state.canvas.zoom, wfW, 1 / state.canvas.zoom);
+    }
+
+    // Volume slider (compact, right side)
+    const volW = 16 / state.canvas.zoom;
+    const volX = x + cw - volW - 4 / state.canvas.zoom;
+    const volTrackH = ch - 6 / state.canvas.zoom;
+    const volTrackY = y + 3 / state.canvas.zoom;
+    ctx.strokeStyle = '#d0d0d0';
+    ctx.lineWidth = 1 / state.canvas.zoom;
+    ctx.beginPath();
+    ctx.moveTo(volX + volW / 2, volTrackY);
+    ctx.lineTo(volX + volW / 2, volTrackY + volTrackH);
+    ctx.stroke();
+    const knobY = volTrackY + (1 - card.volume) * volTrackH;
+    if (card.volume > 0) {
+      ctx.strokeStyle = accentColor;
       ctx.beginPath();
-      const placeLineY = y + (ch - 13) / 2;
-      ctx.moveTo(x + 12, placeLineY);
-      ctx.lineTo(x + cw - 12, placeLineY);
+      ctx.moveTo(volX + volW / 2, knobY);
+      ctx.lineTo(volX + volW / 2, volTrackY + volTrackH);
       ctx.stroke();
     }
-
-    // Separator + label at card bottom (Figma: name x:12, duration x:73, near bottom)
-    const sepY = y + ch - 13;
-    const labelTextY = y + ch - 6;
-    ctx.strokeStyle = colors.border;
-    ctx.lineWidth = 0.5 / state.canvas.zoom;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 0.8 / state.canvas.zoom;
     ctx.beginPath();
-    ctx.moveTo(x + 13, sepY);
-    ctx.lineTo(x + cw - 13, sepY);
+    ctx.arc(volX + volW / 2, knobY, 2.5 / state.canvas.zoom, 0, Math.PI * 2);
+    ctx.fill();
     ctx.stroke();
 
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = colors.label;
-    ctx.font = `700 10px "Inter", system-ui, sans-serif`;
-    let _label = card.label;
-    const _maxLabelW = cw - 90;
-    while (ctx.measureText(_label).width > _maxLabelW && _label.length > 3) {
-      _label = _label.slice(0, -4) + '...';
-    }
-    ctx.fillText(_label, x + 12, labelTextY);
-
-    if (card.duration > 0) {
-      const dur = card.trimOut - card.trimIn;
-      ctx.fillStyle = colors.duration;
-      ctx.font = `400 8px "Inter", system-ui, sans-serif`;
-      ctx.fillText(formatTime(dur), x + 73, labelTextY);
-    }
+    // Volume percentage label
+    const pctText = Math.round(card.volume * 100) + '%';
+    ctx.fillStyle = '#999';
+    ctx.font = `400 ${Math.max(6, 8 / state.canvas.zoom)}px "Inter", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(pctText, volX + volW / 2, volTrackY + volTrackH + 1 / state.canvas.zoom);
+    ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
-
-    // Pink handles (Figma: left/right 11px bars)
-    const _handleW = 11;
-    ctx.fillStyle = colors.border;
-    ctx.fillRect(x, y, _handleW, ch);
-    ctx.fillRect(x + cw - _handleW, y, _handleW, ch);
+    card._volPctBounds = { x: volX, y: volTrackY + volTrackH, w: volW, h: 10 / state.canvas.zoom };
 
     ctx.restore();
+
+    // --- Label (outside card body, below) ---
+    const labelY = y + ch;
+    const labelPad = 2 / state.canvas.zoom;
+
+    const inGroup = isCardInGroup(card.id);
+    ctx.fillStyle = accentColor;
+    const labelFontSize = inGroup ? 11 : Math.max(9, 11 / state.canvas.zoom);
+    ctx.font = `${isSelected ? '550' : '450'} ${labelFontSize}px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'top';
+    const labelTextY = labelY + labelPad;
+    const maxLabelW = cw - 12 / state.canvas.zoom - (cw > 140 ? 40 : 0);
+    let label = card.label || '';
+    while (ctx.measureText(label).width > maxLabelW && label.length > 3) { label = label.slice(0, -4) + '...'; }
+    ctx.fillText(label, x + 6 / state.canvas.zoom, labelTextY);
+
+    if (cw > 140 && card.duration > 0) {
+      const dur = card.trimOut - card.trimIn;
+      ctx.fillStyle = '#e8a0a0';
+      const durFontSize = inGroup ? 9 : Math.max(7, 9 / state.canvas.zoom);
+      ctx.font = `400 ${durFontSize}px "JetBrains Mono", monospace`;
+      ctx.textAlign = 'right';
+      ctx.fillText(formatTime(dur), x + cw - 6 / state.canvas.zoom, labelTextY);
+      ctx.textAlign = 'start';
+    }
+    ctx.textBaseline = 'alphabetic';
 
   } else if (card.type === 'text') {
     // ===== Text card content =====
@@ -278,8 +309,8 @@ function renderCard(card) {
     // Type badge (top-right)
     const badgeW2 = 20;
     const badgeH2 = 12;
-    ctx.fillStyle = 'rgba(212,255,0,0.1)';
-    ctx.strokeStyle = 'rgba(212,255,0,0.3)';
+    ctx.fillStyle = 'rgba(212,255,0,0.15)';
+    ctx.strokeStyle = 'rgba(212,255,0,0.4)';
     ctx.lineWidth = 1 / state.canvas.zoom;
     ctx.beginPath();
     roundRectPath(x + cw - badgeW2 - 4, y + 3, badgeW2, badgeH2, badgeH2 / 2);
@@ -296,7 +327,9 @@ function renderCard(card) {
     ctx.restore();
 
   } else if (card.type === 'composition') {
-    // ===== Composition card (green gradient bg matching video card style) =====
+    // ===== Composition card content =====
+    ctx.fillStyle = '#f5f0ff';
+    ctx.fillRect(x, y, cw, CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT);
 
     // Mini shape thumbnails
     const eb = findEditBoxById(card.editBoxId);
@@ -304,16 +337,12 @@ function renderCard(card) {
     if (shapes.length > 0) {
       ctx.save();
       const miniScale = 0.3;
-      if (eb && eb._shapesWorldCoords) {
-        ctx.translate(x + 8 - eb.x * miniScale, y + 8 - eb.y * miniScale);
-      } else {
-        ctx.translate(x + 8, y + 8);
-      }
+      ctx.translate(x + 8, y + 8);
       ctx.scale(miniScale, miniScale);
       for (const s of shapes.slice(0, 10)) {
         if (s.shapeType === 'rect') {
-          ctx.fillStyle = s.fill || 'rgba(213,255,0,0.15)';
-          ctx.strokeStyle = s.stroke || '#D4FF00';
+          ctx.fillStyle = s.fill || 'rgba(124,108,231,0.3)';
+          ctx.strokeStyle = s.stroke || '#b3d900';
           ctx.lineWidth = 1;
           if (s.angle) { ctx.save(); const cx = s.left + s.width / 2; const cy = s.top + s.height / 2; ctx.translate(cx, cy); ctx.rotate(s.angle * Math.PI / 180); ctx.translate(-cx, -cy); }
           ctx.fillRect(s.left, s.top, s.width, s.height);
@@ -324,14 +353,14 @@ function renderCard(card) {
           if (s.angle) { ctx.save(); ctx.translate(ecx, ecy); ctx.rotate(s.angle * Math.PI / 180); ctx.translate(-ecx, -ecy); }
           ctx.beginPath();
           ctx.ellipse(ecx, ecy, s.width / 2, s.height / 2, 0, 0, Math.PI * 2);
-          ctx.fillStyle = s.fill || 'rgba(213,255,0,0.15)';
-          ctx.strokeStyle = s.stroke || '#D4FF00';
+          ctx.fillStyle = s.fill || 'rgba(124,108,231,0.3)';
+          ctx.strokeStyle = s.stroke || '#b3d900';
           ctx.lineWidth = 1;
           ctx.fill();
           ctx.stroke();
           if (s.angle) ctx.restore();
         } else if (s.shapeType === 'line') {
-          ctx.strokeStyle = s.stroke || '#D4FF00';
+          ctx.strokeStyle = s.stroke || '#b3d900';
           ctx.lineWidth = 1;
           const lcx = (s.x1 + s.x2) / 2, lcy = (s.y1 + s.y2) / 2;
           if (s.angle) { ctx.save(); ctx.translate(lcx, lcy); ctx.rotate(s.angle * Math.PI / 180); ctx.translate(-lcx, -lcy); }
@@ -344,65 +373,169 @@ function renderCard(card) {
       }
       ctx.restore();
     } else {
-      ctx.fillStyle = '#c8ccc8';
+      // Empty placeholder
+      ctx.fillStyle = '#d5cce8';
       ctx.font = `11px "Inter", system-ui, sans-serif`;
       ctx.textBaseline = 'middle';
-      ctx.fillText('空编辑盒', x + 12, y + CARD_THUMB_HEIGHT / 2);
+      ctx.fillText('空编辑盒', x + 12, y + (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT) / 2);
     }
 
-    // Duration + Label (bottom-left, black)
-    const cLabelY2 = y + CARD_THUMB_HEIGHT;
-    const dur = (card.trimOut || card.totalDuration) - (card.trimIn || card.trimStart || 0);
-    const durText = formatTime(dur);
-    ctx.fillStyle = '#000000';
-    ctx.font = `400 8px "Inter", system-ui, sans-serif`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(durText, x + 75, cLabelY2 + CARD_LABEL_HEIGHT / 2);
-    ctx.textAlign = 'start';
-
-    ctx.fillStyle = '#000000';
-    ctx.font = `700 12px "Inter", system-ui, sans-serif`;
-    ctx.fillText(card.label || '合成', x + 14, cLabelY2 + CARD_LABEL_HEIGHT / 2);
-    ctx.textBaseline = 'alphabetic';
-
-    // Left/Right handles — same as video card: 11px wide, full card height, green
-    const handleW = 11;
-    ctx.fillStyle = '#D4FF00';
-    ctx.fillRect(x, y, handleW, ch);
-    ctx.fillRect(x + cw - handleW, y, handleW, ch);
-
-    // "合成" badge (top layer — drawn last, fully green)
-    const badgeWc = 31, badgeHc = 13;
-    const badgeXc = x + cw - badgeWc - 5;
-    const badgeYc = y + 3;
-    ctx.fillStyle = '#D4FF00';
-    ctx.strokeStyle = '#D4FF00';
+    // "合成" badge
+    const badgeWc = 30;
+    const badgeHc = 14;
+    ctx.fillStyle = 'rgba(124,108,231,0.15)';
+    ctx.strokeStyle = 'rgba(124,108,231,0.4)';
     ctx.lineWidth = 1 / state.canvas.zoom;
+    const badgeXc = x + cw - badgeWc - 6;
+    const badgeYc = y + 4;
     ctx.beginPath();
     roundRectPath(badgeXc, badgeYc, badgeWc, badgeHc, badgeHc / 2);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#000000';
-    ctx.font = '400 6px "Inter", system-ui, sans-serif';
+    ctx.fillStyle = '#b3d900';
+    ctx.font = `500 9px "Inter", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('合成', badgeXc + badgeWc / 2, badgeYc + badgeHc / 2);
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
-    ctx.restore(); // end clip (composition)
+
+    // Edit box reference
+    ctx.fillStyle = '#9b8aef';
+    ctx.font = `420 8px "Inter", system-ui, sans-serif`;
+    ctx.fillText('→ 编辑盒: ' + (card.editBoxId || '').slice(0, 12), x + 8, y + (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT) - 4);
+
+    // Duration badge
+    const durBadge = formatTime((card.trimOut || card.totalDuration) - (card.trimIn || card.trimStart || 0));
+    ctx.fillStyle = '#999';
+    ctx.font = `420 9px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'right';
+    ctx.fillText(durBadge, x + cw - 6, y + (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT) - 4);
+    ctx.textAlign = 'start';
+
+    // Label bar for composition
+    const cLabelY = y + CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT;
+    ctx.strokeStyle = '#ece8f0';
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(x + 4, cLabelY);
+    ctx.lineTo(x + cw - 4, cLabelY);
+    ctx.stroke();
+    ctx.fillStyle = isSelected ? '#1a1a1a' : '#1a1a1a';
+    ctx.font = `450 11px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(card.label || '合成', x + 6, cLabelY + CARD_LABEL_HEIGHT / 2);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore(); // end clip
+
+  } else if (card.type === 'synthesized-video') {
+    // ===== Synthesized video card content =====
+    ctx.fillStyle = '#fff8f0';
+    ctx.fillRect(x, y, cw, CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT);
+
+    // Mini shape thumbnails from first edit box in chain
+    const chain = card.editBoxChain || [];
+    const firstEb = chain.length > 0 ? findEditBoxById(chain[0]) : null;
+    const shapes = firstEb ? (firstEb.shapes || []) : [];
+    if (shapes.length > 0) {
+      ctx.save();
+      const miniScale = 0.3;
+      ctx.translate(x + 8, y + 8);
+      ctx.scale(miniScale, miniScale);
+      for (const s of shapes.slice(0, 10)) {
+        if (s.shapeType === 'rect') {
+          ctx.fillStyle = s.fill || 'rgba(255,152,0,0.3)';
+          ctx.strokeStyle = s.stroke || '#ff9800';
+          ctx.lineWidth = 1;
+          if (s.angle) { ctx.save(); const cx = s.left + s.width / 2; const cy = s.top + s.height / 2; ctx.translate(cx, cy); ctx.rotate(s.angle * Math.PI / 180); ctx.translate(-cx, -cy); }
+          ctx.fillRect(s.left, s.top, s.width, s.height);
+          ctx.strokeRect(s.left, s.top, s.width, s.height);
+          if (s.angle) ctx.restore();
+        } else if (s.shapeType === 'ellipse') {
+          const ecx = s.left + s.width / 2, ecy = s.top + s.height / 2;
+          if (s.angle) { ctx.save(); ctx.translate(ecx, ecy); ctx.rotate(s.angle * Math.PI / 180); ctx.translate(-ecx, -ecy); }
+          ctx.beginPath();
+          ctx.ellipse(ecx, ecy, s.width / 2, s.height / 2, 0, 0, Math.PI * 2);
+          ctx.fillStyle = s.fill || 'rgba(255,152,0,0.3)';
+          ctx.strokeStyle = s.stroke || '#ff9800';
+          ctx.lineWidth = 1;
+          ctx.fill();
+          ctx.stroke();
+          if (s.angle) ctx.restore();
+        } else if (s.shapeType === 'line') {
+          ctx.strokeStyle = s.stroke || '#ff9800';
+          ctx.lineWidth = 1;
+          const lcx = (s.x1 + s.x2) / 2, lcy = (s.y1 + s.y2) / 2;
+          if (s.angle) { ctx.save(); ctx.translate(lcx, lcy); ctx.rotate(s.angle * Math.PI / 180); ctx.translate(-lcx, -lcy); }
+          ctx.beginPath();
+          ctx.moveTo(s.x1, s.y1);
+          ctx.lineTo(s.x2, s.y2);
+          ctx.stroke();
+          if (s.angle) ctx.restore();
+        }
+      }
+      ctx.restore();
+    } else {
+      // Empty placeholder
+      ctx.fillStyle = '#e8d5c0';
+      ctx.font = `11px "Inter", system-ui, sans-serif`;
+      ctx.textBaseline = 'middle';
+      ctx.fillText('空编辑盒链', x + 12, y + (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT) / 2);
+    }
+
+    // "合成动画" badge
+    const badgeWc = 44;
+    const badgeHc = 14;
+    ctx.fillStyle = colors.badgeFill;
+    ctx.strokeStyle = colors.badgeStroke;
+    ctx.lineWidth = 1 / state.canvas.zoom;
+    const badgeXc = x + cw - badgeWc - 6;
+    const badgeYc = y + 4;
+    ctx.beginPath();
+    roundRectPath(badgeXc, badgeYc, badgeWc, badgeHc, badgeHc / 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = colors.badgeText;
+    ctx.font = `500 9px "Inter", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('合成动画', badgeXc + badgeWc / 2, badgeYc + badgeHc / 2);
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+
+    // Chain info
+    ctx.fillStyle = '#cc8800';
+    ctx.font = `420 8px "Inter", system-ui, sans-serif`;
+    ctx.fillText('→ ' + chain.length + ' 编辑盒', x + 8, y + (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT) - 4);
+
+    // Duration badge
+    const durBadge = formatTime(card.totalDuration || 0);
+    ctx.fillStyle = '#999';
+    ctx.font = `420 9px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'right';
+    ctx.fillText(durBadge, x + cw - 6, y + (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT) - 4);
+    ctx.textAlign = 'start';
+
+    // Label bar
+    const cLabelY2 = y + CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT;
+    ctx.strokeStyle = '#ece8f0';
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(x + 4, cLabelY2);
+    ctx.lineTo(x + cw - 4, cLabelY2);
+    ctx.stroke();
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = `450 11px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(card.label || '合成动画', x + 6, cLabelY2 + CARD_LABEL_HEIGHT / 2);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore(); // end clip
 
   } else {
     // ===== Video/BGM card content =====
 
   // --- Thumbnail strip (crop based on trim range) ---
-  const thumbInsetX = 13;
-  const thumbInsetY = 2;
   const thumbAreaH = CARD_THUMB_HEIGHT;
-  const thumbX = x + thumbInsetX;
-  const thumbY = contentY + thumbInsetY;
-  const thumbW = cw - thumbInsetX * 2;
-  const thumbH = thumbAreaH - thumbInsetY * 2;
 
   // Recreate frameImage from dataURL if lost (e.g., after undo/redo)
   if (card.isFreezeFrame && card.frameImageDataURL && (!card.frameImage || !card.frameImage.src)) {
@@ -413,10 +546,10 @@ function renderCard(card) {
   if (card.isFreezeFrame && card.frameImage) {
     // Freeze frame: draw the captured frame image covering the thumb area
     try {
-      ctx.drawImage(card.frameImage, thumbX, thumbY, thumbW, thumbH);
+      ctx.drawImage(card.frameImage, x, y, cw, thumbAreaH);
     } catch (e) {
       ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
+      ctx.fillRect(x, y, cw, thumbAreaH);
     }
   } else if (card.thumbStrip && card.duration > 0) {
     try {
@@ -426,186 +559,222 @@ function renderCard(card) {
       const srcX = stripW * fracIn;
       const srcW = stripW * (fracOut - fracIn);
       if (srcW > 0) {
-        ctx.drawImage(card.thumbStrip, srcX, 0, srcW, card.thumbStrip.height, thumbX, thumbY, thumbW, thumbH);
+        ctx.drawImage(card.thumbStrip, srcX, 0, srcW, card.thumbStrip.height, x, y, cw, thumbAreaH);
       } else {
         ctx.fillStyle = '#3a3a3a';
-        ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
+        ctx.fillRect(x, y, cw, thumbAreaH);
       }
     } catch (e) {
       ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
+      ctx.fillRect(x, y, cw, thumbAreaH);
     }
   } else if (card.thumbStrip) {
     // fallback: still use cropped if possible, otherwise scale full strip
     try {
-      ctx.drawImage(card.thumbStrip, thumbX, thumbY, thumbW, thumbH);
+      ctx.drawImage(card.thumbStrip, x, y, cw, thumbAreaH);
     } catch (e) {
       ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
+      ctx.fillRect(x, y, cw, thumbAreaH);
     }
   } else {
     ctx.fillStyle = '#e0e0e0';
-    ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
+    ctx.fillRect(x, y, cw, thumbAreaH);
     ctx.fillStyle = '#999';
     ctx.font = `400 12px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
-    ctx.fillText('生成缩略图...', thumbX + 12, thumbY + thumbH / 2);
+    ctx.fillText('生成缩略图...', x + 12, y + thumbAreaH / 2);
   }
 
-  // --- Waveform area (audio/BGM only; video cards match Figma: no waveform) ---
+  // --- Waveform area ---
   const wfY = y + CARD_THUMB_HEIGHT;
-  const wfH = (card.type === 'video' || card.type === 'composition' || card.type === 'synthesized-video' || card.type === 'image') ? 0 : CARD_WAVEFORM_HEIGHT;
+  const wfH = CARD_WAVEFORM_HEIGHT;
+  const wfPad = 3;
 
-  if (card.type !== 'video' && card.type !== 'composition' && card.type !== 'synthesized-video' && card.type !== 'image') {
-    const wfPad = 3;
+  // Waveform background
+  ctx.fillStyle = '#fafafa';
+  ctx.fillRect(x, wfY, cw, wfH);
 
-    // Waveform background
-    ctx.fillStyle = '#fafafa';
-    ctx.fillRect(x, wfY, cw, wfH);
+  // --- Volume slider (left side of waveform area, vertical) ---
+  const volPad = 4;
+  const volAreaX = x + volPad;
+  const volTrackX = volAreaX + 5;
+  const volTrackY = wfY + 5;
+  const volTrackH = wfH - 10;
+  const volCenterX = volTrackX;
 
-    // Waveform bars (full width, no volume slider)
-    if (card.waveform && card.waveform.length > 0) {
-      const peaks = card.waveform;
-      const barCount = Math.min(peaks.length, Math.floor((cw - wfPad * 2) / 2));
-      const barW = (cw - wfPad * 2) / barCount;
-      const maxBarH = wfH - wfPad * 4;
-      const barCenterY = wfY + wfH / 2;
-      const trimStart = card.trimIn / card.duration;
-      const trimEnd = card.trimOut / card.duration;
+  // Volume track (vertical line)
+  ctx.strokeStyle = '#d0d0d0';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(volCenterX, volTrackY);
+  ctx.lineTo(volCenterX, volTrackY + volTrackH);
+  ctx.stroke();
 
-      for (let i = 0; i < barCount; i++) {
-        const idxFloat = (i / barCount) * (trimEnd - trimStart) + trimStart;
-        const idx = Math.floor(idxFloat * peaks.length);
-        const peak = peaks[Math.min(idx, peaks.length - 1)];
-        const barH = Math.max(1, peak * maxBarH);
+  // Volume fill (from bottom to knob)
+  const knobY = volTrackY + (1 - card.volume) * volTrackH;
+  if (card.volume > 0) {
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(volCenterX, knobY);
+    ctx.lineTo(volCenterX, volTrackY + volTrackH);
+    ctx.stroke();
+  }
 
-        ctx.fillStyle = (i % 2 === 0) ? '#d0d0d0' : '#c4c4c4';
-        ctx.fillRect(
-          x + wfPad + i * barW,
-          barCenterY - barH / 2,
-          Math.max(1, barW - 0.5),
-          barH
-        );
-      }
-    } else {
-      // No waveform yet — subtle placeholder line
-      ctx.fillStyle = '#e8e8e8';
-      ctx.fillRect(x + 24, wfY + wfH / 2 - 1, cw - 28, 1);
+  // Volume knob (small circle)
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(volCenterX, knobY, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Speaker icon above the track
+  const iconY = volTrackY - 2;
+  ctx.fillStyle = '#bbb';
+  ctx.font = `8px "Inter", system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('♪', volCenterX, iconY);
+  ctx.textAlign = 'start';
+
+  // Volume percentage text (clickable for input)
+  const volPctX = volAreaX + 14;
+  const volPctY = wfY + wfH / 2;
+  const pctText = Math.round(card.volume * 100) + '%';
+  ctx.fillStyle = '#999';
+  ctx.font = `450 9px "Inter", system-ui, sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(pctText, volPctX, volPctY);
+  ctx.textBaseline = 'alphabetic';
+
+  // Store volume text position for hit testing
+  card._volPctBounds = {
+    x: volPctX,
+    y: volPctY - 7,
+    w: ctx.measureText(pctText).width,
+    h: 14
+  };
+
+  // Shift waveform bars right to make room for volume slider
+  const wfContentPad = 22; // leave space for volume slider on left
+  // Redraw waveform bars shifted right
+  if (card.waveform && card.waveform.length > 0) {
+    const peaks = card.waveform;
+    const barCount = Math.min(peaks.length, Math.floor((cw - wfContentPad) / 2));
+    const barW = (cw - wfContentPad - wfPad) / barCount;
+    const maxBarH = wfH - wfPad * 4;
+    const barCenterY = wfY + wfH / 2;
+    const trimStart = card.trimIn / card.duration;
+    const trimEnd = card.trimOut / card.duration;
+
+    for (let i = 0; i < barCount; i++) {
+      const idxFloat = (i / barCount) * (trimEnd - trimStart) + trimStart;
+      const idx = Math.floor(idxFloat * peaks.length);
+      const peak = peaks[Math.min(idx, peaks.length - 1)];
+      const barH = Math.max(1, peak * maxBarH);
+
+      ctx.fillStyle = (i % 2 === 0) ? '#d0d0d0' : '#c4c4c4';
+      ctx.fillRect(
+        x + wfContentPad + i * barW,
+        barCenterY - barH / 2,
+        Math.max(1, barW - 0.5),
+        barH
+      );
     }
+  } else {
+    // No waveform yet — subtle placeholder line
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillRect(x + 24, wfY + wfH / 2 - 1, cw - 28, 1);
+  }
 
-    // --- Markers (triangle flags on thumbnail/waveform area) ---
-    if (card.markers && card.markers.length > 0 && card.duration > 0) {
-      const trimDur = card.trimOut - card.trimIn;
-      if (trimDur > 0) {
-        for (const marker of card.markers) {
-          const mx = x + cw * ((marker.time - card.trimIn) / trimDur);
-          if (mx < x + 2 || mx > x + cw - 2) continue;
-          const flagY = contentY + CARD_THUMB_HEIGHT;
-          const flagH = 10;
-          ctx.fillStyle = marker.color;
-          ctx.beginPath();
-          ctx.moveTo(mx, flagY);
-          ctx.lineTo(mx - 5, flagY - flagH);
-          ctx.lineTo(mx + 5, flagY - flagH);
-          ctx.closePath();
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(mx, flagY, 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
+  // --- Markers (triangle flags on thumbnail/waveform area) ---
+  if (card.markers && card.markers.length > 0 && card.duration > 0) {
+    const trimDur = card.trimOut - card.trimIn;
+    if (trimDur > 0) {
+      for (const marker of card.markers) {
+        const mx = x + cw * ((marker.time - card.trimIn) / trimDur);
+        if (mx < x + 2 || mx > x + cw - 2) continue; // off-screen
+        const flagY = y + CARD_THUMB_HEIGHT;
+        const flagH = 10;
+        ctx.fillStyle = marker.color;
+        ctx.beginPath();
+        ctx.moveTo(mx, flagY);
+        ctx.lineTo(mx - 5, flagY - flagH);
+        ctx.lineTo(mx + 5, flagY - flagH);
+        ctx.closePath();
+        ctx.fill();
+        // Small dot at tip
+        ctx.beginPath();
+        ctx.arc(mx, flagY, 2, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
   }
 
-  // --- Left/Right handles (Figma: inside clip, on top of content) ---
-  if (card.type === 'video' || card.type === 'audio' || card.type === 'synthesized-video' || card.type === 'image') {
-    const handleW = 11;
-    ctx.fillStyle = colors.border;
-    ctx.fillRect(x, bodyY, handleW, bodyH);
-    ctx.fillRect(x + cw - handleW, bodyY, handleW, bodyH);
+  // --- Label bar ---
+  const labelY = wfY + wfH;
+  ctx.strokeStyle = '#f1f1f1';
+  ctx.lineWidth = lw;
+  ctx.beginPath();
+  ctx.moveTo(x + 4, labelY);
+  ctx.lineTo(x + cw - 4, labelY);
+  ctx.stroke();
+
+  ctx.fillStyle = isSelected ? '#1a1a1a' : '#1a1a1a';
+  ctx.font = `${isSelected ? '550' : '450'} 11px "Inter", system-ui, sans-serif`;
+  ctx.textBaseline = 'middle';
+  const labelTextX = x + 6;
+  const labelTextY = labelY + CARD_LABEL_HEIGHT / 2;
+  const maxLabelW = cw - 12 - (cw > 140 ? 50 : 0); // leave room for duration
+
+  let label = card.label;
+  while (ctx.measureText(label).width > maxLabelW && label.length > 3) {
+    label = label.slice(0, -4) + '...';
+  }
+  ctx.fillText(label, labelTextX, labelTextY);
+
+  // Duration badge (right-aligned in label)
+  if (cw > 140 && card.duration > 0) {
+    const dur = card.trimOut - card.trimIn;
+    const durStr = formatTime(dur) + ' / ' + formatTime(card.duration);
+    ctx.fillStyle = '#999';
+    ctx.font = `400 10px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'right';
+    ctx.fillText(durStr, x + cw - 6, labelTextY);
+    ctx.textAlign = 'start';
   }
 
   ctx.restore();
   } // end video card content
 
-  // --- Video label (Figma: above card body, outside clip) ---
-  if (card.type === 'video' || card.type === 'synthesized-video') {
-    const vLabelY = y;
-    ctx.fillStyle = colors.label;
-    ctx.font = `700 12px "Inter", system-ui, sans-serif`;
-    ctx.textBaseline = 'middle';
-
-    const vLabelTextX = x + 14;
-    const vLabelTextY = vLabelY + CARD_LABEL_HEIGHT / 2;
-    const vMaxLabelW = cw - 12 - (cw > 140 ? 50 : 0);
-
-    let vLabel = card.label;
-    while (ctx.measureText(vLabel).width > vMaxLabelW && vLabel.length > 3) {
-      vLabel = vLabel.slice(0, -4) + '...';
-    }
-    ctx.fillText(vLabel, vLabelTextX, vLabelTextY);
-
-    // Duration
-    if (cw > 140 && card.duration > 0) {
-      const dur = card.trimOut - card.trimIn;
-      ctx.fillStyle = colors.duration;
-      ctx.font = `400 8px "Inter", system-ui, sans-serif`;
-      ctx.textAlign = 'left';
-      ctx.fillText(formatTime(dur), x + 75, vLabelTextY);
-      ctx.textAlign = 'start';
-    }
-
-    ctx.textBaseline = 'alphabetic';
-
-    // Video type badge (top-right, same y as label)
-    const vBadgeW = 40, vBadgeH = 13;
-    const vBadgeX = x + cw - vBadgeW - 5;
-    const vBadgeY = vLabelY + 2;
-    ctx.fillStyle = colors.badgeFill;
-    ctx.strokeStyle = colors.badgeStroke;
-    ctx.lineWidth = 1 / state.canvas.zoom;
-    ctx.beginPath();
-    roundRectPath(vBadgeX, vBadgeY, vBadgeW, vBadgeH, vBadgeH / 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '400 6px "Inter", system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Video', vBadgeX + vBadgeW / 2, vBadgeY + vBadgeH / 2);
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
-  }
-
   // --- Trim handles (only for video/audio, outside clip) ---
-  if (showHandles && (card.type === 'video' || card.type === 'audio' || card.type === 'bgm' || card.type === 'composition' || card.type === 'synthesized-video' || card.type === 'image')) {
+  if (showHandles && (card.type === 'video' || card.type === 'audio' || card.type === 'bgm' || card.type === 'composition')) {
     const handleW = 6 / state.canvas.zoom;
     const handleAlpha = isHovered && !isSelected ? 0.6 : 1;
-    // Handle color per card type (dynamic via accentColor)
-    const handleColor = colors.handleColor(handleAlpha);
 
     // Left trim handle
-    ctx.fillStyle = handleColor;
+    ctx.fillStyle = colors.handleColor(handleAlpha);
     ctx.beginPath();
-    ctx.moveTo(x, bodyY + r);
-    ctx.lineTo(x + handleW, bodyY + r - 3 / state.canvas.zoom);
-    ctx.lineTo(x + handleW, bodyY + r + 3 / state.canvas.zoom);
+    ctx.moveTo(x, y + r);
+    ctx.lineTo(x + handleW, y + r - 3 / state.canvas.zoom);
+    ctx.lineTo(x + handleW, y + r + 3 / state.canvas.zoom);
     ctx.closePath();
     ctx.fill();
-    ctx.fillRect(x, bodyY + r, handleW, bodyH - r * 2);
+    ctx.fillRect(x, y + r, handleW, ch - r * 2);
 
     // Right trim handle
     ctx.beginPath();
-    ctx.moveTo(x + cw, bodyY + r);
-    ctx.lineTo(x + cw - handleW, bodyY + r - 3 / state.canvas.zoom);
-    ctx.lineTo(x + cw - handleW, bodyY + r + 3 / state.canvas.zoom);
+    ctx.moveTo(x + cw, y + r);
+    ctx.lineTo(x + cw - handleW, y + r - 3 / state.canvas.zoom);
+    ctx.lineTo(x + cw - handleW, y + r + 3 / state.canvas.zoom);
     ctx.closePath();
     ctx.fill();
-    ctx.fillRect(x + cw - handleW, bodyY + r, handleW, bodyH - r * 2);
+    ctx.fillRect(x + cw - handleW, y + r, handleW, ch - r * 2);
   }
 
-  // Anchor points (left + right) — for video/synthesized-video cards
-  if (card.type === 'video' || card.type === 'synthesized-video') {
+  // Anchor points (left + right) — for video cards
+  if (card.type === 'video') {
   const anchorR = ANCHOR_RADIUS / state.canvas.zoom;
   const ha = state.hoveredAnchor;
   const isConnSource = state.interaction.mode === 'connecting' &&
@@ -617,20 +786,19 @@ function renderCard(card) {
   const anchor = getAnchorPos(card, side);
   const r = isHoveredAnchor ? anchorR * 1.4 : anchorR;
 
-  // Outer glow (dynamic accent color for video, side-based for legacy)
+  // Outer glow
   if (isHoveredAnchor || (isConnSource && state.interaction.connectingFrom.side === side)) {
-  const glowColor = card.accentColor
+  ctx.fillStyle = card.accentColor
     ? `rgba(${card.accentColor.r},${card.accentColor.g},${card.accentColor.b},0.25)`
-    : (side === 'right' ? 'rgba(130,110,220,0.25)' : 'rgba(212,255,0,0.25)');
-  ctx.fillStyle = glowColor;
+    : 'rgba(212,255,0,0.25)';
   ctx.beginPath();
   ctx.arc(anchor.x, anchor.y, r + 4 / state.canvas.zoom, 0, Math.PI * 2);
   ctx.fill();
   }
 
-  // Inner dot (dynamic accent on hover, card border color for default)
+  // Inner dot
   ctx.fillStyle = isHoveredAnchor ? colors.border : '#ffffff';
-  ctx.strokeStyle = colors.border;
+  ctx.strokeStyle = isHoveredAnchor ? colors.border : '#aaaaaa';
   ctx.lineWidth = 1.5 / state.canvas.zoom;
   ctx.beginPath();
   ctx.arc(anchor.x, anchor.y, r, 0, Math.PI * 2);
@@ -654,23 +822,32 @@ function renderCard(card) {
   }
   }
 
-  // Top anchor — diamond shape that follows the playhead (group mode only).
+  // Top anchor — diamond shape that follows the playhead.
+  // Only shown during playback (linear or group), not when a card is merely selected/hovered.
   const keyframeConnsFrom = state.connections.filter(c => c.type === 'keyframe' && c.fromCardId === card.id);
   const isConnectingMode = state.interaction.mode === 'connecting';
   const pb = state.playback;
 
-  // Determine whether group playback is active on this specific card
-  const isPlaybackOnCard = pb && (pb.isPlaying || pb.pausedAt > 0) &&
-    pb.playbackMode === 'group' && pb._groupPlaybackGroup &&
-    pb._groupPlaybackGroup.cardIds.includes(card.id) &&
-    pb._groupPlayheadX != null &&
-    pb._groupPlayheadX >= card.x && pb._groupPlayheadX < card.x + getCardWidth(card);
+  // Determine whether playback is active on this specific card
+  const isPlaybackOnCard = pb && (pb.isPlaying || pb.pausedAt > 0) && (
+  // Linear mode: playhead is on this card
+  pb.currentCardId === card.id ||
+  // Group mode: card is in the playing group and playhead is over it
+  (pb.playbackMode === 'group' && pb._groupPlaybackGroup &&
+  pb._groupPlaybackGroup.cardIds.includes(card.id) &&
+  pb._groupPlayheadX != null &&
+  pb._groupPlayheadX >= card.x && pb._groupPlayheadX < card.x + getCardWidth(card))
+  );
 
   // Determine default fromPosition: follow playhead if on this card, else center
   let defaultFromPos = 0.5;
   if (isPlaybackOnCard) {
-    const cw2 = getCardWidth(card);
-    defaultFromPos = cw2 > 0 ? (pb._groupPlayheadX - card.x) / cw2 : 0.5;
+  if (pb.playbackMode === 'group' && pb._groupPlayheadX != null) {
+  const cw2 = getCardWidth(card);
+  defaultFromPos = cw2 > 0 ? (pb._groupPlayheadX - card.x) / cw2 : 0.5;
+  } else {
+  defaultFromPos = pb.cardProgress;
+  }
   }
 
   // Build list of top anchor positions
@@ -705,7 +882,7 @@ function renderCard(card) {
 
   // Outer glow (diamond) — only for hovered
   if (isHoveredAnchor) {
-  ctx.fillStyle = 'rgba(212,255,0,0.25)';
+  ctx.fillStyle = 'rgba(255,152,0,0.25)';
   ctx.beginPath();
   const gr = hw + 4 / state.canvas.zoom;
   ctx.moveTo(anchor.x, anchor.y - gr);
@@ -716,10 +893,10 @@ function renderCard(card) {
   ctx.fill();
   }
 
-  // Diamond shape — green for keyframe (Figma: #D4FF00), subtle when permanent non-interactive
+  // Diamond shape — orange for keyframe, subtle when permanent non-interactive
   const isHighlighted = isHoveredAnchor || isConnSel;
-  ctx.fillStyle = isHighlighted ? '#D4FF00' : 'rgba(212,255,0,0.35)';
-  ctx.strokeStyle = isHighlighted ? '#D4FF00' : 'rgba(212,255,0,0.5)';
+  ctx.fillStyle = isHighlighted ? '#ff9800' : 'rgba(255,152,0,0.35)';
+  ctx.strokeStyle = isHighlighted ? '#ff9800' : 'rgba(255,152,0,0.5)';
   ctx.lineWidth = (isHighlighted ? 1.5 : 1) / state.canvas.zoom;
   ctx.beginPath();
   ctx.moveTo(anchor.x, anchor.y - hw);
@@ -741,7 +918,7 @@ function renderCard(card) {
   const thumbY = anchor.y - hw - thumbH - 8 / state.canvas.zoom;
 
   // Dashed line from thumbnail bottom to diamond top
-  ctx.strokeStyle = '#D4FF00';
+  ctx.strokeStyle = '#ff9800';
   ctx.lineWidth = 1 / state.canvas.zoom;
   ctx.setLineDash([3 / state.canvas.zoom, 2 / state.canvas.zoom]);
   ctx.beginPath();
@@ -752,7 +929,7 @@ function renderCard(card) {
 
   // Thumbnail box
   ctx.fillStyle = '#1a1a1a';
-  ctx.strokeStyle = '#D4FF00';
+  ctx.strokeStyle = '#ff9800';
   ctx.lineWidth = 1 / state.canvas.zoom;
   roundRect(thumbX, thumbY, thumbW, thumbH, 3 / state.canvas.zoom);
   ctx.fill();
@@ -785,7 +962,7 @@ function renderCard(card) {
   // Connecting-from indicator (larger filled diamond)
   if (isConnSource && state.interaction.connectingFrom.side === 'top' &&
   state.interaction.connectingFrom.cardId === card.id) {
-  ctx.fillStyle = '#D4FF00';
+  ctx.fillStyle = '#ff9800';
   const cr = hw * 1.4;
   ctx.beginPath();
   ctx.moveTo(anchor.x, anchor.y - cr);
@@ -907,8 +1084,8 @@ const TRANSITION_CYCLE = ['cut', 'dissolve', 'fade'];
 // Rendering: Groups
 // ================================================================
 function getGroupFrame(group) {
-  if (group.collapsed) {
-    return { x: group.x, y: group.y, w: group.width, h: group.height, titleH: group.height };
+  if (group.collapsed || group.sizingMode === 'fixed') {
+    return { x: group.x, y: group.y, w: group.width || 200, h: group.height || 60, titleH: (group.collapsed ? group.height : 22) };
   }
   const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
   if (memberCards.length === 0) return null;
@@ -950,7 +1127,7 @@ function renderMarkerCard(marker) {
   const thumbY = cardY - thumbH - 12 / state.canvas.zoom;
 
   // Dashed line from thumbnail bottom to card top
-  ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
+  ctx.strokeStyle = highlight ? '#ff6600' : '#ff9800';
   ctx.lineWidth = highlight ? (1.5 / state.canvas.zoom) : (1 / state.canvas.zoom);
   ctx.setLineDash([4 / state.canvas.zoom, 3 / state.canvas.zoom]);
   ctx.beginPath();
@@ -961,7 +1138,7 @@ function renderMarkerCard(marker) {
 
   // Thumbnail background + border
   ctx.fillStyle = '#1a1a1a';
-  ctx.strokeStyle = highlight ? '#b3d900' : '#555';
+  ctx.strokeStyle = highlight ? '#ff6600' : '#444';
   ctx.lineWidth = highlight ? (2 / state.canvas.zoom) : (1 / state.canvas.zoom);
   roundRect(thumbX, thumbY, thumbW, thumbH, 3 / state.canvas.zoom);
   ctx.fill();
@@ -985,8 +1162,8 @@ function renderMarkerCard(marker) {
   // Diamond anchor at thumbnail top
   const dSize = 6 / state.canvas.zoom;
   const anchorY = thumbY;
-  ctx.fillStyle = highlight ? '#b3d900' : '#D4FF00';
-  ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
+  ctx.fillStyle = highlight ? '#ff6600' : '#ff9800';
+  ctx.strokeStyle = highlight ? '#ff6600' : '#ff9800';
   ctx.lineWidth = 1.2 / state.canvas.zoom;
   ctx.beginPath();
   ctx.moveTo(x, anchorY - dSize);
@@ -1000,9 +1177,9 @@ function renderMarkerCard(marker) {
   // Highlight glow
   if (highlight) {
     ctx.save();
-    ctx.shadowColor = 'rgba(212,255,0,0.4)';
+    ctx.shadowColor = 'rgba(255,152,0,0.4)';
     ctx.shadowBlur = 8 / state.canvas.zoom;
-    ctx.strokeStyle = '#b3d900';
+    ctx.strokeStyle = '#ff6600';
     ctx.lineWidth = 1.5 / state.canvas.zoom;
     ctx.setLineDash([4 / state.canvas.zoom, 3 / state.canvas.zoom]);
     ctx.beginPath();
@@ -1017,6 +1194,10 @@ function renderMarkerCard(marker) {
   marker._thumbBounds = { x: thumbX, y: thumbY, w: thumbW, h: thumbH, anchorY: anchorY };
 }
 
+function isCardInGroup(cardId) {
+  return state.groups.some(g => g.cardIds.includes(cardId));
+}
+
 function renderGroup(group) {
   const isHovered = state.hoveredGroupId === group.id;
   const isSelected = state.selection.groupIds.includes(group.id);
@@ -1024,72 +1205,88 @@ function renderGroup(group) {
   // Drill-down: group is selected but user has clicked into individual cards
   const hasCardSelected = state.selection.cardIds.some(cid => group.cardIds.includes(cid));
   const isDrillDown = isSelected && hasCardSelected;
+  const purple = '101,84,203'; // #6554CB
+  const titleFontSize = Math.max(10, 12 / state.canvas.zoom);
   if (group.collapsed) {
     const gx = group.x;
     const gy = group.y;
     const gw = group.width || 200;
     const gh = group.height || 60;
+    const titleH = 18 / state.canvas.zoom;
 
-    const gAlpha = isDropTarget ? 0.18 : (isDrillDown ? 0.04 : (isSelected ? 0.24 : (isHovered ? 0.10 : 0.06)));
-    const gStrokeAlpha = isDropTarget ? 0.75 : (isDrillDown ? 0.2 : (isSelected ? 0.9 : (isHovered ? 0.5 : 0.35)));
-    ctx.fillStyle = `rgba(100,100,255,${gAlpha})`;
-    ctx.strokeStyle = `rgba(100,100,255,${gStrokeAlpha})`;
-    ctx.lineWidth = (isSelected ? 2.5 : (isHovered ? 2 : 1.5)) / state.canvas.zoom;
-    roundRect(gx, gy, gw, gh, 8);
-    ctx.fill();
+    // Rect — no rounded corners, below title
+    const rx = gx, ry = gy + titleH, rw = gw, rh = gh - titleH;
+
+    // Title — outside, above the rect (bottom-left anchor)
+    ctx.fillStyle = `#6554CB`;
+    ctx.font = `bold ${titleFontSize}px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(group.name || 'Group', gx, ry);
+    const gAlpha = isDropTarget ? 0.08 : (isDrillDown ? 0 : (isSelected ? 0.08 : (isHovered ? 0.04 : 0)));
+    const gStrokeAlpha = isDropTarget ? 0.9 : (isDrillDown ? 0.2 : (isSelected ? 0.9 : (isHovered ? 0.6 : 0.35)));
+    ctx.fillStyle = `rgba(${purple},${gAlpha})`;
+    ctx.strokeStyle = `rgba(${purple},${gStrokeAlpha})`;
+    ctx.lineWidth = (isSelected || isDropTarget ? 1.5 : 1) / state.canvas.zoom;
+    ctx.beginPath();
+    ctx.rect(rx, ry, rw, rh);
+    if (gAlpha > 0) ctx.fill();
     ctx.stroke();
-
-    ctx.fillStyle = '#555';
-    ctx.font = '500 12px "Inter", system-ui, sans-serif';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(group.name || 'Group', gx + 10, gy + gh / 2 - 4);
 
     const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
     const totalDur = memberCards.reduce((s, c) => s + (c.trimOut - c.trimIn), 0);
-    ctx.fillStyle = '#999';
-    ctx.font = '400 10px "Inter", system-ui, sans-serif';
-    ctx.fillText(`${memberCards.length}段 · ${Math.round(totalDur)}秒`, gx + 10, gy + gh / 2 + 12);
+    ctx.fillStyle = `rgba(${purple},0.5)`;
+    ctx.font = `${Math.max(8, Math.min(14, 10 / state.canvas.zoom))}px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${memberCards.length}段 · ${Math.round(totalDur)}秒`, rx + 10, ry + rh / 2);
   } else {
     const frame = getGroupFrame(group);
     if (!frame) return;
     const frameX = frame.x, frameY = frame.y, frameW = frame.w, frameH = frame.h;
+    const titleH = frame.titleH || 22;
 
-    // Background
-    const gAlpha2 = isDropTarget ? 0.14 : (isDrillDown ? 0.02 : (isSelected ? 0.16 : (isHovered ? 0.05 : 0.03)));
-    const gStrokeAlpha2 = isDropTarget ? 0.7 : (isDrillDown ? 0.15 : (isSelected ? 0.85 : (isHovered ? 0.4 : 0.25)));
-    ctx.fillStyle = `rgba(100,100,255,${gAlpha2})`;
-    ctx.strokeStyle = `rgba(100,100,255,${gStrokeAlpha2})`;
-    ctx.lineWidth = (isSelected || isDropTarget ? 2.5 : (isHovered ? 2 : 1.5)) / state.canvas.zoom;
+    // Rect — no rounded corners, cards area only
+    const rx = frameX, ry = frameY + titleH, rw = frameW, rh = frameH - titleH;
+
+    // Title — outside, above the rect (bottom-left anchor)
+    ctx.fillStyle = `#6554CB`;
+    ctx.font = `bold ${titleFontSize}px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(group.name || 'Group', frameX, ry);
+    const gAlpha2 = isDropTarget ? 0.06 : (isDrillDown ? 0 : (isSelected ? 0.06 : (isHovered ? 0.03 : 0)));
+    const gStrokeAlpha2 = isDropTarget ? 0.85 : (isDrillDown ? 0.18 : (isSelected ? 0.85 : (isHovered ? 0.55 : 0.3)));
+    ctx.fillStyle = `rgba(${purple},${gAlpha2})`;
+    ctx.strokeStyle = `rgba(${purple},${gStrokeAlpha2})`;
+    ctx.lineWidth = (isSelected || isDropTarget ? 1.5 : 1) / state.canvas.zoom;
     ctx.setLineDash([]);
-    roundRect(frameX, frameY, frameW, frameH, 10);
-    ctx.fill();
+    ctx.beginPath();
+    ctx.rect(rx, ry, rw, rh);
+    if (gAlpha2 > 0) ctx.fill();
     ctx.stroke();
+  }
 
-    // Title bar background
-    const titleAlpha = isDrillDown ? 0.03 : (isSelected ? 0.18 : (isHovered ? 0.12 : 0.06));
-    ctx.fillStyle = `rgba(100,100,255,${titleAlpha})`;
-    ctx.beginPath();
-    ctx.moveTo(frameX + 10, frameY);
-    ctx.lineTo(frameX + frameW - 10, frameY);
-    ctx.quadraticCurveTo(frameX + frameW, frameY, frameX + frameW, frameY + 10);
-    ctx.lineTo(frameX + frameW, frameY + 22);
-    ctx.lineTo(frameX, frameY + 22);
-    ctx.lineTo(frameX, frameY + 10);
-    ctx.quadraticCurveTo(frameX, frameY, frameX + 10, frameY);
-    ctx.closePath();
-    ctx.fill();
-
-    // Collapse/expand toggle dot
-    ctx.fillStyle = isHovered ? '#4488ff' : '#999';
-    ctx.beginPath();
-    ctx.arc(frameX + 10, frameY + 11, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Title
-    ctx.fillStyle = '#555';
-    ctx.font = '500 12px "Inter", system-ui, sans-serif';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(group.name || 'Group', frameX + 22, frameY + 11);
+  // Resize handles for fixed-mode non-collapsed groups
+  if (isSelected && !group.collapsed && group.sizingMode === 'fixed') {
+    const frame = getGroupFrame(group);
+    if (frame) {
+      const hw = 6 / state.canvas.zoom; // half-size of handle square
+      const handles = [
+        { name: 'nw', x: frame.x, y: frame.y },
+        { name: 'n',  x: frame.x + frame.w / 2, y: frame.y },
+        { name: 'ne', x: frame.x + frame.w, y: frame.y },
+        { name: 'e',  x: frame.x + frame.w, y: frame.y + frame.h / 2 },
+        { name: 'se', x: frame.x + frame.w, y: frame.y + frame.h },
+        { name: 's',  x: frame.x + frame.w / 2, y: frame.y + frame.h },
+        { name: 'sw', x: frame.x, y: frame.y + frame.h },
+        { name: 'w',  x: frame.x, y: frame.y + frame.h / 2 },
+      ];
+      for (const h of handles) {
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#6554CB';
+        ctx.lineWidth = 1.5 / state.canvas.zoom;
+        ctx.fillRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
+        ctx.strokeRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
+      }
+    }
   }
 }
 
@@ -1124,7 +1321,7 @@ function renderEditBoxTimelines() {
     const tlEnd = lastEb.x + lastEb.width / 2;
 
     // Horizontal line
-    ctx.strokeStyle = 'rgba(212,255,0,0.35)';
+    ctx.strokeStyle = 'rgba(255,152,0,0.35)';
     ctx.lineWidth = 2 / z;
     ctx.beginPath();
     ctx.moveTo(tlStart, tlY);
@@ -1139,14 +1336,14 @@ function renderEditBoxTimelines() {
       const dotR = 5 / z;
 
       // Dot fill
-      ctx.fillStyle = '#D4FF00';
+      ctx.fillStyle = '#ff9800';
       ctx.beginPath();
       ctx.arc(dotX, tlY, dotR, 0, Math.PI * 2);
       ctx.fill();
 
       // Selected/highlighted chain dot
       if (chain[i] === state.selection.editBoxId) {
-        ctx.strokeStyle = '#D4FF00';
+        ctx.strokeStyle = '#ff9800';
         ctx.lineWidth = 2 / z;
         ctx.beginPath();
         ctx.arc(dotX, tlY, dotR + 3 / z, 0, Math.PI * 2);
@@ -1154,46 +1351,9 @@ function renderEditBoxTimelines() {
       }
     }
 
-    // Red progress indicator during eb-chain playback
-    const pb = state.playback;
-    if (pb && pb.playbackMode === 'eb-chain' && pb._ebChain) {
-      const chainData = pb._ebChain;
-      const progress = pb.isPlaying
-        ? (pb._ebChainProgress != null ? pb._ebChainProgress : 0)
-        : (chainData._currentInterp != null ? (pb._ebChainProgress || 0) : 0);
-      const progX = tlStart + (tlEnd - tlStart) * Math.max(0, Math.min(1, progress));
-
-      // Glow
-      ctx.fillStyle = 'rgba(255,51,51,0.25)';
-      ctx.beginPath();
-      ctx.arc(progX, tlY, 10 / z, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Inner dot
-      ctx.fillStyle = '#FF3333';
-      ctx.beginPath();
-      ctx.arc(progX, tlY, 5 / z, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Ring
-      ctx.strokeStyle = '#FF3333';
-      ctx.lineWidth = 1.5 / z;
-      ctx.beginPath();
-      ctx.arc(progX, tlY, 7 / z, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
     // Store timeline bounds for hit testing
     state._ebTimelines = state._ebTimelines || {};
-    state._ebTimelines[chain[0]] = { x: tlStart, y: tlY - 8 / z, w: tlEnd - tlStart, h: 16 / z, chain: chain, tlY: tlY, dots: chain.map(id => { const e = findEditBoxById(id); return { editBoxId: id, x: e ? e.x + e.width / 2 : 0, y: tlY, r: 8 / z }; }) };
-
-    // Store progress dot position for hit-testing
-    if (pb && pb.playbackMode === 'eb-chain' && pb._ebChain) {
-      const chainData = pb._ebChain;
-      const progress = pb._ebChainProgress != null ? pb._ebChainProgress : 0;
-      const progX = tlStart + (tlEnd - tlStart) * Math.max(0, Math.min(1, progress));
-      state._ebTimelines[chain[0]].progDot = { x: progX, y: tlY, r: 12 / z };
-    }
+    state._ebTimelines[chain[0]] = { x: tlStart, y: tlY - 8 / z, w: tlEnd - tlStart, h: 16 / z, chain: chain, dots: chain.map(id => { const e = findEditBoxById(id); return { editBoxId: id, x: e ? e.x + e.width / 2 : 0, y: tlY, r: 8 / z }; }) };
   }
 }
 
@@ -1216,10 +1376,10 @@ function renderConnection(conn) {
   if (!bz) return;
   const { p0, p1, p2, p3 } = bz;
 
-  // Keyframe connection: green dashed (Figma: #D4FF00), vertical bezier
+  // Keyframe connection: orange dashed, vertical bezier, no arrow
   if (isKeyframe) {
     const lw = highlight ? (2.5 / state.canvas.zoom) : (1.5 / state.canvas.zoom);
-    ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
+    ctx.strokeStyle = highlight ? '#e65100' : '#ff9800';
     ctx.lineWidth = lw;
     ctx.lineCap = 'round';
     ctx.setLineDash([8 / state.canvas.zoom, 5 / state.canvas.zoom]);
@@ -1229,22 +1389,22 @@ function renderConnection(conn) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Midpoint badge
+    // Midpoint badge — world-space sizing (scales with zoom like cards)
     const mid = bezierPoint(0.5, p0, p1, p2, p3);
     const badgeW = 44;
     const badgeH = 18;
     const badgeR = 9;
     const labelFontSize = 11;
 
-    ctx.fillStyle = highlight ? '#b3d900' : '#ffffff';
-    ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
+    ctx.fillStyle = highlight ? '#e65100' : '#ffffff';
+    ctx.strokeStyle = highlight ? '#e65100' : '#ffcc80';
     ctx.lineWidth = 1.2 / state.canvas.zoom;
     ctx.beginPath();
     roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = highlight ? '#ffffff' : '#808000';
+    ctx.fillStyle = highlight ? '#ffffff' : '#e65100';
     ctx.font = `${isHovered ? '550' : '450'} ${labelFontSize}px "Inter", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1283,10 +1443,10 @@ function renderConnection(conn) {
     return;
   }
 
-  // Tween connection: purple dashed (Figma: rgb(101,84,203)), no arrow
+  // Tween connection: blue dashed, no arrow
   if (isTween) {
     const lw = highlight ? (2.5 / state.canvas.zoom) : (1.5 / state.canvas.zoom);
-    ctx.strokeStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
+    ctx.strokeStyle = highlight ? '#b3d900' : '#D4FF00';
     ctx.lineWidth = lw;
     ctx.lineCap = 'round';
     ctx.setLineDash([8 / state.canvas.zoom, 5 / state.canvas.zoom]);
@@ -1303,15 +1463,15 @@ function renderConnection(conn) {
     const badgeR = 9;
     const labelFontSize = 11;
 
-    ctx.fillStyle = highlight ? 'rgb(130,110,220)' : '#ffffff';
-    ctx.strokeStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
+    ctx.fillStyle = highlight ? '#b3d900' : '#ffffff';
+    ctx.strokeStyle = highlight ? '#b3d900' : '#e6ff80';
     ctx.lineWidth = 1.2 / state.canvas.zoom;
     ctx.beginPath();
     roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = highlight ? '#ffffff' : 'rgb(101,84,203)';
+    ctx.fillStyle = highlight ? '#ffffff' : '#b3d900';
     ctx.font = `${isHovered ? '550' : '450'} ${labelFontSize}px "Inter", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1372,8 +1532,7 @@ function renderConnection(conn) {
   }
 
   // Bezier curve (ends at arrow base, not tip)
-  // Transition connection: purple (Figma: rgb(101,84,203))
-  ctx.strokeStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
+  ctx.strokeStyle = highlight ? '#D4FF00' : '#666666';
   ctx.lineWidth = lw;
   ctx.lineCap = 'round';
   ctx.setLineDash([]);
@@ -1384,7 +1543,7 @@ function renderConnection(conn) {
 
   // Arrowhead triangle (from tip back to base)
   if (alen > 0.01) {
-    ctx.fillStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
+    ctx.fillStyle = highlight ? '#D4FF00' : '#666666';
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
     ctx.lineTo(baseX + perpX, baseY + perpY);
@@ -1402,20 +1561,20 @@ function renderConnection(conn) {
   const mid = bezierPoint(0.5, p0, p1, p2, p3);
   const badgeW = 28 / state.canvas.zoom;
   const badgeH = 18 / state.canvas.zoom;
-  const badgeR = 2 / state.canvas.zoom;
+  const badgeR = 9 / state.canvas.zoom;
 
-  // Badge background (Figma: light purple fill, purple stroke)
-  ctx.fillStyle = highlight ? 'rgb(130,110,220)' : 'rgb(202, 193, 254)';
-  ctx.strokeStyle = highlight ? 'rgb(130,110,220)' : 'rgb(101,84,203)';
+  // Badge background
+  ctx.fillStyle = highlight ? '#D4FF00' : '#ffffff';
+  ctx.strokeStyle = highlight ? '#D4FF00' : '#bbbbbb';
   ctx.lineWidth = 1.2 / state.canvas.zoom;
   ctx.beginPath();
   roundRectPath(mid.x - badgeW / 2, mid.y - badgeH / 2, badgeW, badgeH, badgeR);
   ctx.fill();
   ctx.stroke();
 
-  // Badge text (Figma: purple)
+  // Badge text
   const label = TRANSITION_LABELS[conn.transition] || '切';
-  ctx.fillStyle = highlight ? '#ffffff' : 'rgb(101,84,203)';
+  ctx.fillStyle = highlight ? '#ffffff' : '#333333';
   ctx.font = `${isHovered ? '550' : '450'} 11px "Inter", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1549,8 +1708,8 @@ function renderConnectionPreview() {
     perp2Y = anx2 * arrowW2;
   }
 
-  // Keyframe (top) connections use green; others use purple
-  const previewColor = isTopSide ? 'rgba(212,255,0,0.45)' : 'rgba(130,110,220,0.45)';
+  // Keyframe (top) connections use orange; others use blue
+  const previewColor = isTopSide ? 'rgba(255,152,0,0.45)' : 'rgba(212,255,0,0.45)';
   ctx.strokeStyle = previewColor;
   ctx.lineWidth = 2 / state.canvas.zoom;
   ctx.lineCap = 'round';
@@ -1563,7 +1722,7 @@ function renderConnectionPreview() {
 
   // Arrowhead at cursor (skip for keyframe/top connections)
   if (!isTopSide && alen2 > 0.01) {
-    ctx.fillStyle = 'rgba(130,110,220,0.5)';
+    ctx.fillStyle = 'rgba(212,255,0,0.5)';
     ctx.beginPath();
     ctx.moveTo(tip2X, tip2Y);
     ctx.lineTo(base2X + perp2X, base2Y + perp2Y);
@@ -1627,6 +1786,35 @@ function hitTest(sx, sy) {
   const wx = world.x;
   const wy = world.y;
   const zoom = state.canvas.zoom;
+
+  // Check group resize handles for fixed-mode selected groups (highest priority)
+  {
+    const handleHitR = 10 / zoom; // world units
+    for (let i = state.groups.length - 1; i >= 0; i--) {
+      const group = state.groups[i];
+      if (group.collapsed || group.sizingMode !== 'fixed') continue;
+      if (!state.selection.groupIds.includes(group.id)) continue;
+      const frame = getGroupFrame(group);
+      if (!frame) continue;
+      const handles = [
+        { name: 'nw', x: frame.x, y: frame.y },
+        { name: 'n',  x: frame.x + frame.w / 2, y: frame.y },
+        { name: 'ne', x: frame.x + frame.w, y: frame.y },
+        { name: 'e',  x: frame.x + frame.w, y: frame.y + frame.h / 2 },
+        { name: 'se', x: frame.x + frame.w, y: frame.y + frame.h },
+        { name: 's',  x: frame.x + frame.w / 2, y: frame.y + frame.h },
+        { name: 'sw', x: frame.x, y: frame.y + frame.h },
+        { name: 'w',  x: frame.x, y: frame.y + frame.h / 2 },
+      ];
+      for (const h of handles) {
+        if (Math.abs(wx - h.x) <= handleHitR && Math.abs(wy - h.y) <= handleHitR) {
+          return { type: 'group-resize', groupId: group.id, handle: h.name };
+        }
+      }
+      // Only check resize handles for the topmost selected fixed group
+      break;
+    }
+  }
 
   // Check group title bars first — they float above cards for drag (always)
   for (let i = state.groups.length - 1; i >= 0; i--) {
@@ -1813,12 +2001,20 @@ function hitTest(sx, sy) {
         }
       }
 
-      // Volume slider area (left side, vertical)?
-      const wfY = card.type === 'audio' ? card.y + 6 : card.y + CARD_THUMB_HEIGHT;
-      const wfH = card.type === 'audio' ? (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT - 18) : CARD_WAVEFORM_HEIGHT;
-      const volAreaW = 22; // width of volume control area on left
+      // Volume slider area
+      const wfY = card.type === 'audio' ? card.y : card.y + CARD_THUMB_HEIGHT;
+      const wfH = CARD_WAVEFORM_HEIGHT;
 
-      if (wx >= card.x && wx <= card.x + volAreaW && wy >= wfY && wy <= wfY + wfH) {
+      let inVolumeArea = false;
+      if (card.type === 'audio') {
+        // Volume slider on RIGHT side for audio cards
+        inVolumeArea = wx >= card.x + cw - 24 / state.canvas.zoom && wx <= card.x + cw && wy >= wfY && wy <= wfY + wfH;
+      } else {
+        // Volume slider on LEFT side for non-audio cards
+        inVolumeArea = wx >= card.x && wx <= card.x + 22 && wy >= wfY && wy <= wfY + wfH;
+      }
+
+      if (inVolumeArea) {
         // Check if clicking on the percentage text (to edit)
         if (card._volPctBounds) {
           const b = card._volPctBounds;
@@ -1981,21 +2177,6 @@ function hitTest(sx, sy) {
     }
   }
 
-  // Check timeline progress dot first (higher priority)
-  if (state._ebTimelines) {
-    for (const key of Object.keys(state._ebTimelines)) {
-      const tl = state._ebTimelines[key];
-      if (!tl) continue;
-      // Progress dot (red scrubber) — hit-test with larger radius
-      if (tl.progDot) {
-        const pdx = wx - tl.progDot.x, pdy = wy - tl.progDot.y;
-        if (Math.sqrt(pdx * pdx + pdy * pdy) <= tl.progDot.r) {
-          return { type: 'timeline-progress', timelineKey: key };
-        }
-      }
-    }
-  }
-
   // Check timeline dots (eb-keyframe timeline)
   if (state._ebTimelines) {
     for (const key of Object.keys(state._ebTimelines)) {
@@ -2031,6 +2212,30 @@ function roundRectPath(x, y, w, h, r) {
   ctx.lineTo(x, y + r);
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
+}
+
+// ================================================================
+// Rendering: Empty state hint
+// ================================================================
+function renderEmptyHint() {
+  if (state.cards.length > 0) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.width / dpr;
+  const h = canvas.height / dpr;
+  const cx = w / 2;
+  const cy = h / 2;
+
+  ctx.fillStyle = '#999999';
+  ctx.font = `450 18px "Inter", system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('拖入视频文件开始创作', cx, cy - 10);
+
+  ctx.font = `420 13px "Inter", system-ui, sans-serif`;
+  ctx.fillStyle = '#bbbbbb';
+  ctx.fillText('或点击顶部 "导入视频/音频" 按钮', cx, cy + 16);
+  ctx.textAlign = 'start';
 }
 
 // ================================================================
@@ -2084,45 +2289,41 @@ function renderShapeSelectionHighlights() {
 // ================================================================
 function renderEditBox(eb) {
   const z = state.canvas.zoom;
-  const ebR = 10; // Figma cornerRadius
+  const lw = 1 / z;
   const isSelected = state.selection.editBoxId === eb.id || (state.selection.editBoxIds || []).includes(eb.id);
   const isHovered = state.hoveredEditBoxId === eb.id;
   const isActive = state.interaction.activeEditBoxId === eb.id;
 
-  // --- White background (Figma: rgb(249, 249, 249)) ---
-  ctx.fillStyle = '#f9f9f9';
-  roundRect(eb.x, eb.y, eb.width, eb.height, ebR, true, false);
-
   // --- State glow ---
   if (isActive) {
-    // Edit mode — prominent green glow + solid border
+    // Edit mode — prominent blue glow + solid border
     ctx.save();
     ctx.shadowColor = 'rgba(212,255,0,0.35)';
     ctx.shadowBlur = 20 / z;
-    roundRect(eb.x, eb.y, eb.width, eb.height, ebR, false, false);
+    roundRect(eb.x, eb.y, eb.width, eb.height, 6, false, false);
     ctx.fillStyle = 'rgba(212,255,0,0.08)';
-    roundRect(eb.x, eb.y, eb.width, eb.height, ebR, true, false);
+    roundRect(eb.x, eb.y, eb.width, eb.height, 6, true, false);
     ctx.restore();
   } else if (isSelected) {
-    // Selected — visible green highlight, draggable
+    // Selected — visible blue highlight, draggable
     ctx.save();
     ctx.shadowColor = 'rgba(212,255,0,0.2)';
     ctx.shadowBlur = 14 / z;
-    roundRect(eb.x, eb.y, eb.width, eb.height, ebR, false, false);
+    roundRect(eb.x, eb.y, eb.width, eb.height, 6, false, false);
     ctx.fillStyle = 'rgba(212,255,0,0.05)';
-    roundRect(eb.x, eb.y, eb.width, eb.height, ebR, true, false);
+    roundRect(eb.x, eb.y, eb.width, eb.height, 6, true, false);
     ctx.restore();
   } else if (isHovered) {
     ctx.fillStyle = 'rgba(212,255,0,0.03)';
-    roundRect(eb.x, eb.y, eb.width, eb.height, ebR, true, false);
+    roundRect(eb.x, eb.y, eb.width, eb.height, 6, true, false);
   }
 
-  // --- Border (Figma: #88C405, strokeWeight 3) ---
+  // --- Border ---
   ctx.save();
-  ctx.strokeStyle = '#88C405';
-  ctx.lineWidth = isActive ? 3 / z : (isSelected ? 2.5 / z : 1.5 / z);
+  ctx.strokeStyle = isActive ? '#D4FF00' : (isSelected ? '#c5e800' : (isHovered ? '#b3d900' : '#b3d900'));
+  ctx.lineWidth = isActive ? 2.5 / z : (isSelected ? 2 / z : 1.5 / z);
   ctx.setLineDash(isActive ? [] : (isSelected ? [6 / z, 3 / z] : [8 / z, 4 / z]));
-  roundRect(eb.x, eb.y, eb.width, eb.height, ebR, false, true);
+  roundRect(eb.x, eb.y, eb.width, eb.height, 6, false, true);
   ctx.setLineDash([]);
   ctx.restore();
 
@@ -2147,8 +2348,8 @@ function renderEditBox(eb) {
       const isSelConn = allConns.some(c => c.id === state.selection.connectionId);
       const scale = (isHovAnchor || isSelConn) ? 1 : 0.7;
 
-      ctx.fillStyle = '#88C405';
-      ctx.strokeStyle = '#88C405';
+      ctx.fillStyle = isHovAnchor ? '#e65100' : '#ff9800';
+      ctx.strokeStyle = isHovAnchor ? '#e65100' : '#ff9800';
       ctx.lineWidth = 1.5 / z;
       ctx.globalAlpha = isHovAnchor || isSelConn ? 1 : 0.75;
       ctx.beginPath();
@@ -2163,7 +2364,7 @@ function renderEditBox(eb) {
 
       if (isHovAnchor) {
         ctx.save();
-        ctx.shadowColor = 'rgba(136,196,5,0.5)';
+        ctx.shadowColor = 'rgba(255,152,0,0.5)';
         ctx.shadowBlur = 10 / z;
         ctx.fill();
         ctx.restore();
@@ -2176,8 +2377,8 @@ function renderEditBox(eb) {
       const scale = isHovDefAnchor ? 1 : 0.7;
       const alpha = allConns.length > 0 ? 0.6 : (isHovDefAnchor ? 0.95 : 0.6);
 
-      ctx.fillStyle = `rgba(136,196,5,${alpha})`;
-      ctx.strokeStyle = `rgba(136,196,5,${alpha})`;
+      ctx.fillStyle = `rgba(255,152,0,${alpha})`;
+      ctx.strokeStyle = `rgba(255,152,0,${alpha})`;
       ctx.lineWidth = 1.5 / z;
       ctx.globalAlpha = alpha;
       ctx.beginPath();
@@ -2192,7 +2393,7 @@ function renderEditBox(eb) {
 
       if (isHovDefAnchor) {
         ctx.save();
-        ctx.shadowColor = 'rgba(136,196,5,0.5)';
+        ctx.shadowColor = 'rgba(255,152,0,0.5)';
         ctx.shadowBlur = 10 / z;
         ctx.fill();
         ctx.restore();
@@ -2203,12 +2404,17 @@ function renderEditBox(eb) {
   // --- Clip to edit box for shape rendering ---
   ctx.save();
   ctx.beginPath();
-  roundRectPath(eb.x, eb.y, eb.width, eb.height, ebR);
+  roundRectPath(eb.x, eb.y, eb.width, eb.height, 6);
   ctx.clip();
 
   // When active, Fabric handles non-line shape rendering — only render lines on 2D canvas
   if (!isActive) {
-    // Shapes are in world coords — draw directly (world transform already applied by render pipeline)
+    // --- Render shapes inside edit box with its camera ---
+    const cam = eb.camera || { zoom: 1, offsetX: 0, offsetY: 0 };
+    ctx.save();
+    ctx.translate(eb.x + cam.offsetX, eb.y + cam.offsetY);
+    ctx.scale(cam.zoom, cam.zoom);
+
     for (const s of (eb.shapes || [])) {
       if (s.shapeType === 'rect') {
         ctx.globalAlpha = s.opacity != null ? s.opacity : 1;
@@ -2238,7 +2444,7 @@ function renderEditBox(eb) {
         const lcx = (s.x1 + s.x2) / 2;
         const lcy = (s.y1 + s.y2) / 2;
         if (s.angle) { ctx.save(); ctx.translate(lcx, lcy); ctx.rotate(s.angle * Math.PI / 180); ctx.translate(-lcx, -lcy); }
-        ctx.strokeStyle = s.stroke || '#88C405';
+        ctx.strokeStyle = s.stroke || '#D4FF00';
         ctx.lineWidth = s.strokeWidth || 2;
         ctx.beginPath();
         ctx.moveTo(s.x1, s.y1);
@@ -2258,16 +2464,20 @@ function renderEditBox(eb) {
       }
     }
     ctx.globalAlpha = 1;
+    ctx.restore();
   } else {
     // Active: still render line shapes on 2D canvas (Fabric doesn't handle lines)
-    // Lines are in world coords — draw directly
+    const cam = eb.camera || { zoom: 1, offsetX: 0, offsetY: 0 };
+    ctx.save();
+    ctx.translate(eb.x + cam.offsetX, eb.y + cam.offsetY);
+    ctx.scale(cam.zoom, cam.zoom);
     for (const s of (eb.shapes || [])) {
       if (s.shapeType === 'line') {
         ctx.globalAlpha = s.opacity != null ? s.opacity : 1;
         const lcx = (s.x1 + s.x2) / 2;
         const lcy = (s.y1 + s.y2) / 2;
         if (s.angle) { ctx.save(); ctx.translate(lcx, lcy); ctx.rotate(s.angle * Math.PI / 180); ctx.translate(-lcx, -lcy); }
-        ctx.strokeStyle = s.stroke || '#88C405';
+        ctx.strokeStyle = s.stroke || '#D4FF00';
         ctx.lineWidth = s.strokeWidth || 2;
         ctx.beginPath();
         ctx.moveTo(s.x1, s.y1);
@@ -2277,36 +2487,39 @@ function renderEditBox(eb) {
       }
     }
     ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   ctx.restore(); // end clip
 
-  // --- Top-left label (Figma: "box 1", Inter Bold 12, black) ---
-  const ebName = eb.name || ('box ' + state.editBoxes.indexOf(eb));
-  ctx.fillStyle = '#000000';
-  ctx.font = `700 12px "Inter", system-ui, sans-serif`;
-  ctx.textBaseline = 'top';
-  ctx.fillText(ebName, eb.x + 12, eb.y + 9);
+  // --- Top-left label ---
+  const labelH = 20;
+  ctx.fillStyle = 'rgba(124,108,231,0.18)';
+  ctx.fillRect(eb.x, eb.y, 70, labelH);
+  ctx.fillStyle = '#6b5ab8';
+  ctx.font = `450 11px "Inter", system-ui, sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText('编辑盒', eb.x + 6, eb.y + labelH / 2);
   ctx.textBaseline = 'alphabetic';
 
-  // --- Top-right badge (Figma: green pill, 31x13, "Box") ---
-  const eBadgeW = 31, eBadgeH = 13;
-  const eBadgeX = eb.x + (eb.width || 499) - eBadgeW - 5;
-  const eBadgeY = eb.y + 5;
-  ctx.fillStyle = 'rgba(136,196,5,0.23)';
-  ctx.strokeStyle = '#88C405';
-  ctx.lineWidth = 1 / state.canvas.zoom;
-  ctx.beginPath();
-  roundRectPath(eBadgeX, eBadgeY, eBadgeW, eBadgeH, eBadgeH / 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = '#000000';
-  ctx.font = `400 6px "Inter", system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Box', eBadgeX + eBadgeW / 2, eBadgeY + eBadgeH / 2);
-  ctx.textAlign = 'start';
-  ctx.textBaseline = 'alphabetic';
+  // Shape count badge
+  const shapeCount = (eb.shapes || []).length;
+  if (shapeCount > 0) {
+    const badgeW = 18;
+    const badgeX = eb.x + 62;
+    const badgeY = eb.y + 2;
+    ctx.fillStyle = '#b3d900';
+    ctx.beginPath();
+    ctx.arc(badgeX + badgeW, badgeY + badgeW / 2, badgeW / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = `500 9px "Inter", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(shapeCount, badgeX + badgeW, badgeY + badgeW / 2);
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+  }
 }
 
 // ================================================================
@@ -2320,10 +2533,6 @@ function render() {
   // Clear everything (identity transform — clear physical pixels)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Fill background
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // 1. Grid — screen space (DPR only, no world transform)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2344,13 +2553,6 @@ function render() {
   }
   ctx.restore();
 
-  // Migrate any edit box shapes to world coords before rendering
-  for (const eb of state.editBoxes) {
-    if (!eb._shapesWorldCoords) {
-      _migrateEditBoxShapesToWorld(eb);
-    }
-  }
-
   // Render edit boxes — active one at full opacity, others dimmed
   for (const eb of state.editBoxes) {
     ctx.save();
@@ -2370,7 +2572,19 @@ function render() {
   ctx.save();
   if (editingEbId) ctx.globalAlpha = 0.25;
   for (const card of state.cards) {
-    if (!collapsedCardIds.has(card.id)) renderCard(card);
+    if (collapsedCardIds.has(card.id)) continue;
+    // Clip for fixed-mode group: hide card parts outside the group frame
+    const isSelected = state.selection.cardIds.includes(card.id);
+    const parentFixedGroup = !isSelected ? state.groups.find(g => !g.collapsed && g.sizingMode === 'fixed' && g.cardIds.includes(card.id)) : null;
+    if (parentFixedGroup) {
+      ctx.save();
+      const f = getGroupFrame(parentFixedGroup);
+      ctx.beginPath();
+      ctx.rect(f.x, f.y + f.titleH, f.w, f.h - f.titleH);
+      ctx.clip();
+    }
+    renderCard(card);
+    if (parentFixedGroup) ctx.restore();
   }
   ctx.restore();
 
@@ -2397,7 +2611,6 @@ function render() {
   renderLineEndpointHandles();
   renderShapeSelectionHighlights();
   ctx.restore();
-
   // 6. Rubber-band selection rectangle (always full opacity)
   renderRubberBand();
   // 7. Snap alignment guides (always full opacity)
@@ -2417,7 +2630,7 @@ function render() {
 
   // 7. Empty state hint — screen space
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // empty hint removed
+  renderEmptyHint();
 
   // Update UI
   updateStatusBar();
@@ -2428,7 +2641,6 @@ function render() {
 }
 
 function updateStatusBar() {
-  if (!statusCards || !statusHint) return;
   const count = state.cards.length;
   const connCount = state.connections.length;
   const selCount = state.selection.cardIds.length;
@@ -2461,6 +2673,9 @@ function updateStatusBar() {
       statusCards.textContent = `已暂停  ·  卡片 ${count}  ·  连线 ${connCount}`;
       statusHint.textContent = `${label}  |  ${formatTime(pb.pausedAt)} / ${formatTime(pb.totalDuration)}  |  空格继续  ·  Esc 停止`;
     }
+  } else if (count === 0) {
+    statusCards.textContent = '卡片 0';
+    statusHint.textContent = '拖入视频文件开始';
   } else if (state.interaction.mode === 'connecting') {
     statusCards.textContent = `卡片 ${count}  ·  连线 ${connCount}`;
     statusHint.textContent = '拖拽至另一张卡片边缘锚点创建连线  ·  Esc 取消';
