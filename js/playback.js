@@ -90,6 +90,17 @@ function captureFreezeFrame(sourceCardId) {
   const frameImage = new Image();
   frameImage.src = dataURL;
 
+  pushUndo();
+
+  // Remember original trimOut before modifying sourceCard
+  const originalTrimOut = sourceCard.trimOut;
+
+  // ---- 1. Source card becomes segment A (trimIn → splitTime) ----
+  sourceCard.trimOut = splitTime;
+
+  // ---- 2. Create freeze frame card ----
+  const freezeDuration = 5;
+
   // Generate thumbStrip: same dimensions as video card thumbnails
   const frameCount = Math.min(THUMBNAIL_COUNT, Math.max(3, Math.floor(freezeDuration / 2)));
   const frameW = 240;
@@ -105,17 +116,6 @@ function captureFreezeFrame(sourceCardId) {
     sctx.drawImage(capCanvas, i * frameW, 0, frameW, frameH);
   }
   const thumbStrip = stripCanvas;
-
-  pushUndo();
-
-  // Remember original trimOut before modifying sourceCard
-  const originalTrimOut = sourceCard.trimOut;
-
-  // ---- 1. Source card becomes segment A (trimIn → splitTime) ----
-  sourceCard.trimOut = splitTime;
-
-  // ---- 2. Create freeze frame card ----
-  const freezeDuration = 5;
   const freezeId = 'freeze_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 
   const freezeCard = {
