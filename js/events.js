@@ -2598,8 +2598,6 @@ function showContextMenu(clientX, clientY, hit) {
       html += `<div class="cm-item${state.clipboard ? '' : ' disabled'}" data-action="paste">粘贴</div>`;
       if (card.type === 'text') {
         html += `<div class="cm-item" data-action="edit-text">编辑文字</div>`;
-      } else {
-        html += `<div class="cm-item" data-action="rename">重命名</div>`;
       }
       if (card.type === 'video' || card.type === 'audio' || card.type === 'bgm' || card.type === 'synthesized-video') {
         html += `<div class="cm-sep"></div>`;
@@ -2612,15 +2610,10 @@ function showContextMenu(clientX, clientY, hit) {
           pausedOnThisCard = pb.pausedAt > 0 && pb.currentCardId === card.id;
         }
         html += `<div class="cm-item${pausedOnThisCard ? '' : ' disabled'}" data-action="cut-at-playhead">裁剪到此处</div>`;
-        html += `<div class="cm-item" data-action="reset-trim">重置裁剪</div>`;
-        if (card.type !== 'synthesized-video') {
-          html += `<div class="cm-item" data-action="replace-content">替换素材...</div>`;
+        if (card.type !== 'audio') {
+          html += `<div class="cm-item${pausedOnThisCard ? '' : ' disabled'}" data-action="freeze-frame">定格</div>`;
         }
         html += `<div class="cm-item" data-action="locate-eb-chain">定位编辑盒链</div>`;
-      }
-      if (card.type === 'composition') {
-        html += `<div class="cm-sep"></div>`;
-        html += `<div class="cm-item" data-action="locate-editbox">定位编辑盒</div>`;
       }
       if (card.type === 'image') {
         html += `<div class="cm-sep"></div>`;
@@ -2636,26 +2629,16 @@ function showContextMenu(clientX, clientY, hit) {
   } else if (hit.connectionId) {
     // Connection selected
     const conn = state.connections.find(c => c.id === hit.connectionId);
-    if (conn && conn.type === 'eb-keyframe') {
-      html += `<div class="cm-item" data-action="insert-eb-keyframe">插入关键帧</div>`;
-      html += `<div class="cm-item" data-action="synthesize-eb-video">合成视频</div>`;
-      html += `<div class="cm-sep"></div>`;
-    } else if (conn && conn.type !== 'eb-keyframe') {
+    if (conn && conn.type !== 'eb-keyframe') {
       html += `<div class="cm-item" data-action="cycle-transition">切换转场</div>`;
+      html += `<div class="cm-sep"></div>`;
     }
-    html += `<div class="cm-sep"></div>`;
     html += `<div class="cm-item danger" data-action="delete-conn">删除连线</div>`;
   } else if (hit.editBoxId) {
     // Edit box selected
     const eb = findEditBoxById(hit.editBoxId);
     if (eb) {
       html += `<div class="cm-item" data-action="duplicate-editbox">复制编辑盒</div>`;
-      html += `<div class="cm-item" data-action="create-comp-from-eb">创建合成卡片</div>`;
-      // Check if this edit box is part of an eb-keyframe chain
-      const ebKeyConns = state.connections.filter(c => c.type === 'eb-keyframe' && (c.fromEditBoxId === eb.id || c.toEditBoxId === eb.id));
-      if (ebKeyConns.length > 0) {
-        html += `<div class="cm-item" data-action="synthesize-eb-video">合成视频</div>`;
-      }
       html += `<div class="cm-sep"></div>`;
       html += `<div class="cm-item danger" data-action="delete-editbox">删除编辑盒</div>`;
     }
@@ -2671,23 +2654,14 @@ function showContextMenu(clientX, clientY, hit) {
       html += `<div class="cm-item" data-action="import-video">导入视频</div>`;
       html += `<div class="cm-item" data-action="import-audio">导入音频</div>`;
       html += `<div class="cm-item" data-action="import-image">导入图片</div>`;
-      html += `<div class="cm-sep"></div>`;
-      html += `<div class="cm-item" data-action="auto-arrange">排列全部</div>`;
     }
   } else {
-    // Canvas / empty area — also check for selected shapes
-    const hasSelectedShapes = state.selection.shapeId || (fabricCanvas && fabricCanvas.getActiveObject() && fabricCanvas.getActiveObject()._shapeId);
-    if (hasSelectedShapes) {
-      html += `<div class="cm-item" data-action="create-editbox">创建合成</div>`;
-      html += `<div class="cm-sep"></div>`;
-    }
+    // Canvas / empty area
     html += `<div class="cm-item${state.clipboard ? '' : ' disabled'}" data-action="paste">粘贴</div>`;
     html += `<div class="cm-sep"></div>`;
     html += `<div class="cm-item" data-action="import-video">导入视频</div>`;
     html += `<div class="cm-item" data-action="import-audio">导入音频</div>`;
     html += `<div class="cm-item" data-action="import-image">导入图片</div>`;
-    html += `<div class="cm-sep"></div>`;
-    html += `<div class="cm-item" data-action="auto-arrange">排列全部</div>`;
   }
 
   ctxMenu.innerHTML = html;
@@ -2951,6 +2925,24 @@ function handleContextAction(action, hit) {
       if (parentGroup2) {
         parentGroup2.cardIds.splice(parentGroup2.cardIds.indexOf(card.id) + 1, 0, newCard.id);
       }
+      render();
+      break;
+    }
+    case 'freeze-frame': {
+      const card = state.cards.find(c => c.id === hit.cardId);
+      if (!card) break;
+      const pb = state.playback;
+      if (pb.pausedAt <= 0) break;
+      let pausedOnThisCard = false;
+      if (pb.playbackMode === 'group' && pb._groupPlayheadX != null) {
+        const cw2 = getCardWidth(card);
+        pausedOnThisCard = pb._groupPlayheadX >= card.x && pb._groupPlayheadX <= card.x + cw2;
+      } else {
+        pausedOnThisCard = pb.currentCardId === card.id;
+      }
+      if (!pausedOnThisCard) break;
+      pushUndo();
+      captureFreezeFrame(card.id);
       render();
       break;
     }
