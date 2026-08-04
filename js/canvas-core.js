@@ -198,13 +198,26 @@ function buildGroupTimeline(group) {
   const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
   if (memberCards.length === 0) return null;
 
-  let startX = Infinity, endX = -Infinity;
-  const timelineCards = [];
+  let startX, endX;
 
+  if (group.sizingMode === 'fixed') {
+    // Fixed mode: playback constrained to group frame
+    startX = group.x;
+    endX = group.x + (group.width || 200);
+  } else {
+    // Fit mode: playback spans all member cards
+    startX = Infinity;
+    endX = -Infinity;
+    for (const card of memberCards) {
+      const cw = getCardWidth(card);
+      if (card.x < startX) startX = card.x;
+      if (card.x + cw > endX) endX = card.x + cw;
+    }
+  }
+
+  const timelineCards = [];
   for (const card of memberCards) {
     const cw = getCardWidth(card);
-    if (card.x < startX) startX = card.x;
-    if (card.x + cw > endX) endX = card.x + cw;
     timelineCards.push({
       cardId: card.id,
       card,

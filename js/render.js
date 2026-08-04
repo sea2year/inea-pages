@@ -1092,25 +1092,21 @@ function renderGroup(group) {
     ctx.fillText(group.name || 'Group', frameX + 22, frameY + 11);
   }
 
-  // Resize handles for fixed-mode non-collapsed groups
+  // Resize handles for fixed-mode non-collapsed groups (corners only, fixed size)
   if (isSelected && !group.collapsed && group.sizingMode === 'fixed') {
     const frame = getGroupFrame(group);
     if (frame) {
-      const hw = 6 / state.canvas.zoom;
+      const hw = 6;
       const handles = [
         { name: 'nw', x: frame.x, y: frame.y },
-        { name: 'n',  x: frame.x + frame.w / 2, y: frame.y },
         { name: 'ne', x: frame.x + frame.w, y: frame.y },
-        { name: 'e',  x: frame.x + frame.w, y: frame.y + frame.h / 2 },
         { name: 'se', x: frame.x + frame.w, y: frame.y + frame.h },
-        { name: 's',  x: frame.x + frame.w / 2, y: frame.y + frame.h },
         { name: 'sw', x: frame.x, y: frame.y + frame.h },
-        { name: 'w',  x: frame.x, y: frame.y + frame.h / 2 },
       ];
       for (const h of handles) {
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#6554CB';
-        ctx.lineWidth = 1.5 / state.canvas.zoom;
+        ctx.lineWidth = 1.5;
         ctx.fillRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
         ctx.strokeRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
       }
@@ -1655,7 +1651,7 @@ function hitTest(sx, sy) {
 
   // Check group resize handles for fixed-mode selected groups (highest priority)
   {
-    const handleHitR = 10 / zoom;
+    const handleHitR = 10;
     for (let i = state.groups.length - 1; i >= 0; i--) {
       const group = state.groups[i];
       if (group.collapsed || group.sizingMode !== 'fixed') continue;
@@ -1664,13 +1660,9 @@ function hitTest(sx, sy) {
       if (!frame) continue;
       const handles = [
         { name: 'nw', x: frame.x, y: frame.y },
-        { name: 'n',  x: frame.x + frame.w / 2, y: frame.y },
         { name: 'ne', x: frame.x + frame.w, y: frame.y },
-        { name: 'e',  x: frame.x + frame.w, y: frame.y + frame.h / 2 },
         { name: 'se', x: frame.x + frame.w, y: frame.y + frame.h },
-        { name: 's',  x: frame.x + frame.w / 2, y: frame.y + frame.h },
         { name: 'sw', x: frame.x, y: frame.y + frame.h },
-        { name: 'w',  x: frame.x, y: frame.y + frame.h / 2 },
       ];
       for (const h of handles) {
         if (Math.abs(wx - h.x) <= handleHitR && Math.abs(wy - h.y) <= handleHitR) {

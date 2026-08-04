@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=50');
+console.log('[inea] render-v4.js v=51');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1083,25 +1083,21 @@ function renderGroup(group) {
     ctx.stroke();
   }
 
-  // Resize handles for fixed-mode non-collapsed groups
+  // Resize handles for fixed-mode non-collapsed groups (corners only, fixed size)
   if (isSelected && !group.collapsed && group.sizingMode === 'fixed') {
     const rf = getGroupFrame(group);
     if (rf) {
-      const hw = 6 / state.canvas.zoom;
+      const hw = 6;
       const handles = [
         { name: 'nw', x: rf.x, y: rf.y },
-        { name: 'n',  x: rf.x + rf.w / 2, y: rf.y },
         { name: 'ne', x: rf.x + rf.w, y: rf.y },
-        { name: 'e',  x: rf.x + rf.w, y: rf.y + rf.h / 2 },
         { name: 'se', x: rf.x + rf.w, y: rf.y + rf.h },
-        { name: 's',  x: rf.x + rf.w / 2, y: rf.y + rf.h },
         { name: 'sw', x: rf.x, y: rf.y + rf.h },
-        { name: 'w',  x: rf.x, y: rf.y + rf.h / 2 },
       ];
       for (const h of handles) {
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#6554CB';
-        ctx.lineWidth = 1.5 / state.canvas.zoom;
+        ctx.lineWidth = 1.5;
         ctx.fillRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
         ctx.strokeRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
       }
@@ -1704,7 +1700,7 @@ function hitTest(sx, sy) {
 
   // Check group resize handles for fixed-mode selected groups (highest priority)
   {
-    const handleHitR = 10 / zoom;
+    const handleHitR = 10;
     for (let i = state.groups.length - 1; i >= 0; i--) {
       const group = state.groups[i];
       if (group.collapsed || group.sizingMode !== 'fixed') continue;
@@ -1713,13 +1709,9 @@ function hitTest(sx, sy) {
       if (!grf) continue;
       const handles = [
         { name: 'nw', x: grf.x, y: grf.y },
-        { name: 'n',  x: grf.x + grf.w / 2, y: grf.y },
         { name: 'ne', x: grf.x + grf.w, y: grf.y },
-        { name: 'e',  x: grf.x + grf.w, y: grf.y + grf.h / 2 },
         { name: 'se', x: grf.x + grf.w, y: grf.y + grf.h },
-        { name: 's',  x: grf.x + grf.w / 2, y: grf.y + grf.h },
         { name: 'sw', x: grf.x, y: grf.y + grf.h },
-        { name: 'w',  x: grf.x, y: grf.y + grf.h / 2 },
       ];
       for (const h of handles) {
         if (Math.abs(wx - h.x) <= handleHitR && Math.abs(wy - h.y) <= handleHitR) {
