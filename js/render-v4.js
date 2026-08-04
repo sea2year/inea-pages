@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=96');
+console.log('[inea] render-v4.js v=97');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2606,6 +2606,7 @@ function render() {
 
   // Update UI
   updateStatusBar();
+  updateHintBar();
   updateZoomBadge();
   renderLayerList();
   updateInspector();
@@ -2656,6 +2657,37 @@ function updateStatusBar() {
     statusCards.textContent = `卡片 ${count}  ·  连线 ${connCount}`;
     statusHint.textContent = '点击选中卡片  ·  Shift+点击多选  ·  拖拽锚点连线  ·  空格+拖拽平移';
   }
+}
+
+function updateHintBar() {
+  const el = document.getElementById('hint-text');
+  if (!el) return;
+  const pb = state.playback;
+  const selCount = state.selection.cardIds.length;
+  const selGroupCount = state.selection.groupIds.length;
+  const hasConnections = state.connections.length > 0;
+
+  let hint = '';
+
+  if (pb.isPlaying) {
+    hint = '空格 暂停  ·  Esc 停止';
+  } else if (pb.pausedAt > 0 && (pb.sequence.length > 0 || pb.playbackMode === 'group')) {
+    hint = '空格 继续  ·  右键 定格 / 裁剪';
+  } else if (state.interaction.mode === 'connecting') {
+    hint = '拖至目标卡片释放  ·  Esc 取消';
+  } else if (selCount === 1) {
+    hint = '空格 播放  ·  拖拽右侧圆点连线  ·  右键 更多操作';
+  } else if (selCount > 1) {
+    hint = '右键 创建组  ·  Delete 删除';
+  } else if (selGroupCount === 1) {
+    hint = '空格 播放组内素材';
+  } else if (hasConnections) {
+    hint = '点击连线可切换转场或删除  ·  拖拽框选  ·  右键导入素材';
+  } else {
+    hint = '拖拽框选  ·  右键导入素材';
+  }
+
+  el.textContent = hint;
 }
 
 function updateZoomBadge() {

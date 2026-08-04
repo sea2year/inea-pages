@@ -182,6 +182,46 @@ canvas {
   position: static;
 }
 
+/* Hint bar — top-left frosted glass card (提示栏) */
+#hint-bar {
+  position: absolute;
+  top: 24px;
+  left: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 16px 16px 16px;
+  min-width: 200px;
+  max-width: 260px;
+  background: rgba(0,0,0,0.004);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 20px;
+  box-shadow: 15px 14px 25.6px rgba(101,104,0,0.08);
+  z-index: 29;
+  transition: opacity 0.3s ease;
+}
+#hint-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #D4FF00;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: -32px;
+  margin-left: -4px;
+}
+#hint-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #1a1a1a;
+  font-family: "Inter", system-ui, sans-serif;
+  font-weight: 400;
+}
+
 /* Floating toolbar — Figma-style bottom-center (底部工具栏) */
 #float-bar {
   position: absolute;
