@@ -46,9 +46,8 @@ function renderGrid() {
 function renderCard(card) {
   const cw = getCardWidth(card);
   const isVideoLike = card.type === 'video' || card.type === 'synthesized-video';
-  const labelH = isVideoLike ? Math.max(CARD_LABEL_HEIGHT, 14 / state.canvas.zoom) : CARD_LABEL_HEIGHT;
   const ch = card.type === 'image' ? (card.height || CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT) :
-             isVideoLike ? CARD_THUMB_HEIGHT + labelH :
+             isVideoLike ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
              (card.type === 'composition') ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
              card.type === 'audio' ? 41 : CARD_HEIGHT;
   const x = card.x;
@@ -59,7 +58,7 @@ function renderCard(card) {
   const isHovered = state.hoveredCardId === card.id;
   const showHandles = isSelected;
   const colors = getCardColors(card);
-  const contentY = isVideoLike ? y + labelH : y + CARD_LABEL_HEIGHT;
+  const contentY = y + CARD_LABEL_HEIGHT;
   // Figma: card body (background, border, clip) is just the thumbnail; label floats above
   const bodyY = isVideoLike ? contentY : y;
   const bodyH = isVideoLike ? CARD_THUMB_HEIGHT : ch;
@@ -540,7 +539,7 @@ function renderCard(card) {
     ctx.textBaseline = 'bottom';
 
     const vLabelTextX = x + 14;
-    const vLabelTextY = y + labelH;
+    const vLabelTextY = y + CARD_LABEL_HEIGHT;
     const vMaxLabelW = cw - 12 - (cw > 140 ? 50 : 0);
 
     let vLabel = card.label;
@@ -1743,12 +1742,14 @@ function hitTest(sx, sy) {
     const card = state.cards[i];
     if (collapsedCardIds.has(card.id)) continue;
     const cw = getCardWidth(card);
-    const ch = CARD_HEIGHT;
+    const isVideo = card.type === 'video' || card.type === 'synthesized-video';
+    const overflowH = isVideo ? Math.max(0, 14 / state.canvas.zoom - CARD_LABEL_HEIGHT) : 0;
+    const ch = isVideo ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT : CARD_HEIGHT;
     const trimHitWorld = TRIM_HIT / state.canvas.zoom;
     const anchorHitWorld = ANCHOR_HIT_R / state.canvas.zoom;
 
-    // Card bounding box
-    if (wx >= card.x && wx <= card.x + cw && wy >= card.y && wy <= card.y + ch) {
+    // Card bounding box (video cards: overflowH expands the hit area above the card)
+    if (wx >= card.x && wx <= card.x + cw && wy >= card.y - overflowH && wy <= card.y + ch) {
 
       // Text cards: no trim, no volume, no playhead — just card body and anchors
       if (card.type === 'text') {
@@ -1868,10 +1869,9 @@ function hitTest(sx, sy) {
         }
       }
 
-      // Video label region (top strip where card title is shown)
-      const _videoLabelH = Math.max(CARD_LABEL_HEIGHT, 14 / state.canvas.zoom);
+      // Video label region (top strip where card title is shown; overflow extends above card)
       if ((card.type === 'video' || card.type === 'synthesized-video') &&
-          wy >= card.y && wy <= card.y + _videoLabelH) {
+          wy >= card.y - overflowH && wy <= card.y + CARD_LABEL_HEIGHT) {
         return { type: 'card-label', cardId: card.id };
       }
 
@@ -2684,8 +2684,8 @@ function startCardLabelEdit(cardId) {
 
     if (isVideo) {
       labelScreenH = Math.round(Math.max(CARD_LABEL_HEIGHT * zoom, 14));
-      labelScreenY = s.y;
-      // Cap editor height: fill label area up to 100% zoom, lock at 20px beyond
+      labelScreenY = s.y - Math.max(0, 14 - CARD_LABEL_HEIGHT * zoom);
+      // Cap editor height: fill label area up to 100% zoom, lock at 14px beyond
       const editorH = Math.min(labelScreenH, 14);
       el.style.height = editorH + 'px';
       el.style.top = (labelScreenY + labelScreenH - editorH) + 'px';
