@@ -2399,9 +2399,9 @@ window.addEventListener('mouseup', (e) => {
         }
         targetGroup.cardIds.push(card.id);
       }
-      // Clean up empty groups
+      // Clean up empty non-fixed groups (fixed empty groups are intentional)
       for (let i = state.groups.length - 1; i >= 0; i--) {
-        if (state.groups[i].cardIds.length === 0) {
+        if (state.groups[i].cardIds.length === 0 && state.groups[i].sizingMode !== 'fixed') {
           state.groups.splice(i, 1);
         }
       }
@@ -2429,7 +2429,7 @@ window.addEventListener('mouseup', (e) => {
       }
     }
     for (let i = state.groups.length - 1; i >= 0; i--) {
-      if (state.groups[i].cardIds.length === 0) {
+      if (state.groups[i].cardIds.length === 0 && state.groups[i].sizingMode !== 'fixed') {
         state.groups.splice(i, 1);
       }
     }
