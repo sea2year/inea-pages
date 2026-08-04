@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=85');
+console.log('[inea] render-v4.js v=89');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -412,8 +412,26 @@ function renderCard(card) {
     card.frameImage.src = card.frameImageDataURL;
   }
 
-  if (card.isFreezeFrame && card.frameImage) {
-    // Freeze frame: draw the captured frame image covering the thumb area
+  if (card.isFreezeFrame && card.thumbStrip && card.duration > 0) {
+    // Freeze frame with thumbStrip: draw as filmstrip
+    try {
+      const stripW2 = card.thumbStrip.width;
+      const fracIn2 = card.trimIn / card.duration;
+      const fracOut2 = card.trimOut / card.duration;
+      const srcX2 = stripW2 * fracIn2;
+      const srcW2 = stripW2 * (fracOut2 - fracIn2);
+      if (srcW2 > 0) {
+        ctx.drawImage(card.thumbStrip, srcX2, 0, srcW2, card.thumbStrip.height, thumbX, thumbY, thumbW, thumbH);
+      } else {
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
+      }
+    } catch (e) {
+      ctx.fillStyle = '#3a3a3a';
+      ctx.fillRect(thumbX, thumbY, thumbW, thumbH);
+    }
+  } else if (card.isFreezeFrame && card.frameImage) {
+    // Fallback: single frame image
     try {
       ctx.drawImage(card.frameImage, thumbX, thumbY, thumbW, thumbH);
     } catch (e) {

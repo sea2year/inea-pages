@@ -2613,7 +2613,6 @@ function showContextMenu(clientX, clientY, hit) {
         if (card.type !== 'audio') {
           html += `<div class="cm-item${pausedOnThisCard ? '' : ' disabled'}" data-action="freeze-frame">定格</div>`;
         }
-        html += `<div class="cm-item" data-action="locate-eb-chain">定位编辑盒链</div>`;
       }
       if (card.type === 'image') {
         html += `<div class="cm-sep"></div>`;

@@ -90,6 +90,22 @@ function captureFreezeFrame(sourceCardId) {
   const frameImage = new Image();
   frameImage.src = dataURL;
 
+  // Generate thumbStrip: repeat the captured frame as filmstrip frames
+  const frameCount = 25; // ~5 frames per second × 5 seconds
+  const stripFrameW = Math.round(capCanvas.width * 0.6);
+  const stripFrameH = Math.round(capCanvas.height * 0.6);
+  const stripGap = 2;
+  const stripW = frameCount * (stripFrameW + stripGap);
+  const stripCanvas = document.createElement('canvas');
+  stripCanvas.width = stripW;
+  stripCanvas.height = stripFrameH;
+  const sctx = stripCanvas.getContext('2d');
+  for (let i = 0; i < frameCount; i++) {
+    const fx = i * (stripFrameW + stripGap);
+    sctx.drawImage(capCanvas, fx, 0, stripFrameW, stripFrameH);
+  }
+  const thumbStrip = stripCanvas;
+
   pushUndo();
 
   // Remember original trimOut before modifying sourceCard
@@ -111,12 +127,13 @@ function captureFreezeFrame(sourceCardId) {
     label: '定格 5.0s',
     frameImage: frameImage,
     frameImageDataURL: dataURL,
+    accentColor: extractDominantColor(capCanvas),
     duration: freezeDuration,
     trimIn: 0,
     trimOut: freezeDuration,
     fileURL: '',
     file: null,
-    thumbStrip: null,
+    thumbStrip: thumbStrip,
     waveform: null,
     volume: 1,
     transformScale: 1.0,
