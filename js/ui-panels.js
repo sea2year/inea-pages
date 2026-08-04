@@ -1981,6 +1981,7 @@ function updateInspector() {
           if (fixedBtn) {
             fixedBtn.addEventListener('click', () => {
               if (group.sizingMode === 'fixed') return;
+              console.log('[DEBUG] 固定按钮被点击, before: sizingMode=', group.sizingMode);
               pushUndo();
               const frame = getGroupFrame(group);
               if (frame) {
@@ -1995,6 +1996,7 @@ function updateInspector() {
                 group.height = group.height || 60;
               }
               group.sizingMode = 'fixed';
+              console.log('[DEBUG] 已设置 fixed, group.sizingMode=', group.sizingMode, 'group.x=', group.x, 'group.y=', group.y);
               document.activeElement?.blur();
               render();
             });
