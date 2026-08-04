@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=51');
+console.log('[inea] render-v4.js v=52');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1083,11 +1083,11 @@ function renderGroup(group) {
     ctx.stroke();
   }
 
-  // Resize handles for fixed-mode non-collapsed groups (corners only, fixed size)
+  // Resize handles for fixed-mode non-collapsed groups (corners only)
   if (isSelected && !group.collapsed && group.sizingMode === 'fixed') {
     const rf = getGroupFrame(group);
     if (rf) {
-      const hw = 6;
+      const hw = 6 / state.canvas.zoom;
       const handles = [
         { name: 'nw', x: rf.x, y: rf.y },
         { name: 'ne', x: rf.x + rf.w, y: rf.y },
@@ -1097,7 +1097,7 @@ function renderGroup(group) {
       for (const h of handles) {
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#6554CB';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 / state.canvas.zoom;
         ctx.fillRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
         ctx.strokeRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
       }
@@ -1700,7 +1700,7 @@ function hitTest(sx, sy) {
 
   // Check group resize handles for fixed-mode selected groups (highest priority)
   {
-    const handleHitR = 10;
+    const handleHitR = 10 / zoom;
     for (let i = state.groups.length - 1; i >= 0; i--) {
       const group = state.groups[i];
       if (group.collapsed || group.sizingMode !== 'fixed') continue;
