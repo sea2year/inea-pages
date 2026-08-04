@@ -1000,6 +1000,20 @@ canvasWrap.addEventListener('mousedown', (e) => {
       }
       state.interaction._lastTextClick = now;
     }
+    // Double-click bgm card to rename
+    if (card && card.type === 'bgm') {
+      const now = Date.now();
+      const prev = state.interaction._lastBgmClick || 0;
+      if (now - prev < 400 && state.selection.cardIds.length === 1 && state.selection.cardIds[0] === card.id) {
+        const newName = prompt('重命名', card.label);
+        if (newName && newName.trim()) {
+          card.label = newName.trim();
+          render();
+          return;
+        }
+      }
+      state.interaction._lastBgmClick = now;
+    }
     // If auto-paused, just select without dragging
     if (state.interaction._autoPaused) {
       render();
@@ -1059,9 +1073,22 @@ canvasWrap.addEventListener('mousedown', (e) => {
     render();
   } else if (hit.type === 'group-title') {
     if (state.interaction._autoPaused) { render(); return; }
-    // Drag group (and all its member cards)
     const group = state.groups.find(g => g.id === hit.groupId);
     if (!group) return;
+    // Double-click to rename
+    const groupNow = Date.now();
+    const groupPrev = state.interaction._lastGroupClick || 0;
+    if (groupNow - groupPrev < 400 && state.interaction._lastGroupClickId === group.id) {
+      const newName = prompt('重命名组', group.name);
+      if (newName && newName.trim()) {
+        group.name = newName.trim();
+        render();
+        return;
+      }
+    }
+    state.interaction._lastGroupClick = groupNow;
+    state.interaction._lastGroupClickId = group.id;
+    // Drag group (and all its member cards)
     pushUndo();
     state.interaction.mode = 'dragging-group';
     state.interaction.targetGroupId = hit.groupId;
