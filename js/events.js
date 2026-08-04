@@ -4100,13 +4100,24 @@ window.addEventListener('keyup', (e) => {
     // If Space was pressed while paused, resume
     if (spaceResume) {
       // If single card selected and differs from current playback source, switch to it
-      if (state.selection.cardIds.length === 1 && state.playback.playbackMode === 'linear') {
+      const pb2 = state.playback;
+      if (state.selection.cardIds.length === 1 && pb2.playbackMode === 'linear') {
         const selId = state.selection.cardIds[0];
-        const firstInSeq = state.playback.sequence[0];
+        const firstInSeq = pb2.sequence[0];
         if (selId !== firstInSeq) {
           stopPlayback();
           startPlayback(selId);
           render();
+          return;
+        }
+      }
+      // If group selected and differs from current playback group, switch to it
+      if (state.selection.groupIds.length === 1 && pb2.pausedAt > 0) {
+        const selGid = state.selection.groupIds[0];
+        const curGid = pb2.playbackMode === 'group' ? pb2.groupPlayback.groupId : null;
+        if (selGid !== curGid) {
+          stopPlayback();
+          togglePlayback(); // will start group playback from selection
           return;
         }
       }
