@@ -1044,6 +1044,7 @@ canvasWrap.addEventListener('mousedown', (e) => {
     state.interaction.targetGroupId = hit.groupId;
     state.interaction._resizeHandle = hit.handle;
     state.interaction.dragStart = { x: e.clientX, y: e.clientY };
+    state.interaction.dragStartWorld = screenToWorld(sx, sy);
     state.interaction._resizeStartFrame = getGroupFrame(grp);
     render();
   } else if (hit.type === 'group-title') {
