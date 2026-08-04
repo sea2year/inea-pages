@@ -1508,19 +1508,22 @@ window.addEventListener('mousemove', (e) => {
       }
     }
     // Snap alignment — only left/right edges (horizontal) and bottom edge (vertical)
+    // Find the single best match across all dragged cards, produce one line per axis
     const SNAP = 6 / state.canvas.zoom; // world units
     const CROSS_AXIS_X = 300; // max horizontal distance for bottom snap
     const CROSS_AXIS_Y = 200; // max vertical distance for left/right snap
     const dragIds = new Set(state.interaction.cardStartPos.keys());
     const snapLines = [];
     let snapDx = 0, snapDy = 0;
+    let globalBestDistX = SNAP, globalBestDistY = SNAP;
+    let globalBestDx = 0, globalBestDy = 0;
+    let globalTargetX = 0, globalTargetY = 0;
     for (const [cid, startPos] of state.interaction.cardStartPos) {
       const c = state.cards.find(ca => ca.id === cid);
       if (!c) continue;
       const cw = getCardWidth(c);
       const ch = (c.type === 'text') ? (c.height || 40) : CARD_HEIGHT;
       const cLeft = c.x, cRight = c.x + cw, cBottom = c.y + ch;
-      let bestDx = 0, bestDy = 0, bestTargetX = 0, bestTargetY = 0, bestDistX = SNAP, bestDistY = SNAP;
       for (const other of state.cards) {
         if (dragIds.has(other.id)) continue;
         const ow = getCardWidth(other);
@@ -1531,7 +1534,11 @@ window.addEventListener('mousemove', (e) => {
           for (const ev of [cLeft, cRight]) {
             for (const oev of [oLeft, oRight]) {
               const dist = Math.abs(ev - oev);
-              if (dist < bestDistX) { bestDistX = dist; bestDx = oev - ev; bestTargetX = oev; }
+              if (dist < globalBestDistX) {
+                globalBestDistX = dist;
+                globalBestDx = oev - ev;
+                globalTargetX = oev;
+              }
             }
           }
         }
@@ -1539,12 +1546,16 @@ window.addEventListener('mousemove', (e) => {
         const hGap = Math.max(0, cLeft - oRight, oLeft - cRight);
         if (hGap < CROSS_AXIS_X) {
           const dist = Math.abs(cBottom - oBottom);
-          if (dist < bestDistY) { bestDistY = dist; bestDy = oBottom - cBottom; bestTargetY = oBottom; }
+          if (dist < globalBestDistY) {
+            globalBestDistY = dist;
+            globalBestDy = oBottom - cBottom;
+            globalTargetY = oBottom;
+          }
         }
       }
-      if (bestDistX < SNAP) { snapDx = bestDx; snapLines.push({ orient: 'v', pos: bestTargetX }); }
-      if (bestDistY < SNAP) { snapDy = bestDy; snapLines.push({ orient: 'h', pos: bestTargetY }); }
     }
+    if (globalBestDistX < SNAP) { snapDx = globalBestDx; snapLines.push({ orient: 'v', pos: globalTargetX }); }
+    if (globalBestDistY < SNAP) { snapDy = globalBestDy; snapLines.push({ orient: 'h', pos: globalTargetY }); }
     // Apply snap
     if (snapDx !== 0 || snapDy !== 0) {
       for (const [cid, startPos] of state.interaction.cardStartPos) {
