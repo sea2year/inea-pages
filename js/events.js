@@ -56,12 +56,6 @@ canvasWrap.addEventListener('mousedown', (e) => {
   // Skip reentrant calls triggered by our own Fabric event forwarding
   if (typeof _isForwarding !== 'undefined' && _isForwarding) return;
 
-  // Click on canvas → commit any active label editor
-  const labelEditor = document.getElementById('__inea-label-editor');
-  if (labelEditor && e.target !== labelEditor && !labelEditor.contains(e.target)) {
-    labelEditor.blur();
-  }
-
   // Drawing tool active → handle on main canvas (card-based drawing)
   if (state.drawingTool !== 'select' && state.drawingTool !== 'pan') {
     if (e.button !== 0) return;

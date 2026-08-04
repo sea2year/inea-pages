@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=65');
+console.log('[inea] render-v4.js v=66');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2811,6 +2811,7 @@ function startCardLabelEdit(cardId) {
 
   const cleanup = () => {
     cancelAnimationFrame(_rafId);
+    document.removeEventListener('mousedown', _onOutsideClick, true);
     el.remove();
   };
 
@@ -2837,10 +2838,17 @@ function startCardLabelEdit(cardId) {
     render();
   };
 
-  // Delay blur handling to avoid immediate destruction from double-click events
+  // Capture-phase document listener: commit when clicking outside the editor.
+  // Canvas is not focusable, so native blur doesn't fire — this replaces it.
   let _ready = false;
   setTimeout(() => { _ready = true; }, 150);
-  el.addEventListener('blur', () => { if (_ready) commit(); });
+  const _onOutsideClick = (ev) => {
+    if (!_ready) return;
+    if (ev.target === el || el.contains(ev.target)) return;
+    commit();
+  };
+  document.addEventListener('mousedown', _onOutsideClick, true);
+
   el.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
     if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
