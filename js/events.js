@@ -915,8 +915,8 @@ canvasWrap.addEventListener('mousedown', (e) => {
     // Apply initial volume from click position (vertical slider)
     const world = screenToWorld(sx, sy);
     const _isAudio = card.type === 'audio';
-    const _wfY = _isAudio ? card.y + 6 / state.canvas.zoom : card.y + CARD_THUMB_HEIGHT;
-    const _wfH = _isAudio ? (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT - 18 / state.canvas.zoom) : CARD_WAVEFORM_HEIGHT;
+    const _wfY = _isAudio ? card.y : card.y + CARD_THUMB_HEIGHT;
+    const _wfH = _isAudio ? 41 : CARD_WAVEFORM_HEIGHT;
     const _volTrackY = _wfY + 8;
     const _volTrackH = _wfH - 16;
     const frac = 1 - (world.y - _volTrackY) / _volTrackH;
@@ -1650,8 +1650,8 @@ window.addEventListener('mousemove', (e) => {
     if (!card) return;
     const world = screenToWorld(sx, sy);
     const isAudio = card.type === 'audio';
-    const wfY = isAudio ? card.y + 6 / state.canvas.zoom : card.y + CARD_THUMB_HEIGHT;
-    const wfH = isAudio ? (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT - 18 / state.canvas.zoom) : CARD_WAVEFORM_HEIGHT;
+    const wfY = isAudio ? card.y : card.y + CARD_THUMB_HEIGHT;
+    const wfH = isAudio ? 41 : CARD_WAVEFORM_HEIGHT;
     const volTrackY = wfY + 8;
     const volTrackH = wfH - 16;
     // Vertical: top = 100%, bottom = 0%

@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=35');
+console.log('[inea] render-v4.js v=36');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1884,9 +1884,9 @@ function hitTest(sx, sy) {
         }
       }
 
-      // Volume slider area (left side, vertical)?
-      const wfY = card.type === 'audio' ? card.y + 6 : card.y + CARD_THUMB_HEIGHT;
-      const wfH = card.type === 'audio' ? (CARD_THUMB_HEIGHT + CARD_WAVEFORM_HEIGHT - 18) : CARD_WAVEFORM_HEIGHT;
+      // Volume slider area (left side, vertical)
+      const wfY = card.type === 'audio' ? card.y : card.y + CARD_THUMB_HEIGHT;
+      const wfH = card.type === 'audio' ? 41 : CARD_WAVEFORM_HEIGHT;
       const volAreaW = 22; // width of volume control area on left
 
       if (wx >= card.x && wx <= card.x + volAreaW && wy >= wfY && wy <= wfY + wfH) {
