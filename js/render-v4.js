@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=32');
+console.log('[inea] render-v4.js v=33');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -224,12 +224,12 @@ function renderCard(card) {
     }
 
     // Label at card top (Figma: title above thumbnail)
-    const labelTextY = y + labelH;
+    const labelTextY = y + CARD_LABEL_HEIGHT;
     ctx.strokeStyle = colors.border;
     ctx.lineWidth = 0.5 / state.canvas.zoom;
     ctx.beginPath();
-    ctx.moveTo(x + 13, y + labelH);
-    ctx.lineTo(x + cw - 13, y + labelH);
+    ctx.moveTo(x + 13, y + CARD_LABEL_HEIGHT);
+    ctx.lineTo(x + cw - 13, y + CARD_LABEL_HEIGHT);
     ctx.stroke();
 
     ctx.textBaseline = 'bottom';
