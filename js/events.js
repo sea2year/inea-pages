@@ -1579,6 +1579,24 @@ window.addEventListener('mousemove', (e) => {
           }
         }
       }
+      // Snap to playback playhead (red line) — left/right edges
+      const pb = state.playback;
+      let phX = null;
+      if (pb.playbackMode === 'group' && pb._groupPlayheadX != null) {
+        phX = pb._groupPlayheadX;
+      } else if ((pb.isPlaying || pb.pausedAt > 0) && pb._playheadX != null) {
+        phX = pb._playheadX;
+      }
+      if (phX != null) {
+        for (const ev of [cLeft, cRight]) {
+          const dist = Math.abs(ev - phX);
+          if (dist < globalBestDistX) {
+            globalBestDistX = dist;
+            globalBestDx = phX - ev;
+            globalTargetX = phX;
+          }
+        }
+      }
     }
     if (globalBestDistX < SNAP) { snapDx = globalBestDx; snapLines.push({ orient: 'v', pos: globalTargetX }); }
     if (globalBestDistY < SNAP) { snapDy = globalBestDy; snapLines.push({ orient: 'h', pos: globalTargetY }); }
