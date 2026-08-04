@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=49');
+console.log('[inea] render-v4.js v=50');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -903,8 +903,8 @@ const TRANSITION_CYCLE = ['cut', 'dissolve', 'fade'];
 // Rendering: Groups
 // ================================================================
 function getGroupFrame(group) {
-  if (group.collapsed) {
-    return { x: group.x, y: group.y, w: group.width, h: group.height, titleH: group.height };
+  if (group.collapsed || group.sizingMode === 'fixed') {
+    return { x: group.x, y: group.y, w: group.width || 200, h: group.height || 60, titleH: (group.collapsed ? group.height : 22) };
   }
   const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
   if (memberCards.length === 0) return null;
@@ -1081,6 +1081,31 @@ function renderGroup(group) {
     ctx.rect(rx, ry, rw, rh);
     if (gAlpha2 > 0) ctx.fill();
     ctx.stroke();
+  }
+
+  // Resize handles for fixed-mode non-collapsed groups
+  if (isSelected && !group.collapsed && group.sizingMode === 'fixed') {
+    const rf = getGroupFrame(group);
+    if (rf) {
+      const hw = 6 / state.canvas.zoom;
+      const handles = [
+        { name: 'nw', x: rf.x, y: rf.y },
+        { name: 'n',  x: rf.x + rf.w / 2, y: rf.y },
+        { name: 'ne', x: rf.x + rf.w, y: rf.y },
+        { name: 'e',  x: rf.x + rf.w, y: rf.y + rf.h / 2 },
+        { name: 'se', x: rf.x + rf.w, y: rf.y + rf.h },
+        { name: 's',  x: rf.x + rf.w / 2, y: rf.y + rf.h },
+        { name: 'sw', x: rf.x, y: rf.y + rf.h },
+        { name: 'w',  x: rf.x, y: rf.y + rf.h / 2 },
+      ];
+      for (const h of handles) {
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#6554CB';
+        ctx.lineWidth = 1.5 / state.canvas.zoom;
+        ctx.fillRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
+        ctx.strokeRect(h.x - hw, h.y - hw, hw * 2, hw * 2);
+      }
+    }
   }
 }
 
@@ -1676,6 +1701,34 @@ function hitTest(sx, sy) {
   const wx = world.x;
   const wy = world.y;
   const zoom = state.canvas.zoom;
+
+  // Check group resize handles for fixed-mode selected groups (highest priority)
+  {
+    const handleHitR = 10 / zoom;
+    for (let i = state.groups.length - 1; i >= 0; i--) {
+      const group = state.groups[i];
+      if (group.collapsed || group.sizingMode !== 'fixed') continue;
+      if (!state.selection.groupIds.includes(group.id)) continue;
+      const grf = getGroupFrame(group);
+      if (!grf) continue;
+      const handles = [
+        { name: 'nw', x: grf.x, y: grf.y },
+        { name: 'n',  x: grf.x + grf.w / 2, y: grf.y },
+        { name: 'ne', x: grf.x + grf.w, y: grf.y },
+        { name: 'e',  x: grf.x + grf.w, y: grf.y + grf.h / 2 },
+        { name: 'se', x: grf.x + grf.w, y: grf.y + grf.h },
+        { name: 's',  x: grf.x + grf.w / 2, y: grf.y + grf.h },
+        { name: 'sw', x: grf.x, y: grf.y + grf.h },
+        { name: 'w',  x: grf.x, y: grf.y + grf.h / 2 },
+      ];
+      for (const h of handles) {
+        if (Math.abs(wx - h.x) <= handleHitR && Math.abs(wy - h.y) <= handleHitR) {
+          return { type: 'group-resize', groupId: group.id, handle: h.name };
+        }
+      }
+      break;
+    }
+  }
 
   // Check group title bars first — they float above cards for drag (always)
   for (let i = state.groups.length - 1; i >= 0; i--) {
@@ -2456,7 +2509,19 @@ function render() {
   ctx.save();
   if (editingEbId) ctx.globalAlpha = 0.25;
   for (const card of state.cards) {
-    if (!collapsedCardIds.has(card.id)) renderCard(card);
+    if (collapsedCardIds.has(card.id)) continue;
+    // Clip for fixed-mode group: hide card parts outside the group frame
+    const isCardSelected = state.selection.cardIds.includes(card.id);
+    const parentFixedGroup = !isCardSelected ? state.groups.find(g => !g.collapsed && g.sizingMode === 'fixed' && g.cardIds.includes(card.id)) : null;
+    if (parentFixedGroup) {
+      ctx.save();
+      const cf = getGroupFrame(parentFixedGroup);
+      ctx.beginPath();
+      ctx.rect(cf.x, cf.y + cf.titleH, cf.w, cf.h - cf.titleH);
+      ctx.clip();
+    }
+    renderCard(card);
+    if (parentFixedGroup) ctx.restore();
   }
   ctx.restore();
 

@@ -907,11 +907,8 @@ const TRANSITION_CYCLE = ['cut', 'dissolve', 'fade'];
 // Rendering: Groups
 // ================================================================
 function getGroupFrame(group) {
-  console.log('[DEBUG] getGroupFrame:', group.name, 'sizingMode=', group.sizingMode, 'collapsed=', group.collapsed, 'x=', group.x, 'y=', group.y, 'w=', group.width, 'h=', group.height);
   if (group.collapsed || group.sizingMode === 'fixed') {
-    const result = { x: group.x, y: group.y, w: group.width || 200, h: group.height || 60, titleH: (group.collapsed ? group.height : 22) };
-    console.log('[DEBUG] → fixed/collapsed branch:', result);
-    return result;
+    return { x: group.x, y: group.y, w: group.width || 200, h: group.height || 60, titleH: (group.collapsed ? group.height : 22) };
   }
   const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
   if (memberCards.length === 0) return null;

@@ -1681,8 +1681,7 @@ function _easingSelect(id, currentVal) {
 }
 
 function updateInspector() {
-  console.log('[DEBUG] updateInspector called, activeElement=', document.activeElement?.tagName, document.activeElement?.id);
-  if (document.activeElement && document.activeElement.closest('#props-content')) { console.log('[DEBUG] updateInspector BLOCKED by focus guard'); return; }
+  if (document.activeElement && document.activeElement.closest('#props-content')) return;
 
   // Line shape (2D canvas)
   if (state.selection.shapeId) {
@@ -1941,7 +1940,6 @@ function updateInspector() {
     if (state.selection.groupIds.length > 0) {
       const group = state.groups.find(g => g.id === state.selection.groupIds[0]);
       if (group) {
-        console.log('[DEBUG] updateInspector group section: group.name=', group.name, 'group.sizingMode=', group.sizingMode);
         const mode = group.sizingMode || 'fit';
         const memberCount = group.cardIds.length;
         const infoHtml = _row('名称', `<input type="text" id="insp-group-name" value="${escAttr(group.name || '')}">`) +
@@ -1967,42 +1965,6 @@ function updateInspector() {
             };
             nameInput.addEventListener('blur', commitName);
             nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { nameInput.blur(); } });
-          }
-          const fitBtn = propsContent.querySelector('#insp-group-fit');
-          const fixedBtn = propsContent.querySelector('#insp-group-fixed');
-          if (fitBtn) {
-            fitBtn.addEventListener('click', (e) => {
-              console.log('[DEBUG] 适应按钮被点击, target.id=', e.target.id, 'currentTarget.id=', e.currentTarget?.id, 'before: sizingMode=', group.sizingMode);
-              if (group.sizingMode === 'fit') return;
-              pushUndo();
-              group.sizingMode = 'fit';
-              group.x = undefined; group.y = undefined; group.width = undefined; group.height = undefined;
-              document.activeElement?.blur();
-              render();
-            });
-          }
-          if (fixedBtn) {
-            fixedBtn.addEventListener('click', (e) => {
-              if (group.sizingMode === 'fixed') return;
-              console.log('[DEBUG] 固定按钮被点击, target.id=', e.target.id, 'before: sizingMode=', group.sizingMode);
-              pushUndo();
-              const frame = getGroupFrame(group);
-              if (frame) {
-                group.x = frame.x;
-                group.y = frame.y;
-                group.width = frame.w;
-                group.height = frame.h;
-              } else {
-                group.x = group.x || 0;
-                group.y = group.y || 0;
-                group.width = group.width || 200;
-                group.height = group.height || 60;
-              }
-              group.sizingMode = 'fixed';
-              console.log('[DEBUG] 已设置 fixed, group.sizingMode=', group.sizingMode, 'group.x=', group.x, 'group.y=', group.y);
-              document.activeElement?.blur();
-              render();
-            });
           }
           const wInput = propsContent.querySelector('#insp-group-width');
           const hInput = propsContent.querySelector('#insp-group-height');
@@ -2555,4 +2517,48 @@ function bindMarkerInspectorEvents(marker) {
     });
   }
 }
+
+// Event delegation for group panel mode toggle buttons.
+// Using a single delegated handler avoids the setTimeout race condition
+// where multiple updateInspector() calls stack duplicate bindings on the same buttons.
+(function initGroupPanelDelegation() {
+  if (!propsContent) return;
+  propsContent.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const gid = state.selection.groupIds[0];
+    if (!gid) return;
+    const group = state.groups.find(g => g.id === gid);
+    if (!group) return;
+
+    if (btn.id === 'insp-group-fit') {
+      if (group.sizingMode === 'fit') return;
+      e.stopPropagation();
+      pushUndo();
+      group.sizingMode = 'fit';
+      group.x = undefined; group.y = undefined; group.width = undefined; group.height = undefined;
+      document.activeElement?.blur();
+      render();
+    } else if (btn.id === 'insp-group-fixed') {
+      if (group.sizingMode === 'fixed') return;
+      e.stopPropagation();
+      pushUndo();
+      const frame = getGroupFrame(group);
+      if (frame) {
+        group.x = frame.x;
+        group.y = frame.y;
+        group.width = frame.w;
+        group.height = frame.h;
+      } else {
+        group.x = group.x || 0;
+        group.y = group.y || 0;
+        group.width = group.width || 200;
+        group.height = group.height || 60;
+      }
+      group.sizingMode = 'fixed';
+      document.activeElement?.blur();
+      render();
+    }
+  });
+})();
 
