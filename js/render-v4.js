@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=41');
+console.log('[inea] render-v4.js v=42');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -58,6 +58,7 @@ function renderCard(card) {
   const isHovered = state.hoveredCardId === card.id;
   const showHandles = isSelected;
   const colors = getCardColors(card);
+  const inGroup = isCardInGroup(card.id);
   const contentY = y + CARD_LABEL_HEIGHT;
   // Figma: card body (background, border, clip) is just the thumbnail; label floats above
   const bodyY = isVideoLike ? contentY : y;
@@ -234,9 +235,10 @@ function renderCard(card) {
     const labelY = y + audioBodyH;
     const labelPad = 2 / state.canvas.zoom;
 
+    const aLabelSize = inGroup ? 10 : (10 / zoom);
     ctx.textBaseline = 'top';
     ctx.fillStyle = colors.label;
-    ctx.font = `700 ${10 / zoom}px "Inter", system-ui, sans-serif`;
+    ctx.font = `700 ${aLabelSize}px "Inter", system-ui, sans-serif`;
     const labelTextY = labelY + labelPad;
     let _label = card.label || '';
     const _maxLabelW = cw - 90;
@@ -351,8 +353,9 @@ function renderCard(card) {
     // Duration + Label (bottom-left, label first, duration after)
     const cLabelY2 = y + CARD_THUMB_HEIGHT;
     const cLabelX = x + 14;
+    const compLabelSize = inGroup ? 12 : (12 / zoom);
     ctx.fillStyle = '#000000';
-    ctx.font = `700 ${12 / zoom}px "Inter", system-ui, sans-serif`;
+    ctx.font = `700 ${compLabelSize}px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'bottom';
     const cLabelName = card.label || '合成';
     ctx.fillText(cLabelName, cLabelX, cLabelY2 + CARD_LABEL_HEIGHT);
@@ -529,8 +532,9 @@ function renderCard(card) {
 
   // --- Video label (Figma: above card body, outside clip) ---
   if (card.type === 'video' || card.type === 'synthesized-video') {
+    const vLabelSize = inGroup ? 12 : (12 / zoom);
     ctx.fillStyle = colors.label;
-    ctx.font = `700 ${12 / zoom}px "Inter", system-ui, sans-serif`;
+    ctx.font = `700 ${vLabelSize}px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'bottom';
 
     const vLabelTextX = x + 14;
@@ -1009,6 +1013,10 @@ function renderMarkerCard(marker) {
   marker._thumbBounds = { x: thumbX, y: thumbY, w: thumbW, h: thumbH, anchorY: anchorY };
 }
 
+function isCardInGroup(cardId) {
+  return state.groups.some(g => g.cardIds.includes(cardId));
+}
+
 function renderGroup(group) {
   const isHovered = state.hoveredGroupId === group.id;
   const isSelected = state.selection.groupIds.includes(group.id);
@@ -1017,7 +1025,7 @@ function renderGroup(group) {
   const hasCardSelected = state.selection.cardIds.some(cid => group.cardIds.includes(cid));
   const isDrillDown = isSelected && hasCardSelected;
   const purple = '101,84,203'; // #6554CB
-  const titleFontSize = Math.max(10, 12 / state.canvas.zoom);
+  const titleFontSize = Math.max(10, Math.min(16, 12 / state.canvas.zoom));
   if (group.collapsed) {
     const gx = group.x;
     const gy = group.y;
@@ -1046,7 +1054,7 @@ function renderGroup(group) {
     const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
     const totalDur = memberCards.reduce((s, c) => s + (c.trimOut - c.trimIn), 0);
     ctx.fillStyle = `rgba(${purple},0.5)`;
-    ctx.font = `${Math.max(8, 10 / state.canvas.zoom)}px "Inter", system-ui, sans-serif`;
+    ctx.font = `${Math.max(8, Math.min(14, 10 / state.canvas.zoom))}px "Inter", system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.fillText(`${memberCards.length}段 · ${Math.round(totalDur)}秒`, rx + 10, ry + rh / 2);
   } else {
