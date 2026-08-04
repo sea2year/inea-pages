@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=39');
+console.log('[inea] render-v4.js v=40');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1017,60 +1017,62 @@ function renderGroup(group) {
   const hasCardSelected = state.selection.cardIds.some(cid => group.cardIds.includes(cid));
   const isDrillDown = isSelected && hasCardSelected;
   const purple = '101,84,203'; // #6554CB
+  const titleFontSize = Math.max(10, 12 / state.canvas.zoom);
   if (group.collapsed) {
     const gx = group.x;
     const gy = group.y;
     const gw = group.width || 200;
     const gh = group.height || 60;
+    const titleH = 18 / state.canvas.zoom;
 
+    // Title — outside, above the rect
+    ctx.fillStyle = `#6554CB`;
+    ctx.font = `bold ${titleFontSize}px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(group.name || 'Group', gx, gy);
+
+    // Rect — no rounded corners, below title
+    const rx = gx, ry = gy + titleH, rw = gw, rh = gh - titleH;
     const gAlpha = isDropTarget ? 0.08 : (isDrillDown ? 0 : (isSelected ? 0.08 : (isHovered ? 0.04 : 0)));
     const gStrokeAlpha = isDropTarget ? 0.9 : (isDrillDown ? 0.2 : (isSelected ? 0.9 : (isHovered ? 0.6 : 0.35)));
     ctx.fillStyle = `rgba(${purple},${gAlpha})`;
     ctx.strokeStyle = `rgba(${purple},${gStrokeAlpha})`;
     ctx.lineWidth = (isSelected || isDropTarget ? 1.5 : 1) / state.canvas.zoom;
-    roundRect(gx, gy, gw, gh, 8);
+    ctx.beginPath();
+    ctx.rect(rx, ry, rw, rh);
     if (gAlpha > 0) ctx.fill();
     ctx.stroke();
-
-    ctx.fillStyle = `#6554CB`;
-    ctx.font = `bold ${Math.max(10, 12 / state.canvas.zoom)}px "Inter", system-ui, sans-serif`;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(group.name || 'Group', gx + 10, gy + gh / 2 - 4);
 
     const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
     const totalDur = memberCards.reduce((s, c) => s + (c.trimOut - c.trimIn), 0);
     ctx.fillStyle = `rgba(${purple},0.5)`;
     ctx.font = `${Math.max(8, 10 / state.canvas.zoom)}px "Inter", system-ui, sans-serif`;
-    ctx.fillText(`${memberCards.length}段 · ${Math.round(totalDur)}秒`, gx + 10, gy + gh / 2 + 12);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${memberCards.length}段 · ${Math.round(totalDur)}秒`, rx + 10, ry + rh / 2);
   } else {
     const frame = getGroupFrame(group);
     if (!frame) return;
     const frameX = frame.x, frameY = frame.y, frameW = frame.w, frameH = frame.h;
+    const titleH = frame.titleH || 22;
 
-    // Outline only — no fill background
+    // Title — outside, above the rect
+    ctx.fillStyle = `#6554CB`;
+    ctx.font = `bold ${titleFontSize}px "Inter", system-ui, sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(group.name || 'Group', frameX, frameY + 1);
+
+    // Rect — no rounded corners, cards area only
+    const rx = frameX, ry = frameY + titleH, rw = frameW, rh = frameH - titleH;
     const gAlpha2 = isDropTarget ? 0.06 : (isDrillDown ? 0 : (isSelected ? 0.06 : (isHovered ? 0.03 : 0)));
     const gStrokeAlpha2 = isDropTarget ? 0.85 : (isDrillDown ? 0.18 : (isSelected ? 0.85 : (isHovered ? 0.55 : 0.3)));
     ctx.fillStyle = `rgba(${purple},${gAlpha2})`;
     ctx.strokeStyle = `rgba(${purple},${gStrokeAlpha2})`;
     ctx.lineWidth = (isSelected || isDropTarget ? 1.5 : 1) / state.canvas.zoom;
     ctx.setLineDash([]);
-    roundRect(frameX, frameY, frameW, frameH, 10);
+    ctx.beginPath();
+    ctx.rect(rx, ry, rw, rh);
     if (gAlpha2 > 0) ctx.fill();
     ctx.stroke();
-
-    // Collapse/expand toggle dot
-    ctx.fillStyle = `#6554CB`;
-    ctx.globalAlpha = isHovered ? 0.9 : 0.5;
-    ctx.beginPath();
-    ctx.arc(frameX + 12, frameY + 12, 3.5 / state.canvas.zoom, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // Title
-    ctx.fillStyle = `#6554CB`;
-    ctx.font = `bold ${Math.max(10, 12 / state.canvas.zoom)}px "Inter", system-ui, sans-serif`;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(group.name || 'Group', frameX + 22, frameY + 12);
   }
 }
 
