@@ -91,7 +91,7 @@ function captureFreezeFrame(sourceCardId) {
   frameImage.src = dataURL;
 
   // Generate thumbStrip: repeat the captured frame as filmstrip frames
-  const frameCount = 25; // ~5 frames per second × 5 seconds
+  const frameCount = 8;
   const stripFrameW = Math.round(capCanvas.width * 0.6);
   const stripFrameH = Math.round(capCanvas.height * 0.6);
   const stripGap = 2;
