@@ -337,11 +337,11 @@ function _forwardToFabric(type, e) {
       state.interaction._lastFabricClickTime = now;
       state.interaction._lastFabricClickX = e.clientX;
       state.interaction._lastFabricClickY = e.clientY;
-      // If double-click on already-selected shape, Fabric won't fire
-      // selection:created/updated, so show controls directly
-      if (state.interaction._fabricDblClick && fabricCanvas.getActiveObject()) {
-        _applyFabricControlVisibility();
-      }
+    }
+    // On mouseup after double-click, show controls (Fabric drag has finished)
+    if (type === 'mouseup' && state.interaction._fabricDblClick && fabricCanvas.getActiveObject()) {
+      _applyFabricControlVisibility();
+      fabricCanvas.requestRenderAll();
     }
     // mousedown target: upperCanvasEl (Fabric's handler is bound directly).
     // bubbles: false — no need to bubble since handler is on the target element,
