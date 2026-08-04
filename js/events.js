@@ -1522,12 +1522,22 @@ window.addEventListener('mousemove', (e) => {
       const c = state.cards.find(ca => ca.id === cid);
       if (!c) continue;
       const cw = getCardWidth(c);
-      const ch = (c.type === 'text') ? (c.height || 40) : CARD_HEIGHT;
+      const isVid = c.type === 'video' || c.type === 'synthesized-video';
+      const ch = c.type === 'image' ? (c.height || CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT) :
+                 isVid ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
+                 c.type === 'composition' ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
+                 c.type === 'audio' ? CARD_WAVEFORM_HEIGHT + CARD_LABEL_HEIGHT + 4 :
+                 (c.type === 'text' ? (c.height || 40) : CARD_HEIGHT);
       const cLeft = c.x, cRight = c.x + cw, cBottom = c.y + ch;
       for (const other of state.cards) {
         if (dragIds.has(other.id)) continue;
         const ow = getCardWidth(other);
-        const oh = (other.type === 'text') ? (other.height || 40) : CARD_HEIGHT;
+        const oVid = other.type === 'video' || other.type === 'synthesized-video';
+        const oh = other.type === 'image' ? (other.height || CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT) :
+                   oVid ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
+                   other.type === 'composition' ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
+                   other.type === 'audio' ? CARD_WAVEFORM_HEIGHT + CARD_LABEL_HEIGHT + 4 :
+                   (other.type === 'text' ? (other.height || 40) : CARD_HEIGHT);
         const oLeft = other.x, oRight = other.x + ow, oBottom = other.y + oh;
         // Left/right snap — only if cards are vertically close
         if (Math.abs(c.y - other.y) < CROSS_AXIS_Y) {
