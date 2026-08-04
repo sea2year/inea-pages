@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=73');
+console.log('[inea] render-v4.js v=74');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -595,8 +595,8 @@ function renderCard(card) {
   if (card.type === 'video' || card.type === 'synthesized-video') {
   const ha = state.hoveredAnchor;
   const isConnecting = state.interaction.mode === 'connecting';
-  const isSelected = state.selection.cardIds.includes(card.id);
-  const shouldShowAnchors = isSelected || isConnecting;
+  const isSingleSelected = state.selection.cardIds.length === 1 && state.selection.cardIds[0] === card.id;
+  const shouldShowAnchors = isSingleSelected || isConnecting;
   const anchorR = ANCHOR_RADIUS / state.canvas.zoom;
   const isConnSource = isConnecting &&
   state.interaction.connectingFrom &&
