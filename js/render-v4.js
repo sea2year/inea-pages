@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=72');
+console.log('[inea] render-v4.js v=73');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -1086,8 +1086,8 @@ function renderGroup(group) {
     ctx.stroke();
   }
 
-  // Resize handles for fixed-mode non-collapsed groups (corners only)
-  if (isSelected && !group.collapsed && group.sizingMode === 'fixed') {
+  // Resize handles for fixed-mode non-collapsed groups (corners only) — double-click to show
+  if (isSelected && !group.collapsed && group.sizingMode === 'fixed' && state.interaction._showGroupHandles && state.interaction._showGroupHandles.has(group.id)) {
     const rf = getGroupFrame(group);
     if (rf) {
       const hw = 6 / state.canvas.zoom;
@@ -1719,13 +1719,14 @@ function hitTest(sx, sy) {
   const wy = world.y;
   const zoom = state.canvas.zoom;
 
-  // Check group resize handles for fixed-mode selected groups (highest priority)
+  // Check group resize handles for fixed-mode selected groups (highest priority) — double-click to show
   {
     const handleHitR = 10 / zoom;
     for (let i = state.groups.length - 1; i >= 0; i--) {
       const group = state.groups[i];
       if (group.collapsed || group.sizingMode !== 'fixed') continue;
       if (!state.selection.groupIds.includes(group.id)) continue;
+      if (!state.interaction._showGroupHandles || !state.interaction._showGroupHandles.has(group.id)) continue;
       const grf = getGroupFrame(group);
       if (!grf) continue;
       const handles = [

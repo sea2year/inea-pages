@@ -1061,6 +1061,8 @@ canvasWrap.addEventListener('mousedown', (e) => {
     if (state.interaction._autoPaused) { render(); return; }
     const group = state.groups.find(g => g.id === hit.groupId);
     if (!group) return;
+    // Clear handles on single click
+    state.interaction._showGroupHandles.clear();
     // Double-click to rename
     const groupNow = Date.now();
     const groupPrev = state.interaction._lastGroupClick || 0;
@@ -1093,7 +1095,24 @@ canvasWrap.addEventListener('mousedown', (e) => {
     if (state.interaction._autoPaused) { render(); return; }
     const group2 = state.groups.find(g => g.id === hit.groupId);
     if (!group2) return;
-    // If group not selected, select it first; if already selected (including drill-down), preserve state
+    // Double-click → toggle handles
+    const bodyNow = Date.now();
+    const bodyPrev = state.interaction._lastGroupBodyClick || 0;
+    if (bodyNow - bodyPrev < 400 && state.interaction._lastGroupBodyClickId === group2.id) {
+      state.interaction._showGroupHandles.add(group2.id);
+      if (!state.selection.groupIds.includes(hit.groupId)) {
+        state.selection.groupIds = [hit.groupId];
+        state.selection.cardIds = [];
+        state.selection.connectionIds = [];
+        state.selection.connectionId = null;
+      }
+      render();
+      return;
+    }
+    state.interaction._lastGroupBodyClick = bodyNow;
+    state.interaction._lastGroupBodyClickId = group2.id;
+    // Single click: clear handles, select, drag
+    state.interaction._showGroupHandles.clear();
     if (!state.selection.groupIds.includes(hit.groupId)) {
       state.selection.groupIds = [hit.groupId];
       state.selection.cardIds = [];
@@ -1156,6 +1175,7 @@ canvasWrap.addEventListener('mousedown', (e) => {
   } else {
     // Click on empty canvas
     if (state.interaction._autoPaused) { render(); return; }
+    state.interaction._showGroupHandles.clear();
     // If cards are selected without modifier, deselect them
     if (state.selection.cardIds.length > 0 && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
       state.selection.cardIds = [];
