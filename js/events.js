@@ -2116,7 +2116,17 @@ window.addEventListener('mouseup', (e) => {
         const connId = 'conn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
         let transDur = 0.5;
         const fromEndX = leftCard.x + getCardWidth(leftCard);
-        const gap = rightCard.x - fromEndX;
+        let gap = rightCard.x - fromEndX;
+
+        // Clamp card positions to valid gap range
+        if (gap > MAX_TRANSITION_GAP) {
+          leftCard.x = rightCard.x - getCardWidth(leftCard) - MAX_TRANSITION_GAP;
+          gap = MAX_TRANSITION_GAP;
+        } else if (gap < MIN_TRANSITION_GAP) {
+          rightCard.x = leftCard.x + getCardWidth(leftCard) + MIN_TRANSITION_GAP;
+          gap = MIN_TRANSITION_GAP;
+        }
+
         transDur = Math.max(0.5, Math.min(5, gap / PIXELS_PER_SECOND));
         const isTween = state.interaction._isTweenConnection;
         state.connections.push({
