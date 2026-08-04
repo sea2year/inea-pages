@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=59');
+console.log('[inea] render-v4.js v=60');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2797,6 +2797,96 @@ function startCardLabelEdit(cardId) {
     if (existingCard && el.textContent.trim()) {
       pushUndo();
       existingCard.label = el.textContent.trim();
+    }
+    cleanup();
+    render();
+  };
+
+  const cancel = () => {
+    cleanup();
+    render();
+  };
+
+  el.addEventListener('blur', commit);
+  el.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+    ev.stopPropagation();
+  });
+  el.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    canvasWrap.dispatchEvent(new WheelEvent('wheel', {
+      deltaX: ev.deltaX, deltaY: ev.deltaY, deltaMode: ev.deltaMode,
+      clientX: ev.clientX, clientY: ev.clientY,
+      ctrlKey: ev.ctrlKey, metaKey: ev.metaKey, shiftKey: ev.shiftKey,
+    }));
+  }, { passive: false });
+}
+
+// ================================================================
+// Group label inline editing (double-click on group title)
+// ================================================================
+function startGroupLabelEdit(groupId) {
+  const group = state.groups.find(g => g.id === groupId);
+  if (!group) return;
+
+  // Remove any existing editor first
+  const prev = document.getElementById('__inea-group-label-editor');
+  if (prev) prev.remove();
+
+  const el = document.createElement('div');
+  el.id = '__inea-group-label-editor';
+  el.contentEditable = 'true';
+  el.textContent = group.name || '';
+  el.style.cssText = ''
+    + 'position:fixed;z-index:200;'
+    + 'font-family:"Inter",system-ui,sans-serif;font-weight:700;'
+    + 'color:#6554CB;background:rgba(255,255,255,0.95);'
+    + 'border:1px solid #6554CB;outline:none;'
+    + 'overflow:hidden;white-space:nowrap;box-sizing:border-box;'
+    + 'line-height:1.2;padding:0 4px;border-radius:3px;'
+    + 'min-width:40px;width:fit-content;';
+  document.body.appendChild(el);
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  const reposition = () => {
+    const zoom = state.canvas.zoom;
+    const frame = getGroupFrame(group);
+    if (!frame) { el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    const titleH = frame.titleH || 22;
+    const titleScreenY = (frame.y + titleH) * zoom;
+    const fontSize = Math.max(10, 12 / zoom) * zoom;
+    el.style.fontSize = fontSize + 'px';
+    el.style.left = (frame.x * zoom) + 'px';
+    el.style.bottom = (window.innerHeight - titleScreenY) + 'px';
+    el.style.maxWidth = Math.max(80, frame.w * zoom - 8) + 'px';
+  };
+  reposition();
+
+  let _rafId;
+  const _rafLoop = () => {
+    reposition();
+    _rafId = requestAnimationFrame(_rafLoop);
+  };
+  _rafId = requestAnimationFrame(_rafLoop);
+
+  const cleanup = () => {
+    cancelAnimationFrame(_rafId);
+    el.remove();
+  };
+
+  const commit = () => {
+    const existingGroup = state.groups.find(g => g.id === groupId);
+    if (existingGroup && el.textContent.trim()) {
+      pushUndo();
+      existingGroup.name = el.textContent.trim();
     }
     cleanup();
     render();

@@ -1065,12 +1065,8 @@ canvasWrap.addEventListener('mousedown', (e) => {
     const groupNow = Date.now();
     const groupPrev = state.interaction._lastGroupClick || 0;
     if (groupNow - groupPrev < 400 && state.interaction._lastGroupClickId === group.id) {
-      const newName = prompt('重命名组', group.name);
-      if (newName && newName.trim()) {
-        group.name = newName.trim();
-        render();
-        return;
-      }
+      startGroupLabelEdit(group.id);
+      return;
     }
     state.interaction._lastGroupClick = groupNow;
     state.interaction._lastGroupClickId = group.id;
