@@ -3012,14 +3012,14 @@ function handleContextAction(action, hit) {
       break;
     }
     case 'import-image': {
-      const imgInput = document.createElement('input');
-      imgInput.type = 'file';
-      imgInput.accept = 'image/*';
-      imgInput.multiple = true;
-      imgInput.addEventListener('change', () => {
-        if (imgInput.files.length > 0) importFiles(imgInput.files);
+      _fileInput = document.createElement('input');
+      _fileInput.type = 'file';
+      _fileInput.accept = 'image/*';
+      _fileInput.multiple = true;
+      _fileInput.addEventListener('change', () => {
+        if (_fileInput.files.length > 0) importFiles(_fileInput.files);
       });
-      imgInput.click();
+      _fileInput.click();
       break;
     }
     case 'convert-to-still-video': {
@@ -4198,16 +4198,17 @@ document.addEventListener('drop', (e) => {
 // ================================================================
 // File Import: Button click
 // ================================================================
+let _fileInput = null;
 document.getElementById('btn-import-video').addEventListener('click', () => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'video/*,audio/*,image/*';
-  input.multiple = true;
-  input.addEventListener('change', () => {
-    if (input.files.length > 0) {
-      importFiles(input.files);
+  _fileInput = document.createElement('input');
+  _fileInput.type = 'file';
+  _fileInput.accept = 'video/*,audio/*,image/*';
+  _fileInput.multiple = true;
+  _fileInput.addEventListener('change', () => {
+    if (_fileInput.files.length > 0) {
+      importFiles(_fileInput.files);
     }
   });
-  input.click();
+  _fileInput.click();
 });
 
