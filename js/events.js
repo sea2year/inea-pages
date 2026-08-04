@@ -2217,6 +2217,14 @@ window.addEventListener('mouseup', (e) => {
           gap = MIN_TRANSITION_GAP;
         }
 
+        // Replace any existing outgoing connection from leftCard (auto-switch target)
+        const existingIdx = state.connections.findIndex(c =>
+          c.fromCardId === leftCard.id && c.fromSide === 'right'
+        );
+        if (existingIdx !== -1) {
+          state.connections.splice(existingIdx, 1);
+        }
+
         transDur = Math.max(0.5, Math.min(5, gap / PIXELS_PER_SECOND));
         const isTween = state.interaction._isTweenConnection;
         state.connections.push({
