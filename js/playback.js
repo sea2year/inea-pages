@@ -1415,16 +1415,15 @@ function renderPlayhead() {
   pb._playheadX = px;
   pb._playheadCardId = card.id;
 
-  // Red playhead line — slightly taller than the card content
+  // Red playhead line
   const isVid = card.type === 'video' || card.type === 'synthesized-video';
   const ch = card.type === 'image' ? (card.height || CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT) :
              isVid ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
              card.type === 'composition' ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
              card.type === 'audio' ? CARD_WAVEFORM_HEIGHT + CARD_LABEL_HEIGHT + 4 :
              CARD_HEIGHT;
-  const pad = 6 / state.canvas.zoom;
-  const topY = card.y - pad;
-  const botY = card.y + ch + pad;
+  const topY = card.y;
+  const botY = card.y + ch;
   ctx.strokeStyle = '#FF3333';
   ctx.lineWidth = 2 / state.canvas.zoom;
   ctx.lineCap = 'round';
@@ -1947,9 +1946,8 @@ function renderGroupPlayhead(group, playheadX) {
   const frame = getGroupFrame(group);
   if (!frame) return;
 
-  const pad = 6 / state.canvas.zoom;
-  const topY = frame.y + frame.titleH - pad;
-  const bottomY = frame.y + frame.h + pad;
+  const topY = frame.y + frame.titleH;
+  const bottomY = frame.y + frame.h;
 
   ctx.strokeStyle = '#FF3333';
   ctx.lineWidth = 2 / state.canvas.zoom;
