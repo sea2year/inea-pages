@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=64');
+console.log('[inea] render-v4.js v=65');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2764,13 +2764,14 @@ function startCardLabelEdit(cardId) {
       if (!frame) { el.style.display = 'none'; return; }
       el.style.display = 'flex';
       const titleH = frame.titleH || 22;
-      const s = worldToScreen(frame.x, frame.y + titleH);
+      const s = worldToScreen(frame.x, frame.y);
+      const titleScreenH = titleH * zoom;
       const fontSize = Math.max(10, 12 / zoom) * zoom;
       const editorH = Math.max(16, fontSize * 1.3);
       el.style.fontSize = fontSize + 'px';
       el.style.height = editorH + 'px';
       el.style.left = s.x + 'px';
-      el.style.top = (s.y - editorH) + 'px';
+      el.style.top = (s.y + titleScreenH - editorH) + 'px';
       el.style.maxWidth = Math.max(80, frame.w * zoom - 8) + 'px';
       return;
     }
