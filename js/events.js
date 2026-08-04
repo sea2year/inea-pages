@@ -1306,6 +1306,7 @@ window.addEventListener('mousemove', (e) => {
   }
 
   // Edit box drag-pending → only start actual drag after mouse moves past threshold
+  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-A] at editbox-drag-pending check');
   if (state.interaction.mode === 'editbox-drag-pending') {
     const worldNow = screenToWorld(sx, sy);
     const dx = Math.abs(worldNow.x - state.interaction.dragStartWorld.x);
@@ -1437,6 +1438,7 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
+  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-B] at dragging-card check');
   if (state.interaction.mode === 'dragging-card' && state.interaction.dragMarkerCardId) {
     // Dragging a marker card — constrain to parent card's x range
     const worldNow = screenToWorld(sx, sy);
@@ -1457,6 +1459,7 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
+  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-C] at dragging-card/group/unified check');
   if (state.interaction.mode === 'dragging-card' || state.interaction.mode === 'dragging-group' || state.interaction.mode === 'dragging-unified') {
     const worldNow = screenToWorld(sx, sy);
     let dx = worldNow.x - state.interaction.dragStartWorld.x;
@@ -1620,6 +1623,7 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
+  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-D] at dragging-group-resize check');
   if (state.interaction.mode === 'dragging-group-resize') {
     const group = state.groups.find(g => g.id === state.interaction.targetGroupId);
     if (!group || !state.interaction._resizeStartFrame) return;
@@ -1650,6 +1654,7 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
+  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-E] at trimming check');
   if (state.interaction.mode === 'trimming-left' || state.interaction.mode === 'trimming-right') {
     const card = state.cards.find(c => c.id === state.interaction.targetCardId);
     if (!card) return;
@@ -1708,6 +1713,7 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
+  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-F] at adjusting-volume check');
   if (state.interaction.mode === 'adjusting-volume') {
     const card = state.cards.find(c => c.id === state.interaction.targetCardId);
     if (!card) return;
@@ -1759,6 +1765,7 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
+  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-PRE-EMPTY] about to enter empty-group handler');
   if (state.interaction.mode === 'drawing-empty-group') {
     const world = screenToWorld(sx, sy);
     console.log('[DIAG-EMPTY] reaching empty-group handler, sx=', sx, 'sy=', sy, 'world=', world, 'before=', state.interaction._emptyGroupCurrent);
