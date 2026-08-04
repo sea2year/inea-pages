@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=53');
+console.log('[inea] render-v4.js v=54');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -907,7 +907,10 @@ function getGroupFrame(group) {
     return { x: group.x, y: group.y, w: group.width || 200, h: group.height || 60, titleH: (group.collapsed ? group.height : 22) };
   }
   const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
-  if (memberCards.length === 0) return null;
+  if (memberCards.length === 0) {
+    const titleH = 22;
+    return { x: group.x || 0, y: group.y || 0, w: group.width || 200, h: group.height || 60, titleH };
+  }
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const c of memberCards) {
     const cw = getCardWidth(c);
@@ -1658,6 +1661,24 @@ function renderRubberBand() {
   ctx.fillStyle = 'rgba(212,255,0,0.06)';
   ctx.beginPath();
   ctx.rect(x, y, w, h);
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function renderEmptyGroupPreview() {
+  if (state.interaction.mode !== 'drawing-empty-group') return;
+  const s = state.interaction._emptyGroupStart;
+  const c = state.interaction._emptyGroupCurrent;
+  if (!s || !c) return;
+  const rx = Math.min(s.x, c.x), ry = Math.min(s.y, c.y);
+  const rw = Math.abs(c.x - s.x), rh = Math.abs(c.y - s.y);
+  ctx.fillStyle = 'rgba(101,84,203,0.1)';
+  ctx.strokeStyle = 'rgba(101,84,203,0.6)';
+  ctx.lineWidth = 1.5 / state.canvas.zoom;
+  ctx.setLineDash([6 / state.canvas.zoom, 4 / state.canvas.zoom]);
+  ctx.beginPath();
+  ctx.rect(rx, ry, rw, rh);
   ctx.fill();
   ctx.stroke();
   ctx.setLineDash([]);
@@ -2543,6 +2564,8 @@ function render() {
 
   // 6. Rubber-band selection rectangle (always full opacity)
   renderRubberBand();
+  // 6.5. Empty-group drawing preview
+  renderEmptyGroupPreview();
   // 7. Snap alignment guides (always full opacity)
   renderSnapLines();
   // 8. Line drawing preview (always full opacity during line-tool drag)

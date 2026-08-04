@@ -911,7 +911,10 @@ function getGroupFrame(group) {
     return { x: group.x, y: group.y, w: group.width || 200, h: group.height || 60, titleH: (group.collapsed ? group.height : 22) };
   }
   const memberCards = group.cardIds.map(id => state.cards.find(c => c.id === id)).filter(Boolean);
-  if (memberCards.length === 0) return null;
+  if (memberCards.length === 0) {
+    const titleH = 22;
+    return { x: group.x || 0, y: group.y || 0, w: group.width || 200, h: group.height || 60, titleH };
+  }
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const c of memberCards) {
     const cw = getCardWidth(c);

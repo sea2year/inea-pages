@@ -249,6 +249,16 @@ canvasWrap.addEventListener('mousedown', (e) => {
       return;
     }
 
+    // Empty group tool — drag to create on main canvas
+    if (state.drawingTool === 'empty-group') {
+      if (state.interaction._autoPaused) { render(); return; }
+      state.interaction.mode = 'drawing-empty-group';
+      state.interaction._emptyGroupStart = { x: world.x, y: world.y };
+      state.interaction._emptyGroupCurrent = { x: world.x, y: world.y };
+      render();
+      return;
+    }
+
     return;
   }
 
@@ -1738,6 +1748,13 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
+  if (state.interaction.mode === 'drawing-empty-group') {
+    const world = screenToWorld(sx, sy);
+    state.interaction._emptyGroupCurrent = { x: world.x, y: world.y };
+    render();
+    return;
+  }
+
   if (state.interaction.mode === 'rubber-band') {
     const world = screenToWorld(sx, sy);
     state.interaction._rubberBand.currentX = world.x;
@@ -2211,6 +2228,32 @@ window.addEventListener('mouseup', (e) => {
     state.interaction._isTweenConnection = false;
     state.interaction._connectSnapPos = null;
     canvasWrap.classList.remove('connecting');
+    render();
+    return;
+  }
+
+  if (state.interaction.mode === 'drawing-empty-group') {
+    const s = state.interaction._emptyGroupStart;
+    const c = state.interaction._emptyGroupCurrent;
+    if (s && c) {
+      const rx = Math.min(s.x, c.x), ry = Math.min(s.y, c.y);
+      const rw = Math.abs(c.x - s.x), rh = Math.abs(c.y - s.y);
+      if (rw > 10 && rh > 10) {
+        pushUndo();
+        const id = 'group_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        state.groups.push({
+          id, name: 'Group ' + (state.groups.length + 1),
+          cardIds: [], collapsed: false,
+          sizingMode: 'fixed',
+          x: rx, y: ry,
+          width: rw, height: rh
+        });
+      }
+    }
+    state.interaction.mode = 'idle';
+    state.interaction._emptyGroupStart = null;
+    state.interaction._emptyGroupCurrent = null;
+    setDrawingTool('select');
     render();
     return;
   }
@@ -3402,6 +3445,7 @@ window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyE') { e.preventDefault(); setDrawingTool('ellipse'); return; }
       if (e.code === 'KeyL' && !state.playback.sequence.length) { e.preventDefault(); setDrawingTool('line'); return; }
       if (e.code === 'KeyP' && !state.playback.sequence.length) { e.preventDefault(); setDrawingTool('path'); return; }
+      if (e.code === 'KeyG') { e.preventDefault(); setDrawingTool('empty-group'); return; }
     }
   }
 

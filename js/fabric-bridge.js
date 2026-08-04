@@ -429,7 +429,7 @@ function setDrawingTool(tool) {
   _moveFloatIndicator(tool);
 
   // Shape drawing cursor
-  const shapeTools = ['rect', 'ellipse', 'line', 'path'];
+  const shapeTools = ['rect', 'ellipse', 'line', 'path', 'empty-group'];
   if (shapeTools.includes(tool)) {
     canvasWrap.classList.add('shape-drawing');
   } else {
