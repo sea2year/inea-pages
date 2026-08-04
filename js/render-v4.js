@@ -232,21 +232,12 @@ function renderCard(card) {
 
     // --- Label (outside card body, below) ---
     const labelY = y + audioBodyH;
-    const labelPad = 4 / state.canvas.zoom;
+    const labelPad = 2 / state.canvas.zoom;
 
-    ctx.strokeStyle = colors.border;
-    ctx.lineWidth = 0.5 / state.canvas.zoom;
-    ctx.globalAlpha = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x + 4 / state.canvas.zoom, labelY + labelPad);
-    ctx.lineTo(x + cw - 4 / state.canvas.zoom, labelY + labelPad);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'top';
     ctx.fillStyle = colors.label;
     ctx.font = `700 ${10 / zoom}px "Inter", system-ui, sans-serif`;
-    const labelTextY = labelY + labelPad + CARD_LABEL_HEIGHT / 2;
+    const labelTextY = labelY + labelPad;
     let _label = card.label || '';
     const _maxLabelW = cw - 90;
     while (ctx.measureText(_label).width > _maxLabelW && _label.length > 3) {
@@ -2695,7 +2686,7 @@ function startCardLabelEdit(cardId) {
       el.style.top = (labelScreenY + labelScreenH - editorH) + 'px';
     } else if (isAudio) {
       labelScreenH = 14;
-      labelScreenY = s.y + CARD_WAVEFORM_HEIGHT * zoom + 4;
+      labelScreenY = s.y + CARD_WAVEFORM_HEIGHT * zoom + 2;
       el.style.height = labelScreenH + 'px';
       el.style.top = labelScreenY + 'px';
     } else {
