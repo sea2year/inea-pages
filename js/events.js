@@ -1507,8 +1507,10 @@ window.addEventListener('mousemove', (e) => {
         if (pb2._groupPlayheadX != null) pb2._groupPlayheadX += ddx;
       }
     }
-    // Snap alignment
+    // Snap alignment — only left/right edges (horizontal) and bottom edge (vertical)
     const SNAP = 6 / state.canvas.zoom; // world units
+    const CROSS_AXIS_X = 300; // max horizontal distance for bottom snap
+    const CROSS_AXIS_Y = 200; // max vertical distance for left/right snap
     const dragIds = new Set(state.interaction.cardStartPos.keys());
     const snapLines = [];
     let snapDx = 0, snapDy = 0;
@@ -1517,36 +1519,30 @@ window.addEventListener('mousemove', (e) => {
       if (!c) continue;
       const cw = getCardWidth(c);
       const ch = (c.type === 'text') ? (c.height || 40) : CARD_HEIGHT;
-      const edges = {
-        left: c.x, centerX: c.x + cw / 2, right: c.x + cw,
-        top: c.y, centerY: c.y + ch / 2, bottom: c.y + ch
-      };
+      const cLeft = c.x, cRight = c.x + cw, cBottom = c.y + ch;
       let bestDx = 0, bestDy = 0, bestDistX = SNAP, bestDistY = SNAP;
       for (const other of state.cards) {
         if (dragIds.has(other.id)) continue;
         const ow = getCardWidth(other);
         const oh = (other.type === 'text') ? (other.height || 40) : CARD_HEIGHT;
-        const oEdges = {
-          left: other.x, centerX: other.x + ow / 2, right: other.x + ow,
-          top: other.y, centerY: other.y + oh / 2, bottom: other.y + oh
-        };
-        for (const [ek, ev] of Object.entries(edges)) {
-          for (const [oek, oev] of Object.entries(oEdges)) {
-            if ((ek.startsWith('left') || ek.startsWith('right') || ek.startsWith('centerX')) &&
-                (oek.startsWith('left') || oek.startsWith('right') || oek.startsWith('centerX'))) {
+        const oLeft = other.x, oRight = other.x + ow, oBottom = other.y + oh;
+        // Left/right snap — only if cards are vertically close
+        if (Math.abs(c.y - other.y) < CROSS_AXIS_Y) {
+          for (const ev of [cLeft, cRight]) {
+            for (const oev of [oLeft, oRight]) {
               const dist = Math.abs(ev - oev);
               if (dist < bestDistX) { bestDistX = dist; bestDx = oev - ev; }
             }
-            if ((ek.startsWith('top') || ek.startsWith('bottom') || ek.startsWith('centerY')) &&
-                (oek.startsWith('top') || oek.startsWith('bottom') || oek.startsWith('centerY'))) {
-              const dist = Math.abs(ev - oev);
-              if (dist < bestDistY) { bestDistY = dist; bestDy = oev - ev; }
-            }
           }
+        }
+        // Bottom snap — only if cards are horizontally close
+        if (Math.abs(c.x - other.x) < CROSS_AXIS_X) {
+          const dist = Math.abs(cBottom - oBottom);
+          if (dist < bestDistY) { bestDistY = dist; bestDy = oBottom - cBottom; }
         }
       }
       if (bestDistX < SNAP) { snapDx = bestDx; snapLines.push({ orient: 'v', pos: c.x + bestDx }); }
-      if (bestDistY < SNAP) { snapDy = bestDy; snapLines.push({ orient: 'h', pos: c.y + bestDy }); }
+      if (bestDistY < SNAP) { snapDy = bestDy; snapLines.push({ orient: 'h', pos: c.y + ch + bestDy }); }
     }
     // Apply snap
     if (snapDx !== 0 || snapDy !== 0) {
