@@ -75,7 +75,8 @@ const state = {
     _isTweenConnection: false, // Alt key held during connect => tween connection
     _editingMarkerId: null,    // marker card id being edited (shape overrides)
     dragMarkerCardId: null,    // marker card id being dragged
-    _markerDragStartX: 0       // initial x when dragging marker card
+    _markerDragStartX: 0,      // initial x when dragging marker card
+    _showGroupHandles: new Set(), // group IDs whose resize handles are visible (double-click to toggle)
   },
   hoveredCardId: null,
   hoveredEditBoxId: null,
