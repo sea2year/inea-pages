@@ -59,18 +59,8 @@ function initFabricCanvas() {
   fabricCanvas.on('object:removed', () => { renderLayerList(); });
   fabricCanvas.on('selection:created', () => {
     _syncFabricSelToState();
-    // Only show controls/borders on double-click
-    if (!state.interaction._fabricDblClick) {
-      const sel = fabricCanvas.getActiveObject();
-      if (sel) {
-        if (sel.type === 'activeselection') {
-          sel.getObjects().forEach(o => { o.hasBorders = false; o.hasControls = false; });
-        } else {
-          sel.hasBorders = false;
-          sel.hasControls = false;
-        }
-      }
-    }
+    // Double-click → show controls; single-click → hide
+    _applyFabricControlVisibility();
     renderLayerList();
     updateInspectorForFabricSelection();
     render();
@@ -78,6 +68,10 @@ function initFabricCanvas() {
   });
   fabricCanvas.on('selection:updated', () => {
     _syncFabricSelToState();
+    // Double-click → show controls if not already showing
+    if (state.interaction._fabricDblClick && !state.interaction._fabricShowControls) {
+      _applyFabricControlVisibility();
+    }
     updateInspectorForFabricSelection();
     render();
     fabricCanvas.requestRenderAll();
@@ -87,6 +81,7 @@ function initFabricCanvas() {
     if (!state.interaction._suppressShapeIdSync) {
       state.selection.shapeIds = [];
     }
+    state.interaction._fabricShowControls = false;
     renderLayerList();
     updateInspector();
     render();
@@ -306,6 +301,28 @@ function _restoreFabricShapeSelection() {
 // synchronously trigger render() → syncFabricSizeAndTransform() →
 // event callbacks that try to forward again.
 let _isForwarding = false;
+function _applyFabricControlVisibility() {
+  const sel = fabricCanvas.getActiveObject();
+  if (!sel) return;
+  const show = state.interaction._fabricDblClick;
+  state.interaction._fabricShowControls = show;
+  if (show) {
+    if (sel.type === 'activeselection') {
+      sel.getObjects().forEach(o => { o.hasBorders = true; o.hasControls = true; });
+    } else {
+      sel.hasBorders = true;
+      sel.hasControls = true;
+    }
+  } else {
+    if (sel.type === 'activeselection') {
+      sel.getObjects().forEach(o => { o.hasBorders = false; o.hasControls = false; });
+    } else {
+      sel.hasBorders = false;
+      sel.hasControls = false;
+    }
+  }
+}
+
 function _forwardToFabric(type, e) {
   if (!fabricCanvas || _isForwarding) return;
   _isForwarding = true;
