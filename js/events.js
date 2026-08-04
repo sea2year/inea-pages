@@ -1186,21 +1186,12 @@ canvasWrap.addEventListener('mousedown', (e) => {
 // Input: Mouse move
 // ================================================================
 window.addEventListener('mousemove', (e) => {
-  try {
-  // [DIAG] Trace execution
-  if (state && state.interaction && state.interaction.mode === 'drawing-empty-group') {
-    console.log('[DIAG-TOP] handler entered, mode=drawing-empty-group, e.target=', e.target?.tagName || e.target);
-  }
   // Skip reentrant calls triggered by our own Fabric event forwarding
-  if (typeof _isForwarding !== 'undefined' && _isForwarding) {
-    if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-BLOCK] blocked by _isForwarding');
-    return;
-  }
+  if (typeof _isForwarding !== 'undefined' && _isForwarding) return;
 
   // If Fabric is mid-transform, mid rubber-band selection, or we're in
   // edit-box forwarding mode → forward event to Fabric.
   if (_isFabricBusy() || state.interaction._fabricForwarding) {
-    if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-BLOCK] _isFabricBusy or _fabricForwarding, busy=', _isFabricBusy(), 'fwd=', state.interaction._fabricForwarding);
     _forwardToFabric('mousemove', e);
     // Fall through to 2D rubber-band update if active
   }
@@ -1208,10 +1199,8 @@ window.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
-  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-AFTER-COORDS] sx=', sx, 'sy=', sy);
 
   // Line preview — 2D canvas
-  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-AT-CHECKS] entering mode check chain');
   if (state.interaction.mode === 'drawing-line' && state._drawing) {
     const world = screenToWorld(sx, sy);
     let nx = world.x, ny = world.y;
@@ -1306,7 +1295,7 @@ window.addEventListener('mousemove', (e) => {
   }
 
   // Edit box drag-pending → only start actual drag after mouse moves past threshold
-  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-A] at editbox-drag-pending check');
+
   if (state.interaction.mode === 'editbox-drag-pending') {
     const worldNow = screenToWorld(sx, sy);
     const dx = Math.abs(worldNow.x - state.interaction.dragStartWorld.x);
@@ -1424,7 +1413,8 @@ window.addEventListener('mousemove', (e) => {
   }
 
   // If a drawing tool is active, no hover updates on main canvas
-  if (state.drawingTool !== 'select') return;
+  // (empty-group drawing needs mousemove to update its drag rect)
+  if (state.drawingTool !== 'select' && state.drawingTool !== 'empty-group') return;
 
   if (state.interaction.mode === 'pan') {
     const dx = e.clientX - state.interaction.dragStart.x;
@@ -1438,7 +1428,6 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
-  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-B] at dragging-card check');
   if (state.interaction.mode === 'dragging-card' && state.interaction.dragMarkerCardId) {
     // Dragging a marker card — constrain to parent card's x range
     const worldNow = screenToWorld(sx, sy);
@@ -1459,7 +1448,6 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
-  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-C] at dragging-card/group/unified check');
   if (state.interaction.mode === 'dragging-card' || state.interaction.mode === 'dragging-group' || state.interaction.mode === 'dragging-unified') {
     const worldNow = screenToWorld(sx, sy);
     let dx = worldNow.x - state.interaction.dragStartWorld.x;
@@ -1623,7 +1611,6 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
-  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-D] at dragging-group-resize check');
   if (state.interaction.mode === 'dragging-group-resize') {
     const group = state.groups.find(g => g.id === state.interaction.targetGroupId);
     if (!group || !state.interaction._resizeStartFrame) return;
@@ -1654,7 +1641,6 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
-  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-E] at trimming check');
   if (state.interaction.mode === 'trimming-left' || state.interaction.mode === 'trimming-right') {
     const card = state.cards.find(c => c.id === state.interaction.targetCardId);
     if (!card) return;
@@ -1713,7 +1699,6 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
-  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-CKPT-F] at adjusting-volume check');
   if (state.interaction.mode === 'adjusting-volume') {
     const card = state.cards.find(c => c.id === state.interaction.targetCardId);
     if (!card) return;
@@ -1765,12 +1750,9 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
-  if (state.interaction.mode === 'drawing-empty-group') console.log('[DIAG-PRE-EMPTY] about to enter empty-group handler');
   if (state.interaction.mode === 'drawing-empty-group') {
     const world = screenToWorld(sx, sy);
-    console.log('[DIAG-EMPTY] reaching empty-group handler, sx=', sx, 'sy=', sy, 'world=', world, 'before=', state.interaction._emptyGroupCurrent);
     state.interaction._emptyGroupCurrent = { x: world.x, y: world.y };
-    console.log('[DIAG-EMPTY] after update=', state.interaction._emptyGroupCurrent);
     render();
     return;
   }
@@ -1938,9 +1920,6 @@ window.addEventListener('mousemove', (e) => {
   } else {
     _setCanvasCursor('default');
   }
-} catch (err) {
-  console.error('[DIAG-CRASH] mousemove handler error:', err);
-}
 });
 
 // ================================================================
