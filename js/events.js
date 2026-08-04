@@ -2574,6 +2574,7 @@ function showContextMenu(clientX, clientY, hit) {
     // Group selected
     const group = state.groups.find(g => g.id === hit.groupId);
     if (group) {
+      html += `<div class="cm-item" data-action="copy">复制</div>`;
       html += `<div class="cm-item" data-action="ungroup">取消分组</div>`;
       html += `<div class="cm-sep"></div>`;
       html += `<div class="cm-item${state.clipboard ? '' : ' disabled'}" data-action="paste">粘贴</div>`;
@@ -2688,27 +2689,116 @@ function cloneCardData(card) {
       markers: (card.markers || []).map(m => ({ ...m }))
     });
   }
+  if (card.type === 'synthesized-video' || card.type === 'composition') {
+    Object.assign(base, {
+      file: card.file,
+      fileURL: card.fileURL,
+      trimIn: card.trimIn,
+      trimOut: card.trimOut,
+      volume: card.volume || 1,
+      duration: card.duration,
+      createdAt: card.createdAt,
+      fadeIn: card.fadeIn || 0,
+      fadeOut: card.fadeOut || 0,
+      markers: (card.markers || []).map(m => ({ ...m })),
+      editBoxChain: card.editBoxChain ? [...card.editBoxChain] : undefined,
+      _synthesizedDataURL: card._synthesizedDataURL || null,
+      _synthesized: card._synthesized || false,
+      totalDuration: card.totalDuration
+    });
+  }
   return base;
 }
 
 function handleContextAction(action, hit) {
   switch (action) {
     case 'copy': {
-      const card = state.cards.find(c => c.id === hit.cardId);
-      if (!card) break;
-      state.clipboard = { type: 'card', cardData: cloneCardData(card) };
+      if (hit.groupId) {
+        const group = state.groups.find(g => g.id === hit.groupId);
+        if (!group) break;
+        const groupCards = group.cardIds.map(cid => state.cards.find(c => c.id === cid)).filter(Boolean);
+        const cardDataList = groupCards.map(c => cloneCardData(c));
+        // Copy internal connections (both ends are cards in this group)
+        const cardIdSet = new Set(group.cardIds);
+        const internalConns = state.connections
+          .filter(c => c.fromCardId && c.toCardId && cardIdSet.has(c.fromCardId) && cardIdSet.has(c.toCardId))
+          .map(c => ({ ...c }));
+        state.clipboard = {
+          type: 'group',
+          groupData: {
+            name: group.name,
+            cardIds: group.cardIds,
+            sizingMode: group.sizingMode,
+            collapsed: group.collapsed,
+            x: group.x, y: group.y,
+            width: group.width, height: group.height
+          },
+          cardDataList,
+          connections: internalConns
+        };
+      } else {
+        const card = state.cards.find(c => c.id === hit.cardId);
+        if (!card) break;
+        state.clipboard = { type: 'card', cardData: cloneCardData(card) };
+      }
       break;
     }
     case 'paste': {
       pushUndo();
-      if (!state.clipboard || state.clipboard.type !== 'card') break;
-      const src = state.clipboard.cardData;
-      const newCard = cloneCardData(src);
-      newCard.id = 'card_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-      newCard.x = (src.x || 0) + 40;
-      newCard.y = (src.y || 0) + 40;
-      state.cards.push(newCard);
-      render();
+      if (!state.clipboard) break;
+      if (state.clipboard.type === 'group') {
+        const { groupData, cardDataList, connections } = state.clipboard;
+        // Build oldId -> newId map
+        const idMap = {};
+        const newCards = cardDataList.map(src => {
+          const newCard = cloneCardData(src);
+          const newId = 'card_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+          idMap[src.id] = newId;
+          newCard.id = newId;
+          return newCard;
+        });
+        // Compute offset from group stored position or card bounding box
+        const baseX = cardDataList.length > 0
+          ? Math.min(...cardDataList.map(c => c.x))
+          : (groupData.x || 0);
+        const baseY = cardDataList.length > 0
+          ? Math.min(...cardDataList.map(c => c.y))
+          : (groupData.y || 0);
+        const dx = (baseX + 40) - baseX;
+        const dy = (baseY + 40) - baseY;
+        newCards.forEach(c => { c.x += dx; c.y += dy; });
+        state.cards.push(...newCards);
+        // Create new group
+        const newGroupId = 'group_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        state.groups.push({
+          id: newGroupId,
+          name: groupData.name + ' (copy)',
+          cardIds: groupData.cardIds.map(oldId => idMap[oldId]).filter(Boolean),
+          collapsed: groupData.collapsed,
+          sizingMode: groupData.sizingMode,
+          x: (groupData.x || baseX) + dx,
+          y: (groupData.y || baseY) + dy,
+          width: groupData.width,
+          height: groupData.height
+        });
+        // Copy internal connections with remapped IDs
+        const newConns = connections.map(c => ({
+          ...c,
+          id: 'conn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          fromCardId: idMap[c.fromCardId],
+          toCardId: idMap[c.toCardId]
+        })).filter(c => c.fromCardId && c.toCardId);
+        state.connections.push(...newConns);
+        render();
+      } else if (state.clipboard.type === 'card') {
+        const src = state.clipboard.cardData;
+        const newCard = cloneCardData(src);
+        newCard.id = 'card_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        newCard.x = (src.x || 0) + 40;
+        newCard.y = (src.y || 0) + 40;
+        state.cards.push(newCard);
+        render();
+      }
       break;
     }
     case 'rename': {
