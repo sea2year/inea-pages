@@ -91,7 +91,7 @@ function captureFreezeFrame(sourceCardId) {
   frameImage.src = dataURL;
 
   // Generate thumbStrip: same dimensions as video card thumbnails
-  const frameCount = 8;
+  const frameCount = Math.min(THUMBNAIL_COUNT, Math.max(3, Math.floor(freezeDuration / 2)));
   const frameW = 240;
   const frameH = 136;
   const stripW2 = frameW * frameCount;
