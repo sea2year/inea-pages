@@ -75,7 +75,6 @@ function initFabricCanvas() {
     if (!state.interaction._suppressShapeIdSync) {
       state.selection.shapeIds = [];
     }
-    state.interaction._fabricShowControls = false;
     renderLayerList();
     updateInspector();
     render();
@@ -295,40 +294,10 @@ function _restoreFabricShapeSelection() {
 // synchronously trigger render() → syncFabricSizeAndTransform() →
 // event callbacks that try to forward again.
 let _isForwarding = false;
-
-function _hideFabricControls() {
-  if (state.interaction._fabricShowControls) return; // double-click cancelled it
-  const sel = fabricCanvas.getActiveObject();
-  if (!sel) return;
-  if (sel.type === 'activeselection') {
-    sel.getObjects().forEach(o => { o.hasBorders = false; o.hasControls = false; });
-  } else {
-    sel.hasBorders = false;
-    sel.hasControls = false;
-  }
-  fabricCanvas.requestRenderAll();
-}
-
 function _forwardToFabric(type, e) {
   if (!fabricCanvas || _isForwarding) return;
   _isForwarding = true;
   try {
-    if (type === 'mousedown') {
-      const now = Date.now();
-      const dx = Math.abs(e.clientX - (state.interaction._lastFabricClickX || 0));
-      const dy = Math.abs(e.clientY - (state.interaction._lastFabricClickY || 0));
-      const dt = now - (state.interaction._lastFabricClickTime || 0);
-      const isDbl = (dt < 400 && dx < 10 && dy < 10);
-      state.interaction._lastFabricClickTime = now;
-      state.interaction._lastFabricClickX = e.clientX;
-      state.interaction._lastFabricClickY = e.clientY;
-      if (isDbl) {
-        state.interaction._fabricShowControls = true;
-      } else {
-        // Single click: hide controls after Fabric finishes selection
-        setTimeout(() => _hideFabricControls(), 0);
-      }
-    }
     // mousedown target: upperCanvasEl (Fabric's handler is bound directly).
     // bubbles: false — no need to bubble since handler is on the target element,
     // and this prevents re-entering canvasWrap's mousedown handler.

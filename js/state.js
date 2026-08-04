@@ -75,13 +75,7 @@ const state = {
     _isTweenConnection: false, // Alt key held during connect => tween connection
     _editingMarkerId: null,    // marker card id being edited (shape overrides)
     dragMarkerCardId: null,    // marker card id being dragged
-    _markerDragStartX: 0,      // initial x when dragging marker card
-    _showGroupHandles: new Set(), // group IDs whose resize handles are visible (double-click to toggle)
-    _lastFabricClickTime: 0,    // for Fabric double-click detection
-    _lastFabricClickX: 0,
-    _lastFabricClickY: 0,
-    _fabricDblClick: false,     // true when last Fabric click was a double-click
-    _fabricShowControls: false, // persist show-controls state across selection events
+    _markerDragStartX: 0       // initial x when dragging marker card
   },
   hoveredCardId: null,
   hoveredEditBoxId: null,
