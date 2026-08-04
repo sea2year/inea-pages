@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=36');
+console.log('[inea] render-v4.js v=37');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -49,7 +49,7 @@ function renderCard(card) {
   const ch = card.type === 'image' ? (card.height || CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT) :
              isVideoLike ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
              (card.type === 'composition') ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT :
-             card.type === 'audio' ? 41 : CARD_HEIGHT;
+             card.type === 'audio' ? CARD_WAVEFORM_HEIGHT + CARD_LABEL_HEIGHT + 4 : CARD_HEIGHT;
   const x = card.x;
   const y = card.y;
   const r = 10; // Figma cornerRadius
@@ -61,7 +61,7 @@ function renderCard(card) {
   const contentY = y + CARD_LABEL_HEIGHT;
   // Figma: card body (background, border, clip) is just the thumbnail; label floats above
   const bodyY = isVideoLike ? contentY : y;
-  const bodyH = isVideoLike ? CARD_THUMB_HEIGHT : ch;
+  const bodyH = isVideoLike ? CARD_THUMB_HEIGHT : (card.type === 'audio' ? CARD_WAVEFORM_HEIGHT : ch);
 
   // --- Image cards: pure image, no frame ---
   if (card.type === 'image') {
@@ -171,10 +171,10 @@ function renderCard(card) {
   ctx.clip();
 
   if (card.type === 'audio') {
-    // ===== AudioCard (Figma BGM: 41px, waveform content + bottom label row) =====
-    const audioContentH = 18;
+    // ===== Audio/BGM Card: waveform-only body, label below =====
+    const audioBodyH = CARD_WAVEFORM_HEIGHT; // 28px
 
-    // BGM badge (Figma: pink pill, top-right, 31x13)
+    // BGM badge (top-right)
     const badgeW = 31, badgeH = 13;
     const badgeX = x + cw - badgeW - 5;
     const badgeY = y + 3;
@@ -193,7 +193,7 @@ function renderCard(card) {
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
 
-    // Waveform bars — fill content area with exaggerated peaks
+    // Waveform bars
     const wfPad = 4;
     const barGap = 0.5;
     const barW = 1.5;
@@ -201,8 +201,8 @@ function renderCard(card) {
     if (card.waveform && card.waveform.length > 0) {
       const peaks = card.waveform;
       const barCount = Math.floor(wfContentW / (barW + barGap));
-      const maxBarH = audioContentH - 2;
-      const barCenterY = y + (ch - 13) / 2; // centered between top border and separator
+      const maxBarH = audioBodyH - 10;
+      const barCenterY = y + audioBodyH / 2;
       const trimStart = card.trimIn / (card.duration || 1);
       const trimEnd = card.trimOut / (card.duration || 1);
       for (let i = 0; i < barCount; i++) {
@@ -217,25 +217,37 @@ function renderCard(card) {
       ctx.strokeStyle = '#f0d0d5';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      const placeLineY = y + (ch - 13) / 2;
-      ctx.moveTo(x + 12, placeLineY);
-      ctx.lineTo(x + cw - 12, placeLineY);
+      ctx.moveTo(x + 12, y + audioBodyH / 2);
+      ctx.lineTo(x + cw - 12, y + audioBodyH / 2);
       ctx.stroke();
     }
 
-    // Label at card top (Figma: title above thumbnail)
-    const labelTextY = y + CARD_LABEL_HEIGHT;
+    // Accent bars (left/right edges)
+    const _handleW = 11;
+    ctx.fillStyle = colors.border;
+    ctx.fillRect(x, y, _handleW, audioBodyH);
+    ctx.fillRect(x + cw - _handleW, y, _handleW, audioBodyH);
+
+    ctx.restore(); // End card body clip
+
+    // --- Label (outside card body, below) ---
+    const labelY = y + audioBodyH;
+    const labelPad = 4 / state.canvas.zoom;
+
     ctx.strokeStyle = colors.border;
     ctx.lineWidth = 0.5 / state.canvas.zoom;
+    ctx.globalAlpha = 0.5;
     ctx.beginPath();
-    ctx.moveTo(x + 13, y + CARD_LABEL_HEIGHT);
-    ctx.lineTo(x + cw - 13, y + CARD_LABEL_HEIGHT);
+    ctx.moveTo(x + 4 / state.canvas.zoom, labelY + labelPad);
+    ctx.lineTo(x + cw - 4 / state.canvas.zoom, labelY + labelPad);
     ctx.stroke();
+    ctx.globalAlpha = 1;
 
-    ctx.textBaseline = 'bottom';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = colors.label;
     ctx.font = `700 ${10 / zoom}px "Inter", system-ui, sans-serif`;
-    let _label = card.label;
+    const labelTextY = labelY + labelPad + CARD_LABEL_HEIGHT / 2;
+    let _label = card.label || '';
     const _maxLabelW = cw - 90;
     while (ctx.measureText(_label).width > _maxLabelW && _label.length > 3) {
       _label = _label.slice(0, -4) + '...';
@@ -251,14 +263,6 @@ function renderCard(card) {
       ctx.fillText(formatTime(dur), _labelX + _labelW + 8, labelTextY);
     }
     ctx.textBaseline = 'alphabetic';
-
-    // Pink handles (Figma: left/right 11px bars)
-    const _handleW = 11;
-    ctx.fillStyle = colors.border;
-    ctx.fillRect(x, y, _handleW, ch);
-    ctx.fillRect(x + cw - _handleW, y, _handleW, ch);
-
-    ctx.restore();
 
   } else if (card.type === 'text') {
     // ===== Text card content =====
@@ -1744,7 +1748,7 @@ function hitTest(sx, sy) {
     const cw = getCardWidth(card);
     const isVideo = card.type === 'video' || card.type === 'synthesized-video';
     const overflowH = isVideo ? Math.max(0, 14 / state.canvas.zoom - CARD_LABEL_HEIGHT) : 0;
-    const ch = isVideo ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT : CARD_HEIGHT;
+    const ch = isVideo ? CARD_THUMB_HEIGHT + CARD_LABEL_HEIGHT : (card.type === 'audio' ? CARD_WAVEFORM_HEIGHT + CARD_LABEL_HEIGHT + 4 : CARD_HEIGHT);
     const trimHitWorld = TRIM_HIT / state.canvas.zoom;
     const anchorHitWorld = ANCHOR_HIT_R / state.canvas.zoom;
 
@@ -1886,7 +1890,7 @@ function hitTest(sx, sy) {
 
       // Volume slider area (left side, vertical)
       const wfY = card.type === 'audio' ? card.y : card.y + CARD_THUMB_HEIGHT;
-      const wfH = card.type === 'audio' ? 41 : CARD_WAVEFORM_HEIGHT;
+      const wfH = CARD_WAVEFORM_HEIGHT;
       const volAreaW = 22; // width of volume control area on left
 
       if (wx >= card.x && wx <= card.x + volAreaW && wy >= wfY && wy <= wfY + wfH) {
@@ -1899,8 +1903,8 @@ function hitTest(sx, sy) {
         }
         return { type: 'volume', cardId: card.id };
       }
-      // Audio label region (bottom strip, 13px tall)
-      if (card.type === 'audio' && wy >= card.y + ch - 13) {
+      // Audio label region (below card body)
+      if (card.type === 'audio' && wy >= card.y + CARD_WAVEFORM_HEIGHT) {
         return { type: 'card-label', cardId: card.id };
       }
       // Card body
@@ -2691,7 +2695,7 @@ function startCardLabelEdit(cardId) {
       el.style.top = (labelScreenY + labelScreenH - editorH) + 'px';
     } else if (isAudio) {
       labelScreenH = 14;
-      labelScreenY = s.y + (41 - 13) * zoom;
+      labelScreenY = s.y + CARD_WAVEFORM_HEIGHT * zoom + 4;
       el.style.height = labelScreenH + 'px';
       el.style.top = labelScreenY + 'px';
     } else {
