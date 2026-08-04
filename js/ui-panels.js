@@ -1681,7 +1681,8 @@ function _easingSelect(id, currentVal) {
 }
 
 function updateInspector() {
-  if (document.activeElement && document.activeElement.closest('#props-content')) return;
+  console.log('[DEBUG] updateInspector called, activeElement=', document.activeElement?.tagName, document.activeElement?.id);
+  if (document.activeElement && document.activeElement.closest('#props-content')) { console.log('[DEBUG] updateInspector BLOCKED by focus guard'); return; }
 
   // Line shape (2D canvas)
   if (state.selection.shapeId) {
@@ -1940,6 +1941,7 @@ function updateInspector() {
     if (state.selection.groupIds.length > 0) {
       const group = state.groups.find(g => g.id === state.selection.groupIds[0]);
       if (group) {
+        console.log('[DEBUG] updateInspector group section: group.name=', group.name, 'group.sizingMode=', group.sizingMode);
         const mode = group.sizingMode || 'fit';
         const memberCount = group.cardIds.length;
         const infoHtml = _row('名称', `<input type="text" id="insp-group-name" value="${escAttr(group.name || '')}">`) +
@@ -1970,6 +1972,7 @@ function updateInspector() {
           const fixedBtn = propsContent.querySelector('#insp-group-fixed');
           if (fitBtn) {
             fitBtn.addEventListener('click', () => {
+              console.log('[DEBUG] 适应按钮被点击, before: sizingMode=', group.sizingMode);
               if (group.sizingMode === 'fit') return;
               pushUndo();
               group.sizingMode = 'fit';
