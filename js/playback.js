@@ -90,19 +90,19 @@ function captureFreezeFrame(sourceCardId) {
   const frameImage = new Image();
   frameImage.src = dataURL;
 
-  // Generate thumbStrip: repeat the captured frame as filmstrip frames
+  // Generate thumbStrip: same dimensions as video card thumbnails
   const frameCount = 8;
-  const stripFrameW = Math.round(capCanvas.width * 0.6);
-  const stripFrameH = Math.round(capCanvas.height * 0.6);
-  const stripGap = 2;
-  const stripW = frameCount * (stripFrameW + stripGap);
+  const frameW = 240;
+  const frameH = 136;
+  const stripW2 = frameW * frameCount;
   const stripCanvas = document.createElement('canvas');
-  stripCanvas.width = stripW;
-  stripCanvas.height = stripFrameH;
+  stripCanvas.width = stripW2;
+  stripCanvas.height = frameH;
   const sctx = stripCanvas.getContext('2d');
+  sctx.fillStyle = '#3a3a3a';
+  sctx.fillRect(0, 0, stripW2, frameH);
   for (let i = 0; i < frameCount; i++) {
-    const fx = i * (stripFrameW + stripGap);
-    sctx.drawImage(capCanvas, fx, 0, stripFrameW, stripFrameH);
+    sctx.drawImage(capCanvas, i * frameW, 0, frameW, frameH);
   }
   const thumbStrip = stripCanvas;
 
