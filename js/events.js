@@ -1065,7 +1065,7 @@ canvasWrap.addEventListener('mousedown', (e) => {
     const groupNow = Date.now();
     const groupPrev = state.interaction._lastGroupClick || 0;
     if (groupNow - groupPrev < 400 && state.interaction._lastGroupClickId === group.id) {
-      startGroupLabelEdit(group.id);
+      startCardLabelEdit(group.id);
       return;
     }
     state.interaction._lastGroupClick = groupNow;

@@ -1,7 +1,7 @@
 // ================================================================
 // Rendering: Dot pattern background (Figma "画板页")
 // ================================================================
-console.log('[inea] render-v4.js v=61');
+console.log('[inea] render-v4.js v=62');
 function renderGrid() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width / dpr;
@@ -2718,12 +2718,15 @@ function startTextCardEdit(cardId) {
 // ================================================================
 function startCardLabelEdit(cardId) {
   const card = state.cards.find(c => c.id === cardId);
-  if (!card) return;
+  const group = state.groups.find(g => g.id === cardId);
+  const isGroup = !!group;
 
-  const isVideo = card.type === 'video' || card.type === 'synthesized-video';
-  const isAudio = card.type === 'audio';
-  const isComp = card.type === 'composition';
-  if (!isVideo && !isAudio && !isComp) return;
+  if (!card && !isGroup) return;
+
+  const isVideo = card && (card.type === 'video' || card.type === 'synthesized-video');
+  const isAudio = card && card.type === 'audio';
+  const isComp = card && card.type === 'composition';
+  if (!isVideo && !isAudio && !isComp && !isGroup) return;
 
   // Remove any existing editor first
   const prev = document.getElementById('__inea-label-editor');
@@ -2732,12 +2735,14 @@ function startCardLabelEdit(cardId) {
   const el = document.createElement('div');
   el.id = '__inea-label-editor';
   el.contentEditable = 'true';
-  el.textContent = card.label || '';
+  el.textContent = isGroup ? (group.name || '') : (card.label || '');
   el.style.cssText = ''
     + 'position:fixed;z-index:200;'
     + 'font-family:"Inter",system-ui,sans-serif;font-weight:700;'
-    + 'color:#000;background:#fff;'
-    + 'border:1px solid #aaa;outline:none;'
+    + 'color:' + (isGroup ? '#6554CB' : '#000') + ';'
+    + 'background:' + (isGroup ? 'rgba(255,255,255,0.95)' : '#fff') + ';'
+    + 'border:1px solid ' + (isGroup ? '#6554CB' : '#aaa') + ';'
+    + 'outline:none;'
     + 'overflow:hidden;white-space:nowrap;box-sizing:border-box;'
     + 'font-size:10px;line-height:1.2;'
     + 'padding:0 4px;border-radius:3px;'
@@ -2753,13 +2758,29 @@ function startCardLabelEdit(cardId) {
 
   const reposition = () => {
     const zoom = state.canvas.zoom;
+
+    if (isGroup) {
+      const frame = getGroupFrame(group);
+      if (!frame) { el.style.display = 'none'; return; }
+      el.style.display = 'flex';
+      const titleH = frame.titleH || 22;
+      const s = worldToScreen(frame.x, frame.y + titleH);
+      const fontSize = Math.max(10, 12 / zoom) * zoom;
+      const editorH = Math.max(16, fontSize * 1.3);
+      el.style.fontSize = fontSize + 'px';
+      el.style.height = editorH + 'px';
+      el.style.left = s.x + 'px';
+      el.style.top = (s.y - editorH) + 'px';
+      el.style.maxWidth = Math.max(80, frame.w * zoom - 8) + 'px';
+      return;
+    }
+
     const s = worldToScreen(card.x, card.y);
     let labelScreenH, labelScreenY;
 
     if (isVideo) {
       labelScreenH = Math.round(Math.max(CARD_LABEL_HEIGHT * zoom, 14));
       labelScreenY = s.y - Math.max(0, 14 - CARD_LABEL_HEIGHT * zoom);
-      // Cap editor height: fill label area up to 100% zoom, lock at 14px beyond
       const editorH = Math.min(labelScreenH, 14);
       el.style.height = editorH + 'px';
       el.style.top = (labelScreenY + labelScreenH - editorH) + 'px';
@@ -2793,102 +2814,18 @@ function startCardLabelEdit(cardId) {
   };
 
   const commit = () => {
-    const existingCard = state.cards.find(c => c.id === cardId);
-    if (existingCard && el.textContent.trim()) {
-      pushUndo();
-      existingCard.label = el.textContent.trim();
-    }
-    cleanup();
-    render();
-  };
-
-  const cancel = () => {
-    cleanup();
-    render();
-  };
-
-  el.addEventListener('blur', commit);
-  el.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
-    if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
-    ev.stopPropagation();
-  });
-  el.addEventListener('wheel', (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    canvasWrap.dispatchEvent(new WheelEvent('wheel', {
-      deltaX: ev.deltaX, deltaY: ev.deltaY, deltaMode: ev.deltaMode,
-      clientX: ev.clientX, clientY: ev.clientY,
-      ctrlKey: ev.ctrlKey, metaKey: ev.metaKey, shiftKey: ev.shiftKey,
-    }));
-  }, { passive: false });
-}
-
-// ================================================================
-// Group label inline editing (double-click on group title)
-// ================================================================
-function startGroupLabelEdit(groupId) {
-  const group = state.groups.find(g => g.id === groupId);
-  if (!group) return;
-
-  // Remove any existing editor first
-  const prev = document.getElementById('__inea-group-label-editor');
-  if (prev) prev.remove();
-
-  const el = document.createElement('div');
-  el.id = '__inea-group-label-editor';
-  el.contentEditable = 'true';
-  el.textContent = group.name || '';
-  el.style.cssText = ''
-    + 'position:fixed;z-index:200;'
-    + 'font-family:"Inter",system-ui,sans-serif;font-weight:700;'
-    + 'color:#6554CB;background:rgba(255,255,255,0.95);'
-    + 'border:1px solid #6554CB;outline:none;'
-    + 'overflow:hidden;white-space:nowrap;box-sizing:border-box;'
-    + 'line-height:1.2;padding:0 4px;border-radius:3px;'
-    + 'min-width:40px;width:fit-content;';
-  document.body.appendChild(el);
-  el.focus();
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-
-  const reposition = () => {
-    const zoom = state.canvas.zoom;
-    const frame = getGroupFrame(group);
-    if (!frame) { el.style.display = 'none'; return; }
-    el.style.display = 'flex';
-    const titleH = frame.titleH || 22;
-    const s = worldToScreen(frame.x, frame.y + titleH);
-    const fontSize = Math.max(10, 12 / zoom) * zoom;
-    const editorH = Math.max(16, fontSize * 1.3);
-    el.style.fontSize = fontSize + 'px';
-    el.style.height = editorH + 'px';
-    el.style.left = s.x + 'px';
-    el.style.top = (s.y - editorH) + 'px';
-    el.style.maxWidth = Math.max(80, frame.w * zoom - 8) + 'px';
-  };
-  reposition();
-
-  let _rafId;
-  const _rafLoop = () => {
-    reposition();
-    _rafId = requestAnimationFrame(_rafLoop);
-  };
-  _rafId = requestAnimationFrame(_rafLoop);
-
-  const cleanup = () => {
-    cancelAnimationFrame(_rafId);
-    el.remove();
-  };
-
-  const commit = () => {
-    const existingGroup = state.groups.find(g => g.id === groupId);
-    if (existingGroup && el.textContent.trim()) {
-      pushUndo();
-      existingGroup.name = el.textContent.trim();
+    if (isGroup) {
+      const existingGroup = state.groups.find(g => g.id === cardId);
+      if (existingGroup && el.textContent.trim()) {
+        pushUndo();
+        existingGroup.name = el.textContent.trim();
+      }
+    } else {
+      const existingCard = state.cards.find(c => c.id === cardId);
+      if (existingCard && el.textContent.trim()) {
+        pushUndo();
+        existingCard.label = el.textContent.trim();
+      }
     }
     cleanup();
     render();
